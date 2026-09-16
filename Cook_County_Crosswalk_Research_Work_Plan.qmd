@@ -30,21 +30,20 @@ The project has four integrated aims:
 
 ## Project Team & Roles
 
+This project is staffed by a two-person team. All responsibilities from the broader reference methodology are consolidated into these two roles; there are no separate GIS engineer, ML engineer, statistician, research assistant, or compliance positions.
+
 | Role | Responsibility |
 |------------------------------------|------------------------------------|
-| PI / Co-PI | Overall direction, methodology oversight, dissemination |
-| GIS/Data Engineer | OSM extraction, tile-download pipeline, cloud infrastructure management |
-| ML Engineer | SAM fine-tuning/inference, grow-cut algorithm adaptation and QA |
-| Data Analyst(s) (2) | ADI/demographic data assembly; FARS and EMS data cleaning and merging |
-| Statistician/Quant lead | Spatial and statistical modeling (Aims 2–4) |
-| Research Assistant(s) | Manual QA/validation sampling, municipal boundary reconciliation, literature review |
-| Data Governance/Compliance | EMS data use agreements, IRB/data-sharing review if needed |
+| PI / GIS, ML & Data Governance Lead | Overall direction and methodology oversight; OSM extraction and tile-download pipeline; cloud infrastructure provisioning and management; SAM fine-tuning/inference and grow-cut algorithm adaptation and QA; data governance and compliance (EMS data-use agreements, IRB/data-sharing review if needed); dissemination |
+| Data Analyst / Statistician & Quant Lead | Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance |
+
+**Capacity note:** the reference methodology (national 100-city study) assumed a larger team (separate GIS engineer, ML engineer, two data analysts, a statistician, research assistants, and a compliance contact). Concentrating all of that work in two people means Phase 1 (segmentation pipeline) will consume most of the PI/Technical Lead's time, and Phases 2–4 (statistical modeling across three aims) will consume most of the Analyst/Quant Lead's time nearly back-to-back. Build schedule slack into Phase 0 and expect the Integrated Timeline below to compress or extend depending on how much the two roles can work in parallel versus sequentially.
 
 ------------------------------------------------------------------------
 
 ## Phase 0 — Project Setup and Data Scoping (Weeks 1–4)
 
-**Tasks** - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago's \~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Select and provision cloud computing vendor (e.g., Modal, AWS, GCP, Azure) for GPU-based SAM inference and parallelized "serverless" tile-fetch workers; benchmark cost per 1,000 tiles fetched/segmented before committing to full run. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.
+**Tasks** - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago's \~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Size and provision the team's existing scalable cloud server for the segmentation pipeline: add/upgrade a GPU-enabled instance for SAM inference and configure parallel CPU worker processes for tile fetch; run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.
 
 **Deliverables:** finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.
 
@@ -76,6 +75,34 @@ The project has four integrated aims:
 **Deliverables:** suburban Cook County crossing-distance dataset (parcel of comparable structure/fields to the Chicago dataset); combined Cook County (city + suburban) crossing dataset; validation/accuracy report; updated codebase documentation.
 
 **Key risk:** OSM crossing-edge sparsity in lower-density suburbs may undercount true crossings relative to Chicago. *Mitigation:* supplement with municipal GIS crosswalk inventories where available; flag municipalities with low OSM crossing density for interpretive caution in Aim 2.
+
+------------------------------------------------------------------------
+
+## Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)
+
+Phase 1 is the only phase in this project that requires cloud GPU compute; Phases 0, 2, 3, and 4 work with municipal-, block-group-, or point-level tabular/vector data and are sized for a local analyst workstation (no GPU required).
+
+**Software stack (single Linux GPU server):**
+
+-   Ubuntu 22.04 LTS + current NVIDIA driver, CUDA, and cuDNN matched to the PyTorch build in use.
+-   Python 3.11 environment (conda or venv) with PyTorch (CUDA build), the SAM 2.1 codebase and fine-tuned checkpoint, and the existing grow-cut implementation.
+-   OSMnx, GeoPandas, Shapely, Fiona, pyproj for intersection/crossing-edge extraction and post-processing.
+-   Async HTTP client (e.g., `httpx`/`aiohttp`) plus a process pool for parallel Google Maps Tile API fetches, decoupled from the GPU inference step (fetch is network/API-bound, inference is GPU-bound — running them as separate concurrent stages avoids idling the GPU).
+-   Object storage (S3-/GCS-compatible bucket, or large attached block volume) for raw tiles and output masks — provision for hundreds of GB to low TB rather than local disk alone.
+-   Docker (CUDA base image) to keep the environment reproducible and to make it easy to move the job to a bigger instance size if needed.
+-   Optional: PostGIS for the assembled crossing-distance dataset; a lightweight job queue (Ray, Celery, or a simple work-queue script) to coordinate fetch/inference/QA stages.
+
+**Sizing logic:** the reference pipeline processed Chicago's ~80,000 tiles in ~40 minutes using many concurrent serverless GPU workers in parallel (Modal). A single upgraded server does the same total work sequentially/in small batches, so wall-clock time will be substantially longer than 40 minutes — the tradeoff is a simpler, fixed-cost setup instead of many parallel workers. Suburban Cook County is estimated at several hundred thousand tiles (Phase 0 will pin this down from OSMnx intersection counts), so plan for a GPU job on the order of low-tens of hours, not minutes, and validate this estimate with the Phase 0 pilot-batch benchmark before committing to the full run.
+
+**Configuration scenarios (pick one based on your server's upgrade ceiling and target turnaround):**
+
+| Scenario | GPU | vCPU / RAM | Storage | Best for |
+|---|---|---|---|---|
+| A — Pilot/dev | 1× 16–24 GB GPU (e.g., L4, RTX 4000/4090-class) | 8–16 vCPU / 32–64 GB | 200–500 GB SSD or bucket | Phase 0 benchmarking, suburban fine-tuning spot-checks, small municipality clusters |
+| B — Full-county, moderate turnaround | 1× 24–48 GB GPU (e.g., A10G, L40S, RTX A6000-class) with larger inference batch size | 16–32 vCPU / 64–128 GB | 1–2 TB bucket/block storage | Full suburban run in a small number of GPU-days; recommended default |
+| C — Full-county, fast turnaround | 2–4× GPUs (A10G/L40S/A100-class) run as parallel workers against a shared tile/output queue | 32–64+ vCPU / 128–256 GB | 1–2 TB bucket/block storage | Compressing the full run into roughly a day when the server tier supports multi-GPU or a small autoscaling group |
+
+Start with Scenario A to benchmark cost and throughput per 1,000 tiles (Phase 0 deliverable), then size up to B or C for the full suburban run based on the actual tile-count estimate and desired turnaround.
 
 ------------------------------------------------------------------------
 
@@ -129,8 +156,8 @@ The project has four integrated aims:
 | Satellite imagery API costs | Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run. |
 | Cloud storage | Prior 100-city study totaled 8.3 TB for \~3M tiles; suburban Cook County volume will be a small fraction of that but should be estimated in Phase 0. |
 | Data acquisition | ADI (free), FARS (free), EMS data (may involve access/processing fees or require data-use agreement administrative time). |
-| Personnel | GIS/ML engineering time (heaviest in Phase 1), analyst/statistician time (Phases 2–4). |
-| Manual validation | RA time for stratified accuracy-verification sampling in suburban municipalities. |
+| Personnel | PI/Technical Lead time for GIS/ML engineering and cloud infrastructure (heaviest in Phases 0–1); Data Analyst/Quant Lead time for statistical modeling (heaviest in Phases 2–4). With only two people, plan for limited slack to absorb overlap between the end of Phase 1 and the start of Phase 2. |
+| Manual validation | Data Analyst/Quant Lead time for stratified accuracy-verification sampling in suburban municipalities, supported by the PI/Technical Lead on pipeline-side QA. |
 
 ------------------------------------------------------------------------
 
