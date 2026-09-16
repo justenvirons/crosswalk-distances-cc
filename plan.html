@@ -2280,12 +2280,11 @@ vertical-align: -.125em;
 </tr>
 </tbody>
 </table>
-<p><strong>Capacity note:</strong> the reference methodology (national 100-city study) assumed a larger team (separate GIS engineer, ML engineer, two data analysts, a statistician, research assistants, and a compliance contact). Concentrating all of that work in two people means Phase 1 (segmentation pipeline) will consume most of the PI/Technical Lead’s time, and Phases 2–4 (statistical modeling across three aims) will consume most of the Analyst/Quant Lead’s time nearly back-to-back. Build schedule slack into Phase 0 and expect the Integrated Timeline below to compress or extend depending on how much the two roles can work in parallel versus sequentially.</p>
 <hr>
 </section>
 <section id="phase-0-project-setup-and-data-scoping-weeks-14" class="level2">
 <h2 class="anchored" data-anchor-id="phase-0-project-setup-and-data-scoping-weeks-14">Phase 0 — Project Setup and Data Scoping (Weeks 1–4)</h2>
-<p><strong>Tasks</strong> - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago’s ~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Size and provision the team’s existing scalable cloud server for the segmentation pipeline: add/upgrade a GPU-enabled instance for SAM inference and configure parallel CPU worker processes for tile fetch; run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.</p>
+<p><strong>Tasks</strong> - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago’s ~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Continue running the segmentation pipeline on Modal, the serverless cloud platform already used (and credited for compute support) in the original methodology papers; the existing codebase’s tile-fetch and inference functions are expected to already target Modal’s Python SDK, making it the lowest-friction path to scale rather than porting to a different vendor. Confirm/renew the Modal workspace and any available research/in-kind credits, define GPU function tier and autoscaling limits for SAM inference and CPU-only function limits for tile fetch, and run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.</p>
 <p><strong>Deliverables:</strong> finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.</p>
 <hr>
 </section>
@@ -2327,60 +2326,56 @@ vertical-align: -.125em;
 <section id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" class="level2">
 <h2 class="anchored" data-anchor-id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1">Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)</h2>
 <p>Phase 1 is the only phase in this project that requires cloud GPU compute; Phases 0, 2, 3, and 4 work with municipal-, block-group-, or point-level tabular/vector data and are sized for a local analyst workstation (no GPU required).</p>
-<p><strong>Software stack (single Linux GPU server):</strong></p>
+<p><strong>Platform: Modal.</strong> The team will continue using Modal (modal.com) for tile-fetch and segmentation, the same platform already used — and credited for compute support — in the original national-study methodology papers. Modal is the lowest-friction option for extending the pipeline because the existing codebase’s tile-fetch and inference functions are expected to already be written as Modal functions. Modal supports CPU-only functions (for the tile-fetch step, which is network/API-bound) and GPU functions (L4, A10G, L40S, A100, H100) in the same codebase, bills per second of actual execution, and autoscales the number of concurrent containers up or down with load — so there is no fixed server to size, only per-function GPU-tier and concurrency-limit choices.</p>
+<p><strong>Software stack:</strong></p>
 <ul>
-<li>Ubuntu 22.04 LTS + current NVIDIA driver, CUDA, and cuDNN matched to the PyTorch build in use.</li>
-<li>Python 3.11 environment (conda or venv) with PyTorch (CUDA build), the SAM 2.1 codebase and fine-tuned checkpoint, and the existing grow-cut implementation.</li>
-<li>OSMnx, GeoPandas, Shapely, Fiona, pyproj for intersection/crossing-edge extraction and post-processing.</li>
-<li>Async HTTP client (e.g., <code>httpx</code>/<code>aiohttp</code>) plus a process pool for parallel Google Maps Tile API fetches, decoupled from the GPU inference step (fetch is network/API-bound, inference is GPU-bound — running them as separate concurrent stages avoids idling the GPU).</li>
-<li>Object storage (S3-/GCS-compatible bucket, or large attached block volume) for raw tiles and output masks — provision for hundreds of GB to low TB rather than local disk alone.</li>
-<li>Docker (CUDA base image) to keep the environment reproducible and to make it easy to move the job to a bigger instance size if needed.</li>
-<li>Optional: PostGIS for the assembled crossing-distance dataset; a lightweight job queue (Ray, Celery, or a simple work-queue script) to coordinate fetch/inference/QA stages.</li>
+<li><code>modal</code> Python SDK, with tile-fetch defined as CPU-only Modal functions and SAM inference defined as GPU Modal functions (<code>@app.function(gpu=...)</code>), matching the existing codebase’s structure.</li>
+<li><code>modal.Image</code> build spec pinning PyTorch (CUDA build), the SAM 2.1 codebase and fine-tuned checkpoint, and the existing grow-cut implementation, so every container starts from an identical, reproducible environment.</li>
+<li>OSMnx, GeoPandas, Shapely, Fiona, pyproj for intersection/crossing-edge extraction and post-processing (can run as CPU-only Modal functions or locally, since this step is lightweight).</li>
+<li><code>modal.Secret</code> for the Google Maps Tile API key and any storage credentials, rather than embedding them in code or images.</li>
+<li><code>modal.Volume</code> (or a mounted S3-/GCS-compatible bucket) for raw tiles and output masks, shared across the fetch and inference functions — provision for hundreds of GB to low TB given the projected suburban tile count.</li>
+<li>Modal’s built-in <code>max_containers</code>/concurrency-limit settings to cap simultaneous GPU containers (controls both cost and Google Maps Tile API request rate), plus Modal’s dashboard/CLI for run monitoring and spend tracking.</li>
+<li>Optional: PostGIS (local or lightly hosted) for the assembled crossing-distance dataset once it lands from Modal.</li>
 </ul>
-<p><strong>Sizing logic:</strong> the reference pipeline processed Chicago’s ~80,000 tiles in ~40 minutes using many concurrent serverless GPU workers in parallel (Modal). A single upgraded server does the same total work sequentially/in small batches, so wall-clock time will be substantially longer than 40 minutes — the tradeoff is a simpler, fixed-cost setup instead of many parallel workers. Suburban Cook County is estimated at several hundred thousand tiles (Phase 0 will pin this down from OSMnx intersection counts), so plan for a GPU job on the order of low-tens of hours, not minutes, and validate this estimate with the Phase 0 pilot-batch benchmark before committing to the full run.</p>
-<p><strong>Configuration scenarios (pick one based on your server’s upgrade ceiling and target turnaround):</strong></p>
+<p><strong>Sizing logic:</strong> the reference pipeline processed Chicago’s ~80,000 tiles in ~40 minutes using many concurrent Modal GPU containers in parallel — the same pattern to reuse here, just with more total container-time to cover a larger tile count. Suburban Cook County is estimated at several hundred thousand tiles (Phase 0 will pin this down from OSMnx intersection counts), so total GPU-container-time will scale accordingly; wall-clock turnaround is then a function of how many containers are allowed to run concurrently (<code>max_containers</code>), not of provisioning a bigger single machine. Validate the per-1,000-tile cost and throughput on a pilot batch before committing to the full run.</p>
+<p><strong>Configuration scenarios (pick one based on target turnaround and budget; all use the same codebase, just different GPU tier / concurrency settings):</strong></p>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
-<col style="width: 20%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>Scenario</th>
-<th>GPU</th>
-<th>vCPU / RAM</th>
-<th>Storage</th>
+<th>GPU function tier</th>
+<th>Max concurrent containers</th>
 <th>Best for</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>A — Pilot/dev</td>
-<td>1× 16–24 GB GPU (e.g., L4, RTX 4000/4090-class)</td>
-<td>8–16 vCPU / 32–64 GB</td>
-<td>200–500 GB SSD or bucket</td>
-<td>Phase 0 benchmarking, suburban fine-tuning spot-checks, small municipality clusters</td>
+<td>L4</td>
+<td>Low (≈5–10)</td>
+<td>Phase 0 cost/throughput benchmark, suburban fine-tuning spot-checks, small municipality clusters</td>
 </tr>
 <tr class="even">
-<td>B — Full-county, moderate turnaround</td>
-<td>1× 24–48 GB GPU (e.g., A10G, L40S, RTX A6000-class) with larger inference batch size</td>
-<td>16–32 vCPU / 64–128 GB</td>
-<td>1–2 TB bucket/block storage</td>
-<td>Full suburban run in a small number of GPU-days; recommended default</td>
+<td>B — Full-county, moderate spend</td>
+<td>A10G or L40S</td>
+<td>Moderate (≈20–40)</td>
+<td>Full suburban run over a few days at controlled cost; recommended default</td>
 </tr>
 <tr class="odd">
-<td>C — Full-county, fast turnaround</td>
-<td>2–4× GPUs (A10G/L40S/A100-class) run as parallel workers against a shared tile/output queue</td>
-<td>32–64+ vCPU / 128–256 GB</td>
-<td>1–2 TB bucket/block storage</td>
-<td>Compressing the full run into roughly a day when the server tier supports multi-GPU or a small autoscaling group</td>
+<td>C — Full-county, fastest turnaround</td>
+<td>A100 or H100</td>
+<td>High (≈50–100+, matching the original Chicago-scale concurrency)</td>
+<td>Compressing the full run to roughly the timescale of the original Chicago run, at higher peak spend</td>
 </tr>
 </tbody>
 </table>
-<p>Start with Scenario A to benchmark cost and throughput per 1,000 tiles (Phase 0 deliverable), then size up to B or C for the full suburban run based on the actual tile-count estimate and desired turnaround.</p>
+<p>Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so the fetch stage doesn’t idle the GPU stage (or vice versa). Start with Scenario A to get a real cost/throughput-per-1,000-tiles number (Phase 0 deliverable), then size up to B or C for the full suburban run based on the actual tile-count estimate, desired turnaround, and available Modal credits/budget.</p>
 <hr>
 </section>
 <section id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" class="level2">
