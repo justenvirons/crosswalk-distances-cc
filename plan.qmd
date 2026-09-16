@@ -47,7 +47,13 @@ This project is staffed by a two-person team. All responsibilities from the broa
 | Data Analyst / Statistician & Quant Lead (Sufi) | Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance |
 ------------------------------------------------------------------------
 
-## Phase 0 — Project Setup and Data Scoping (Weeks 1–4)
+## Timeline Compression Note (8-Month Project)
+
+To fit an 8-month schedule (down from the 14-month illustrative timeline in the original reference methodology), phases run substantially in parallel rather than sequentially. Work that does not depend on the segmentation pipeline's output — ADI/ACS/LODES assembly (Aim 2), FARS acquisition and geocoding (Aim 3), and EMS outreach (Aim 4) — starts in Month 1, alongside Phase 1, instead of waiting for the crossing-distance dataset to land. The single largest schedule risk is Phase 4 (EMS data access), since it depends on an external agency's timeline; a hard go/no-go checkpoint is built in at Month 3 (see Phase 4) so a fallback data source can be substituted without jeopardizing the other three aims. With only two people on the team, this compressed schedule requires both roles to work across multiple phases concurrently from Month 1 rather than finishing one phase before starting the next.
+
+------------------------------------------------------------------------
+
+## Phase 0 — Project Setup and Data Scoping (Weeks 1–3)
 
 **Tasks** - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago's \~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Continue running the segmentation pipeline on Modal, the serverless cloud platform already used (and credited for compute support) in the original methodology papers; the existing codebase's tile-fetch and inference functions are expected to already target Modal's Python SDK, making it the lowest-friction path to scale rather than porting to a different vendor. Confirm/renew the Modal workspace and any available research/in-kind credits, define GPU function tier and autoscaling limits for SAM inference and CPU-only function limits for tile fetch, and run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.
 
@@ -55,7 +61,7 @@ This project is staffed by a two-person team. All responsibilities from the broa
 
 ------------------------------------------------------------------------
 
-## Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)
+## Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–3)
 
 ### Intersection & Tile Retrieval
 
@@ -114,7 +120,9 @@ Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so th
 
 ------------------------------------------------------------------------
 
-## Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)
+## Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 1–6)
+
+Covariate assembly (ADI/ACS/LODES) starts in Month 1, in parallel with Phase 1; merge and modeling begin once the crossing-distance dataset lands (~Month 3).
 
 **Tasks** - Aggregate crossing-distance statistics (median, mean, distribution, count) to the municipal level for all \~135 Cook County jurisdictions. - Assemble municipal/block-group socioeconomic covariates: - **ADI** (Neighborhood Atlas, block-group level, aggregated to municipality via population-weighted crosswalk). - **Population and housing** (ACS 5-year estimates: density, tenure, vehicle ownership, age structure, poverty rate). - **Employment** (ACS/LEHD LODES: employment density, commute mode share, jobs-housing balance). - Incorporation year and land-area (already partially available from the national study) for comparability with prior findings on crossing distance and municipal age. - Conduct descriptive and spatial analysis: choropleth mapping of median crossing distance by municipality; bivariate/multivariate regression of crossing distance on ADI and demographic/employment covariates, controlling for municipal age, density, and street network form. - Test for spatial autocorrelation/clustering (e.g., Moran's I) in crossing distance across municipalities and at the sub-municipal (block group) level within suburban Cook County.
 
@@ -122,7 +130,9 @@ Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so th
 
 ------------------------------------------------------------------------
 
-## Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)
+## Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 1–6)
+
+FARS acquisition and geocoding starts in Month 1, in parallel with Phase 1; spatial matching and modeling begin once the crossing-distance dataset lands (~Month 3).
 
 **Tasks** - Acquire latest FARS data (NHTSA) for Cook County, filtered to pedestrian fatalities, with available geocoordinates. - Geocode/validate FARS fatality point locations; spatially join each fatality to its nearest measured crossing (or nearest intersection) within a defined buffer distance, using street-network-aware (not straight-line) distance where feasible. - Construct a matched/case-control or spatial point-pattern framework: compare crossing distances at fatality-adjacent locations to distances at a representative sample of non-fatality intersections/crossings (citywide + suburban), controlling for roadway functional class, speed limit (if available via IDOT), lighting/time-of-day, and land use. - Model relationship between crossing distance and fatality occurrence/likelihood (e.g., logistic regression, spatial Poisson/negative binomial for intersection-level fatality counts, or point-process modeling), replicating and extending the exposure-based approach used in the smaller-city case studies (Paris, San Francisco, Irvine) at Cook County scale. - Assess whether the relationship between crossing distance and fatality risk holds consistently in dense urban Chicago vs. lower-density suburban contexts (interaction term / stratified models).
 
@@ -130,29 +140,30 @@ Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so th
 
 ------------------------------------------------------------------------
 
-## Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)
+## Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 1–7)
 
 **Tasks** - Negotiate access to EMS pedestrian/motor-vehicle crash injury records (likely via Cook County EMS Resource Hospital system, individual suburban Fire/EMS departments, or IDPH's EMS data system) — this will require a data-use/sharing agreement and may need IRB determination given proximity to identifiable health data, even if aggregated. - Aggregate EMS-reported pedestrian/MV crash injury counts (and severity, if available) to the municipal level for suburban Cook County. - Merge with Phase 2's municipal crossing-distance and socioeconomic dataset. - Model relationship between municipal median/aggregate crossing distance and injury rates (e.g., injuries per capita, per intersection, or per VMT if exposure data available), controlling for ADI, population density, and roadway characteristics. - Compare findings to the point-level FARS fatality results (Aim 3) to assess consistency between fatality-based and injury-based safety measures.
 
 **Deliverables:** suburban municipal EMS-crossing merged dataset; injury-rate model results; comparative memo (fatality vs. injury associations).
 
-**Key risk:** EMS data access/timeline is the most uncertain dependency in the plan, given data-sharing agreements and potential privacy/IRB review. *Mitigation:* initiate outreach and agreement negotiation in Phase 0, in parallel with segmentation work, so Phase 4 is not blocked by Phase 1–3 timelines; identify a fallback data source (e.g., IDOT crash data with injury severity coding) if EMS-specific data proves inaccessible within the project timeline.
+**Key risk:** EMS data access/timeline is the most uncertain dependency in the plan, and the tightest constraint on an 8-month schedule, given data-sharing agreements and potential privacy/IRB review. *Mitigation:* initiate outreach and agreement negotiation in Month 1, in parallel with segmentation work, so Phase 4 is not blocked by Phase 1–3 timelines. Set a hard **go/no-go checkpoint at Month 3**: if a signed data-use agreement and data delivery timeline are not in hand by then, pivot immediately to the fallback data source (e.g., IDOT crash data with injury severity coding) so Aim 4 modeling can still start on schedule in Month 4 and the 8-month completion date is not put at risk by an external agency's timeline.
 
 ------------------------------------------------------------------------
 
-## Integrated Timeline (Illustrative, \~14-Month Project)
+## Integrated Timeline (Illustrative, \~8-Month Project)
 
 | Month | Phase 0 | Phase 1 (Segmentation) | Phase 2 (Municipal/ADI) | Phase 3 (FARS) | Phase 4 (EMS) | Dissemination |
 |-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-| 1–2 | Setup, boundaries, cloud vendor selection | Intersection extraction begins | — | — | Begin EMS data agreement outreach | — |
-| 3–4 | Data agreements finalized | Tile retrieval & segmentation | Begin ADI/ACS assembly | Acquire FARS data | Continue negotiation | — |
-| 5–6 | — | Grow-cut, QA, validation | Merge & descriptive analysis | Geocode/match fatalities | — | — |
-| 7–8 | — | Final dataset delivered | Regression modeling | Model development | EMS data received (target) | Interim report |
-| 9–10 | — | — | Manuscript drafting | Model refinement, drafting | Municipal aggregation | — |
-| 11–12 | — | — | — | Manuscript finalization | Modeling, drafting | Draft manuscripts circulated |
-| 13–14 | — | — | — | — | Manuscript finalization | Submission, public dataset release |
+| 1 | Setup, boundaries, Modal provisioning/benchmark, data-use agreements initiated | Intersection extraction & tile retrieval begin | Begin ADI/ACS/LODES assembly | Acquire & begin geocoding FARS data | Begin EMS data agreement outreach | — |
+| 2 | — | Tile retrieval & SAM segmentation at scale; suburban fine-tuning spot-checks | Continue ADI/ACS/LODES assembly; prep merge scripts | Continue geocoding/validation; prep matching framework | Continue negotiation | — |
+| 3 | — | Grow-cut, QA/validation, final combined dataset delivered | Merge crossing + socioeconomic data; begin descriptive/spatial analysis | Spatial-match fatalities to crossings; begin model framework | **Go/no-go checkpoint** — pivot to IDOT fallback if no agreement in hand | — |
+| 4 | — | — | Regression modeling; begin manuscript drafting | Fatality risk modeling; begin manuscript drafting | EMS data aggregation (or IDOT fallback aggregation) and merge | — |
+| 5 | — | — | Manuscript drafting continues | Model refinement, drafting continues | Injury-rate modeling begins | — |
+| 6 | — | — | Manuscript finalization | Manuscript finalization | Injury-rate modeling, comparative memo drafting | Interim report; draft Aim 2/3 manuscripts circulated |
+| 7 | — | — | — | — | Manuscript/technical report finalization | Draft Aim 4 manuscript circulated; codebase documentation & dataset packaging |
+| 8 | — | — | — | — | — | Manuscript submission(s); public dataset release |
 
-*(Timeline should be adjusted once actual suburban tile volume and EMS data-access timelines are confirmed in Phase 0.)*
+*(Timeline should be adjusted once actual suburban tile volume and EMS data-access timelines are confirmed in Phase 0; the Month 3 EMS go/no-go checkpoint is the key control point for holding this schedule.)*
 
 ------------------------------------------------------------------------
 
@@ -164,7 +175,7 @@ Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so th
 | Satellite imagery API costs | Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run. |
 | Cloud storage | Prior 100-city study totaled 8.3 TB for \~3M tiles; suburban Cook County volume will be a small fraction of that but should be estimated in Phase 0. |
 | Data acquisition | ADI (free), FARS (free), EMS data (may involve access/processing fees or require data-use agreement administrative time). |
-| Personnel | PI/Technical Lead time for GIS/ML engineering and cloud infrastructure (heaviest in Phases 0–1); Data Analyst/Quant Lead time for statistical modeling (heaviest in Phases 2–4). With only two people, plan for limited slack to absorb overlap between the end of Phase 1 and the start of Phase 2. |
+| Personnel | PI/Technical Lead time for GIS/ML engineering and cloud infrastructure (heaviest in Phases 0–1); Data Analyst/Quant Lead time for statistical modeling and data assembly (Phases 2–4). On the 8-month schedule, both roles carry work concurrently starting Month 1 (segmentation plus parallel covariate/FARS/EMS groundwork), not just at hand-off points, so plan for near-full-time commitment from both people for most of the project rather than staggered phase-by-phase effort. |
 | Manual validation | Data Analyst/Quant Lead time for stratified accuracy-verification sampling in suburban municipalities, supported by the PI/Technical Lead on pipeline-side QA. |
 
 ------------------------------------------------------------------------
@@ -194,6 +205,7 @@ Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so th
 | EMS data access delays | Begin negotiation in Phase 0; identify IDOT crash data as fallback |
 | Municipal boundary/ADI aggregation mismatches (MAUP concerns) | Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels |
 | FARS-to-crossing spatial matching ambiguity (which crossing a fatality is "near") | Predefine buffer distance and network-distance rules; sensitivity analysis on buffer size |
+| Compressed 8-month schedule leaves little slack, with a 2-person team running Phases 1–4 largely in parallel from Month 1 | Front-load all non-segmentation-dependent work (ADI/ACS/LODES assembly, FARS acquisition, EMS outreach) to Month 1; enforce the Month 3 EMS go/no-go checkpoint; treat full manuscript submission as a stretch goal that can extend slightly past Month 8 if a phase slips, without delaying the public dataset release |
 
 ------------------------------------------------------------------------
 
