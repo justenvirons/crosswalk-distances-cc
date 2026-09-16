@@ -1,0 +1,181 @@
+---
+title: "Work Plan: Extending AI-Based Crosswalk Segmentation and Pedestrian Safety Analysis to All of Cook County"
+author: ""
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+---
+
+## Background and Rationale
+
+The existing methodology — developed and validated in *Moran & Laefer (2024)* and scaled nationally in *Moran, Gupta, Qian & Laefer (2025)* — uses OpenStreetMap (OSM) intersection coordinates, Google Maps satellite tiles, a fine-tuned Segment Anything Model (SAM 2.1), and a grow-cut algorithm to automatically measure pedestrian crossing distance at marked and unmarked crosswalks. This method has already been applied to the City of Chicago (\~80,000 tiles processed in the national 100-city study). This project extends that pipeline countywide and links the resulting crossing-distance dataset to socioeconomic, crash, and fatality data to answer applied safety-policy questions across Cook County's 135 municipalities (Chicago + \~125 suburban jurisdictions + unincorporated areas).
+
+The project has four integrated aims:
+
+1.  **Extend the segmentation pipeline** to suburban Cook County, producing a dataset comparable in scope/rigor to the existing Chicago dataset.
+2.  **Cross-sectional municipal analysis**: compare crossing distance across all Cook County municipalities against socioeconomic indicators (Area Deprivation Index \[ADI\], population, housing, and employment data).
+3.  **Point-level fatality analysis**: relate crossing distance to individual pedestrian fatalities using FARS (Fatality Analysis Reporting System) data.
+4.  **Municipal-level injury analysis**: relate crossing distance to EMS-reported pedestrian/motor-vehicle crash injury data for suburban Cook County.
+
+------------------------------------------------------------------------
+
+## Project Team & Roles
+
+| Role | Responsibility |
+|------------------------------------|------------------------------------|
+| PI / Co-PI | Overall direction, methodology oversight, dissemination |
+| GIS/Data Engineer | OSM extraction, tile-download pipeline, cloud infrastructure management |
+| ML Engineer | SAM fine-tuning/inference, grow-cut algorithm adaptation and QA |
+| Data Analyst(s) (2) | ADI/demographic data assembly; FARS and EMS data cleaning and merging |
+| Statistician/Quant lead | Spatial and statistical modeling (Aims 2–4) |
+| Research Assistant(s) | Manual QA/validation sampling, municipal boundary reconciliation, literature review |
+| Data Governance/Compliance | EMS data use agreements, IRB/data-sharing review if needed |
+
+------------------------------------------------------------------------
+
+## Phase 0 — Project Setup and Data Scoping (Weeks 1–4)
+
+**Tasks** - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago's \~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Select and provision cloud computing vendor (e.g., Modal, AWS, GCP, Azure) for GPU-based SAM inference and parallelized "serverless" tile-fetch workers; benchmark cost per 1,000 tiles fetched/segmented before committing to full run. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.
+
+**Deliverables:** finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.
+
+------------------------------------------------------------------------
+
+## Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)
+
+### Intersection & Tile Retrieval
+
+-   Use OSMnx to generate coordinates for all street intersections and mid-block crossings across suburban Cook County municipalities.
+-   Retrieve satellite tiles (25 m radius, 1629×1629 px, \~30 cm/pixel) via the Google Maps Tile API using the existing parallelized serverless fetch approach, scaled to the larger geography.
+-   Monitor cloud spend against the Phase 0 benchmark; adjust worker concurrency to control cost and stay within the \~2,000 tiles/minute throughput ceiling observed previously.
+
+### Segmentation
+
+-   Apply the existing fine-tuned SAM 2.1 model to classify drivable vs. non-drivable surfaces on all suburban tiles.
+-   Spot-check performance on suburban-specific built forms not well represented in the original 14-city training set (e.g., low-density arterial commercial strips, cul-de-sac subdivisions, strip-mall parking aprons) — supplement training data with additional manually annotated suburban intersections if accuracy degrades materially.
+
+### Crossing Edge Extraction & Grow-Cut
+
+-   Extract all OSM-coded pedestrian crossing edges (and generate edges from crossing nodes) for suburban municipalities.
+-   Apply the grow-cut algorithm to compute crossing distances; apply the same post-processing rules (duplicate-buffer merge at 6.5 ft/10°; distance bounds of 6–160 ft).
+
+### Validation
+
+-   Manually verify a stratified random sample of crossings across a representative subset of suburban municipalities (varying density/form), targeting the same accuracy benchmark achieved for Chicago (93% accuracy; median absolute error ≈2 ft 3 in).
+-   Document OSM crossing-coverage completeness by municipality, since crowdsourced OSM density varies more in suburban areas than in the dense urban core.
+
+**Deliverables:** suburban Cook County crossing-distance dataset (parcel of comparable structure/fields to the Chicago dataset); combined Cook County (city + suburban) crossing dataset; validation/accuracy report; updated codebase documentation.
+
+**Key risk:** OSM crossing-edge sparsity in lower-density suburbs may undercount true crossings relative to Chicago. *Mitigation:* supplement with municipal GIS crosswalk inventories where available; flag municipalities with low OSM crossing density for interpretive caution in Aim 2.
+
+------------------------------------------------------------------------
+
+## Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)
+
+**Tasks** - Aggregate crossing-distance statistics (median, mean, distribution, count) to the municipal level for all \~135 Cook County jurisdictions. - Assemble municipal/block-group socioeconomic covariates: - **ADI** (Neighborhood Atlas, block-group level, aggregated to municipality via population-weighted crosswalk). - **Population and housing** (ACS 5-year estimates: density, tenure, vehicle ownership, age structure, poverty rate). - **Employment** (ACS/LEHD LODES: employment density, commute mode share, jobs-housing balance). - Incorporation year and land-area (already partially available from the national study) for comparability with prior findings on crossing distance and municipal age. - Conduct descriptive and spatial analysis: choropleth mapping of median crossing distance by municipality; bivariate/multivariate regression of crossing distance on ADI and demographic/employment covariates, controlling for municipal age, density, and street network form. - Test for spatial autocorrelation/clustering (e.g., Moran's I) in crossing distance across municipalities and at the sub-municipal (block group) level within suburban Cook County.
+
+**Deliverables:** municipal-level merged dataset (crossing distance + ADI + demographics + employment); descriptive report and maps; regression results manuscript draft.
+
+------------------------------------------------------------------------
+
+## Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)
+
+**Tasks** - Acquire latest FARS data (NHTSA) for Cook County, filtered to pedestrian fatalities, with available geocoordinates. - Geocode/validate FARS fatality point locations; spatially join each fatality to its nearest measured crossing (or nearest intersection) within a defined buffer distance, using street-network-aware (not straight-line) distance where feasible. - Construct a matched/case-control or spatial point-pattern framework: compare crossing distances at fatality-adjacent locations to distances at a representative sample of non-fatality intersections/crossings (citywide + suburban), controlling for roadway functional class, speed limit (if available via IDOT), lighting/time-of-day, and land use. - Model relationship between crossing distance and fatality occurrence/likelihood (e.g., logistic regression, spatial Poisson/negative binomial for intersection-level fatality counts, or point-process modeling), replicating and extending the exposure-based approach used in the smaller-city case studies (Paris, San Francisco, Irvine) at Cook County scale. - Assess whether the relationship between crossing distance and fatality risk holds consistently in dense urban Chicago vs. lower-density suburban contexts (interaction term / stratified models).
+
+**Deliverables:** FARS-crossing linked point dataset; fatality risk model results; manuscript draft (potentially standalone paper testing whether crossing-distance/safety associations found in smaller studies hold at metro scale).
+
+------------------------------------------------------------------------
+
+## Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)
+
+**Tasks** - Negotiate access to EMS pedestrian/motor-vehicle crash injury records (likely via Cook County EMS Resource Hospital system, individual suburban Fire/EMS departments, or IDPH's EMS data system) — this will require a data-use/sharing agreement and may need IRB determination given proximity to identifiable health data, even if aggregated. - Aggregate EMS-reported pedestrian/MV crash injury counts (and severity, if available) to the municipal level for suburban Cook County. - Merge with Phase 2's municipal crossing-distance and socioeconomic dataset. - Model relationship between municipal median/aggregate crossing distance and injury rates (e.g., injuries per capita, per intersection, or per VMT if exposure data available), controlling for ADI, population density, and roadway characteristics. - Compare findings to the point-level FARS fatality results (Aim 3) to assess consistency between fatality-based and injury-based safety measures.
+
+**Deliverables:** suburban municipal EMS-crossing merged dataset; injury-rate model results; comparative memo (fatality vs. injury associations).
+
+**Key risk:** EMS data access/timeline is the most uncertain dependency in the plan, given data-sharing agreements and potential privacy/IRB review. *Mitigation:* initiate outreach and agreement negotiation in Phase 0, in parallel with segmentation work, so Phase 4 is not blocked by Phase 1–3 timelines; identify a fallback data source (e.g., IDOT crash data with injury severity coding) if EMS-specific data proves inaccessible within the project timeline.
+
+------------------------------------------------------------------------
+
+## Integrated Timeline (Illustrative, \~14-Month Project)
+
+| Month | Phase 0 | Phase 1 (Segmentation) | Phase 2 (Municipal/ADI) | Phase 3 (FARS) | Phase 4 (EMS) | Dissemination |
+|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
+| 1–2 | Setup, boundaries, cloud vendor selection | Intersection extraction begins | — | — | Begin EMS data agreement outreach | — |
+| 3–4 | Data agreements finalized | Tile retrieval & segmentation | Begin ADI/ACS assembly | Acquire FARS data | Continue negotiation | — |
+| 5–6 | — | Grow-cut, QA, validation | Merge & descriptive analysis | Geocode/match fatalities | — | — |
+| 7–8 | — | Final dataset delivered | Regression modeling | Model development | EMS data received (target) | Interim report |
+| 9–10 | — | — | Manuscript drafting | Model refinement, drafting | Municipal aggregation | — |
+| 11–12 | — | — | — | Manuscript finalization | Modeling, drafting | Draft manuscripts circulated |
+| 13–14 | — | — | — | — | Manuscript finalization | Submission, public dataset release |
+
+*(Timeline should be adjusted once actual suburban tile volume and EMS data-access timelines are confirmed in Phase 0.)*
+
+------------------------------------------------------------------------
+
+## Budget Considerations
+
+| Category | Notes |
+|------------------------------------|------------------------------------|
+| Cloud compute (tile fetch + GPU inference) | Scale from Chicago benchmark (\~80,000 tiles/40 min); suburban Cook County likely requires several hundred thousand tiles given \~125 municipalities. Obtain vendor quote/credits (cf. prior in-kind credits from Modal) before committing; budget contingency for reprocessing/QA passes. |
+| Satellite imagery API costs | Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run. |
+| Cloud storage | Prior 100-city study totaled 8.3 TB for \~3M tiles; suburban Cook County volume will be a small fraction of that but should be estimated in Phase 0. |
+| Data acquisition | ADI (free), FARS (free), EMS data (may involve access/processing fees or require data-use agreement administrative time). |
+| Personnel | GIS/ML engineering time (heaviest in Phase 1), analyst/statistician time (Phases 2–4). |
+| Manual validation | RA time for stratified accuracy-verification sampling in suburban municipalities. |
+
+------------------------------------------------------------------------
+
+## Data Sources Summary
+
+| Data | Source | Aim(s) | Notes |
+|------------------|------------------|------------------|------------------|
+| Intersection coordinates, crossing edges | OpenStreetMap via OSMnx | 1 | Coverage varies by municipality |
+| Satellite imagery | Google Maps Tile API | 1 | Cost scales with tile volume |
+| Segmentation model | Meta SAM 2.1 (fine-tuned) | 1 | May need suburban-specific fine-tuning |
+| ADI | Neighborhood Atlas (Univ. of Wisconsin) | 2 | Block-group level |
+| Population/housing | U.S. Census ACS 5-year | 2 | Municipal or block-group |
+| Employment | ACS / LEHD LODES | 2 | Jobs-housing balance, commute mode |
+| Pedestrian fatalities | NHTSA FARS | 3 | Point-level, latest available year(s) |
+| EMS crash injury data | Cook County EMS system / IDPH | 4 | Requires data-use agreement; municipal-level aggregation |
+
+------------------------------------------------------------------------
+
+## Risks and Mitigations Summary
+
+| Risk | Mitigation |
+|------------------------------------|------------------------------------|
+| Cloud cost overrun at suburban scale | Phase 0 cost-per-tile benchmark; incremental rollout by municipality cluster rather than all at once |
+| Sparse/inconsistent OSM crossing data in low-density suburbs | Supplement with municipal GIS inventories; flag data-sparse municipalities |
+| SAM accuracy degradation on suburban built forms | Additional manual annotation/fine-tuning; validation sampling before full-scale run |
+| EMS data access delays | Begin negotiation in Phase 0; identify IDOT crash data as fallback |
+| Municipal boundary/ADI aggregation mismatches (MAUP concerns) | Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels |
+| FARS-to-crossing spatial matching ambiguity (which crossing a fatality is "near") | Predefine buffer distance and network-distance rules; sensitivity analysis on buffer size |
+
+------------------------------------------------------------------------
+
+## Anticipated Outputs
+
+1.  Public/shareable Cook County (city + suburban) crosswalk-distance dataset, extending the existing Chicago dataset.
+2.  Manuscript: municipal-level crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).
+3.  Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).
+4.  Manuscript or technical report: crossing distance and EMS-reported injury rates in suburban Cook County (Aim 4).
+5.  Updated open-source codebase (GitHub) reflecting suburban-scale pipeline modifications.
+6.  Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).
+
+------------------------------------------------------------------------
+
+## Open Decisions Requiring Early Input
+
+-   Should unincorporated Cook County areas be included, or only the \~135 incorporated municipalities?
+-   Which EMS data source is most feasible (single regional system vs. IDPH statewide extract filtered to Cook County)?
+-   What buffer/matching rule will be used to associate FARS point fatalities with specific measured crossings?
+-   Target FARS year range (single most recent year vs. multi-year pooled for statistical power)?
