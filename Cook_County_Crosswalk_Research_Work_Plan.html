@@ -6,7 +6,8 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content>
+<meta name="author" content="C. Scott Smith, PhD AICP">
+<meta name="author" content="Zane Sufi">
 <meta name="dcterms.date" content="2026-09-16">
 
 <title>Work Plan: Extending AI-Based Crosswalk Segmentation and Pedestrian Safety Analysis to All of Cook County</title>
@@ -2174,19 +2175,20 @@ vertical-align: -.125em;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul class="collapse">
-  <li><a href="#background-and-rationale" id="toc-background-and-rationale" class="nav-link active" data-scroll-target="#background-and-rationale"><span class="header-section-number">1</span> Background and Rationale</a></li>
-  <li><a href="#project-team-roles" id="toc-project-team-roles" class="nav-link" data-scroll-target="#project-team-roles"><span class="header-section-number">2</span> Project Team &amp; Roles</a></li>
-  <li><a href="#phase-0-project-setup-and-data-scoping-weeks-14" id="toc-phase-0-project-setup-and-data-scoping-weeks-14" class="nav-link" data-scroll-target="#phase-0-project-setup-and-data-scoping-weeks-14"><span class="header-section-number">3</span> Phase 0 — Project Setup and Data Scoping (Weeks 1–4)</a></li>
-  <li><a href="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" id="toc-phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" class="nav-link" data-scroll-target="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12"><span class="header-section-number">4</span> Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)</a></li>
-  <li><a href="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" id="toc-phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" class="nav-link" data-scroll-target="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion"><span class="header-section-number">5</span> Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)</a></li>
-  <li><a href="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" id="toc-phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" class="nav-link" data-scroll-target="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56"><span class="header-section-number">6</span> Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)</a></li>
-  <li><a href="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" id="toc-phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" class="nav-link" data-scroll-target="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78"><span class="header-section-number">7</span> Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)</a></li>
-  <li><a href="#integrated-timeline-illustrative-14-month-project" id="toc-integrated-timeline-illustrative-14-month-project" class="nav-link" data-scroll-target="#integrated-timeline-illustrative-14-month-project"><span class="header-section-number">8</span> Integrated Timeline (Illustrative, ~14-Month Project)</a></li>
-  <li><a href="#budget-considerations" id="toc-budget-considerations" class="nav-link" data-scroll-target="#budget-considerations"><span class="header-section-number">9</span> Budget Considerations</a></li>
-  <li><a href="#data-sources-summary" id="toc-data-sources-summary" class="nav-link" data-scroll-target="#data-sources-summary"><span class="header-section-number">10</span> Data Sources Summary</a></li>
-  <li><a href="#risks-and-mitigations-summary" id="toc-risks-and-mitigations-summary" class="nav-link" data-scroll-target="#risks-and-mitigations-summary"><span class="header-section-number">11</span> Risks and Mitigations Summary</a></li>
-  <li><a href="#anticipated-outputs" id="toc-anticipated-outputs" class="nav-link" data-scroll-target="#anticipated-outputs"><span class="header-section-number">12</span> Anticipated Outputs</a></li>
-  <li><a href="#open-decisions-requiring-early-input" id="toc-open-decisions-requiring-early-input" class="nav-link" data-scroll-target="#open-decisions-requiring-early-input"><span class="header-section-number">13</span> Open Decisions Requiring Early Input</a></li>
+  <li><a href="#background-and-rationale" id="toc-background-and-rationale" class="nav-link active" data-scroll-target="#background-and-rationale">Background and Rationale</a></li>
+  <li><a href="#project-team-roles" id="toc-project-team-roles" class="nav-link" data-scroll-target="#project-team-roles">Project Team &amp; Roles</a></li>
+  <li><a href="#phase-0-project-setup-and-data-scoping-weeks-14" id="toc-phase-0-project-setup-and-data-scoping-weeks-14" class="nav-link" data-scroll-target="#phase-0-project-setup-and-data-scoping-weeks-14">Phase 0 — Project Setup and Data Scoping (Weeks 1–4)</a></li>
+  <li><a href="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" id="toc-phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" class="nav-link" data-scroll-target="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12">Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)</a></li>
+  <li><a href="#cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" id="toc-cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" class="nav-link" data-scroll-target="#cloud-compute-strategy-for-the-segmentation-pipeline-phase-1">Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)</a></li>
+  <li><a href="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" id="toc-phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" class="nav-link" data-scroll-target="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion">Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)</a></li>
+  <li><a href="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" id="toc-phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" class="nav-link" data-scroll-target="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56">Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)</a></li>
+  <li><a href="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" id="toc-phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" class="nav-link" data-scroll-target="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78">Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)</a></li>
+  <li><a href="#integrated-timeline-illustrative-14-month-project" id="toc-integrated-timeline-illustrative-14-month-project" class="nav-link" data-scroll-target="#integrated-timeline-illustrative-14-month-project">Integrated Timeline (Illustrative, ~14-Month Project)</a></li>
+  <li><a href="#budget-considerations" id="toc-budget-considerations" class="nav-link" data-scroll-target="#budget-considerations">Budget Considerations</a></li>
+  <li><a href="#data-sources-summary" id="toc-data-sources-summary" class="nav-link" data-scroll-target="#data-sources-summary">Data Sources Summary</a></li>
+  <li><a href="#risks-and-mitigations-summary" id="toc-risks-and-mitigations-summary" class="nav-link" data-scroll-target="#risks-and-mitigations-summary">Risks and Mitigations Summary</a></li>
+  <li><a href="#anticipated-outputs" id="toc-anticipated-outputs" class="nav-link" data-scroll-target="#anticipated-outputs">Anticipated Outputs</a></li>
+  <li><a href="#open-decisions-requiring-early-input" id="toc-open-decisions-requiring-early-input" class="nav-link" data-scroll-target="#open-decisions-requiring-early-input">Open Decisions Requiring Early Input</a></li>
   </ul>
 <div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="Cook_County_Crosswalk_Research_Work_Plan.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
 </div>
@@ -2198,10 +2200,34 @@ vertical-align: -.125em;
 </div>
 
 
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Authors</div>
+  <div class="quarto-title-meta-heading">Affiliations</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">C. Scott Smith, PhD AICP <a href="mailto:c.scott.smith@depaul.edu" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            DePaul University
+          </p>
+        <p class="affiliation">
+            Cook County Department of Public Health (CCDPH)
+          </p>
+      </div>
+    <div class="quarto-title-meta-contents">
+    <p class="author">Zane Sufi </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Oak Park River Forest High School
+          </p>
+      </div>
+  </div>
 
 <div class="quarto-title-meta">
 
-    
+      
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
@@ -2217,8 +2243,8 @@ vertical-align: -.125em;
 </header>
 
 
-<section id="background-and-rationale" class="level2" data-number="1">
-<h2 data-number="1" class="anchored" data-anchor-id="background-and-rationale"><span class="header-section-number">1</span> Background and Rationale</h2>
+<section id="background-and-rationale" class="level2">
+<h2 class="anchored" data-anchor-id="background-and-rationale">Background and Rationale</h2>
 <p>The existing methodology — developed and validated in <em>Moran &amp; Laefer (2024)</em> and scaled nationally in <em>Moran, Gupta, Qian &amp; Laefer (2025)</em> — uses OpenStreetMap (OSM) intersection coordinates, Google Maps satellite tiles, a fine-tuned Segment Anything Model (SAM 2.1), and a grow-cut algorithm to automatically measure pedestrian crossing distance at marked and unmarked crosswalks. This method has already been applied to the City of Chicago (~80,000 tiles processed in the national 100-city study). This project extends that pipeline countywide and links the resulting crossing-distance dataset to socioeconomic, crash, and fatality data to answer applied safety-policy questions across Cook County’s 135 municipalities (Chicago + ~125 suburban jurisdictions + unincorporated areas).</p>
 <p>The project has four integrated aims:</p>
 <ol type="1">
@@ -2229,8 +2255,9 @@ vertical-align: -.125em;
 </ol>
 <hr>
 </section>
-<section id="project-team-roles" class="level2" data-number="2">
-<h2 data-number="2" class="anchored" data-anchor-id="project-team-roles"><span class="header-section-number">2</span> Project Team &amp; Roles</h2>
+<section id="project-team-roles" class="level2">
+<h2 class="anchored" data-anchor-id="project-team-roles">Project Team &amp; Roles</h2>
+<p>This project is staffed by a two-person team. All responsibilities from the broader reference methodology are consolidated into these two roles; there are no separate GIS engineer, ML engineer, statistician, research assistant, or compliance positions.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -2244,69 +2271,50 @@ vertical-align: -.125em;
 </thead>
 <tbody>
 <tr class="odd">
-<td>PI / Co-PI</td>
-<td>Overall direction, methodology oversight, dissemination</td>
+<td>PI / GIS, ML &amp; Data Governance Lead (Smith)</td>
+<td>Overall direction and methodology oversight; OSM extraction and tile-download pipeline; cloud infrastructure provisioning and management; SAM fine-tuning/inference and grow-cut algorithm adaptation and QA; data governance and compliance (EMS data-use agreements, IRB/data-sharing review if needed); dissemination</td>
 </tr>
 <tr class="even">
-<td>GIS/Data Engineer</td>
-<td>OSM extraction, tile-download pipeline, cloud infrastructure management</td>
-</tr>
-<tr class="odd">
-<td>ML Engineer</td>
-<td>SAM fine-tuning/inference, grow-cut algorithm adaptation and QA</td>
-</tr>
-<tr class="even">
-<td>Data Analyst(s) (2)</td>
-<td>ADI/demographic data assembly; FARS and EMS data cleaning and merging</td>
-</tr>
-<tr class="odd">
-<td>Statistician/Quant lead</td>
-<td>Spatial and statistical modeling (Aims 2–4)</td>
-</tr>
-<tr class="even">
-<td>Research Assistant(s)</td>
-<td>Manual QA/validation sampling, municipal boundary reconciliation, literature review</td>
-</tr>
-<tr class="odd">
-<td>Data Governance/Compliance</td>
-<td>EMS data use agreements, IRB/data-sharing review if needed</td>
+<td>Data Analyst / Statistician &amp; Quant Lead (Sufi)</td>
+<td>Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Capacity note:</strong> the reference methodology (national 100-city study) assumed a larger team (separate GIS engineer, ML engineer, two data analysts, a statistician, research assistants, and a compliance contact). Concentrating all of that work in two people means Phase 1 (segmentation pipeline) will consume most of the PI/Technical Lead’s time, and Phases 2–4 (statistical modeling across three aims) will consume most of the Analyst/Quant Lead’s time nearly back-to-back. Build schedule slack into Phase 0 and expect the Integrated Timeline below to compress or extend depending on how much the two roles can work in parallel versus sequentially.</p>
 <hr>
 </section>
-<section id="phase-0-project-setup-and-data-scoping-weeks-14" class="level2" data-number="3">
-<h2 data-number="3" class="anchored" data-anchor-id="phase-0-project-setup-and-data-scoping-weeks-14"><span class="header-section-number">3</span> Phase 0 — Project Setup and Data Scoping (Weeks 1–4)</h2>
-<p><strong>Tasks</strong> - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago’s ~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Select and provision cloud computing vendor (e.g., Modal, AWS, GCP, Azure) for GPU-based SAM inference and parallelized “serverless” tile-fetch workers; benchmark cost per 1,000 tiles fetched/segmented before committing to full run. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.</p>
+<section id="phase-0-project-setup-and-data-scoping-weeks-14" class="level2">
+<h2 class="anchored" data-anchor-id="phase-0-project-setup-and-data-scoping-weeks-14">Phase 0 — Project Setup and Data Scoping (Weeks 1–4)</h2>
+<p><strong>Tasks</strong> - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago’s ~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Size and provision the team’s existing scalable cloud server for the segmentation pipeline: add/upgrade a GPU-enabled instance for SAM inference and configure parallel CPU worker processes for tile fetch; run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.</p>
 <p><strong>Deliverables:</strong> finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.</p>
 <hr>
 </section>
-<section id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" class="level2" data-number="4">
-<h2 data-number="4" class="anchored" data-anchor-id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12"><span class="header-section-number">4</span> Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)</h2>
-<section id="intersection-tile-retrieval" class="level3" data-number="4.1">
-<h3 data-number="4.1" class="anchored" data-anchor-id="intersection-tile-retrieval"><span class="header-section-number">4.1</span> Intersection &amp; Tile Retrieval</h3>
+<section id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12" class="level2">
+<h2 class="anchored" data-anchor-id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-12">Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–2)</h2>
+<section id="intersection-tile-retrieval" class="level3">
+<h3 class="anchored" data-anchor-id="intersection-tile-retrieval">Intersection &amp; Tile Retrieval</h3>
 <ul>
 <li>Use OSMnx to generate coordinates for all street intersections and mid-block crossings across suburban Cook County municipalities.</li>
 <li>Retrieve satellite tiles (25 m radius, 1629×1629 px, ~30 cm/pixel) via the Google Maps Tile API using the existing parallelized serverless fetch approach, scaled to the larger geography.</li>
 <li>Monitor cloud spend against the Phase 0 benchmark; adjust worker concurrency to control cost and stay within the ~2,000 tiles/minute throughput ceiling observed previously.</li>
 </ul>
 </section>
-<section id="segmentation" class="level3" data-number="4.2">
-<h3 data-number="4.2" class="anchored" data-anchor-id="segmentation"><span class="header-section-number">4.2</span> Segmentation</h3>
+<section id="segmentation" class="level3">
+<h3 class="anchored" data-anchor-id="segmentation">Segmentation</h3>
 <ul>
 <li>Apply the existing fine-tuned SAM 2.1 model to classify drivable vs. non-drivable surfaces on all suburban tiles.</li>
 <li>Spot-check performance on suburban-specific built forms not well represented in the original 14-city training set (e.g., low-density arterial commercial strips, cul-de-sac subdivisions, strip-mall parking aprons) — supplement training data with additional manually annotated suburban intersections if accuracy degrades materially.</li>
 </ul>
 </section>
-<section id="crossing-edge-extraction-grow-cut" class="level3" data-number="4.3">
-<h3 data-number="4.3" class="anchored" data-anchor-id="crossing-edge-extraction-grow-cut"><span class="header-section-number">4.3</span> Crossing Edge Extraction &amp; Grow-Cut</h3>
+<section id="crossing-edge-extraction-grow-cut" class="level3">
+<h3 class="anchored" data-anchor-id="crossing-edge-extraction-grow-cut">Crossing Edge Extraction &amp; Grow-Cut</h3>
 <ul>
 <li>Extract all OSM-coded pedestrian crossing edges (and generate edges from crossing nodes) for suburban municipalities.</li>
 <li>Apply the grow-cut algorithm to compute crossing distances; apply the same post-processing rules (duplicate-buffer merge at 6.5 ft/10°; distance bounds of 6–160 ft).</li>
 </ul>
 </section>
-<section id="validation" class="level3" data-number="4.4">
-<h3 data-number="4.4" class="anchored" data-anchor-id="validation"><span class="header-section-number">4.4</span> Validation</h3>
+<section id="validation" class="level3">
+<h3 class="anchored" data-anchor-id="validation">Validation</h3>
 <ul>
 <li>Manually verify a stratified random sample of crossings across a representative subset of suburban municipalities (varying density/form), targeting the same accuracy benchmark achieved for Chicago (93% accuracy; median absolute error ≈2 ft 3 in).</li>
 <li>Document OSM crossing-coverage completeness by municipality, since crowdsourced OSM density varies more in suburban areas than in the dense urban core.</li>
@@ -2316,27 +2324,86 @@ vertical-align: -.125em;
 <hr>
 </section>
 </section>
-<section id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" class="level2" data-number="5">
-<h2 data-number="5" class="anchored" data-anchor-id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion"><span class="header-section-number">5</span> Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)</h2>
+<section id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" class="level2">
+<h2 class="anchored" data-anchor-id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1">Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)</h2>
+<p>Phase 1 is the only phase in this project that requires cloud GPU compute; Phases 0, 2, 3, and 4 work with municipal-, block-group-, or point-level tabular/vector data and are sized for a local analyst workstation (no GPU required).</p>
+<p><strong>Software stack (single Linux GPU server):</strong></p>
+<ul>
+<li>Ubuntu 22.04 LTS + current NVIDIA driver, CUDA, and cuDNN matched to the PyTorch build in use.</li>
+<li>Python 3.11 environment (conda or venv) with PyTorch (CUDA build), the SAM 2.1 codebase and fine-tuned checkpoint, and the existing grow-cut implementation.</li>
+<li>OSMnx, GeoPandas, Shapely, Fiona, pyproj for intersection/crossing-edge extraction and post-processing.</li>
+<li>Async HTTP client (e.g., <code>httpx</code>/<code>aiohttp</code>) plus a process pool for parallel Google Maps Tile API fetches, decoupled from the GPU inference step (fetch is network/API-bound, inference is GPU-bound — running them as separate concurrent stages avoids idling the GPU).</li>
+<li>Object storage (S3-/GCS-compatible bucket, or large attached block volume) for raw tiles and output masks — provision for hundreds of GB to low TB rather than local disk alone.</li>
+<li>Docker (CUDA base image) to keep the environment reproducible and to make it easy to move the job to a bigger instance size if needed.</li>
+<li>Optional: PostGIS for the assembled crossing-distance dataset; a lightweight job queue (Ray, Celery, or a simple work-queue script) to coordinate fetch/inference/QA stages.</li>
+</ul>
+<p><strong>Sizing logic:</strong> the reference pipeline processed Chicago’s ~80,000 tiles in ~40 minutes using many concurrent serverless GPU workers in parallel (Modal). A single upgraded server does the same total work sequentially/in small batches, so wall-clock time will be substantially longer than 40 minutes — the tradeoff is a simpler, fixed-cost setup instead of many parallel workers. Suburban Cook County is estimated at several hundred thousand tiles (Phase 0 will pin this down from OSMnx intersection counts), so plan for a GPU job on the order of low-tens of hours, not minutes, and validate this estimate with the Phase 0 pilot-batch benchmark before committing to the full run.</p>
+<p><strong>Configuration scenarios (pick one based on your server’s upgrade ceiling and target turnaround):</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scenario</th>
+<th>GPU</th>
+<th>vCPU / RAM</th>
+<th>Storage</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A — Pilot/dev</td>
+<td>1× 16–24 GB GPU (e.g., L4, RTX 4000/4090-class)</td>
+<td>8–16 vCPU / 32–64 GB</td>
+<td>200–500 GB SSD or bucket</td>
+<td>Phase 0 benchmarking, suburban fine-tuning spot-checks, small municipality clusters</td>
+</tr>
+<tr class="even">
+<td>B — Full-county, moderate turnaround</td>
+<td>1× 24–48 GB GPU (e.g., A10G, L40S, RTX A6000-class) with larger inference batch size</td>
+<td>16–32 vCPU / 64–128 GB</td>
+<td>1–2 TB bucket/block storage</td>
+<td>Full suburban run in a small number of GPU-days; recommended default</td>
+</tr>
+<tr class="odd">
+<td>C — Full-county, fast turnaround</td>
+<td>2–4× GPUs (A10G/L40S/A100-class) run as parallel workers against a shared tile/output queue</td>
+<td>32–64+ vCPU / 128–256 GB</td>
+<td>1–2 TB bucket/block storage</td>
+<td>Compressing the full run into roughly a day when the server tier supports multi-GPU or a small autoscaling group</td>
+</tr>
+</tbody>
+</table>
+<p>Start with Scenario A to benchmark cost and throughput per 1,000 tiles (Phase 0 deliverable), then size up to B or C for the full suburban run based on the actual tile-count estimate and desired turnaround.</p>
+<hr>
+</section>
+<section id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion" class="level2">
+<h2 class="anchored" data-anchor-id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-3-4-overlapping-phase-1-completion">Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 3-4, overlapping Phase 1 completion)</h2>
 <p><strong>Tasks</strong> - Aggregate crossing-distance statistics (median, mean, distribution, count) to the municipal level for all ~135 Cook County jurisdictions. - Assemble municipal/block-group socioeconomic covariates: - <strong>ADI</strong> (Neighborhood Atlas, block-group level, aggregated to municipality via population-weighted crosswalk). - <strong>Population and housing</strong> (ACS 5-year estimates: density, tenure, vehicle ownership, age structure, poverty rate). - <strong>Employment</strong> (ACS/LEHD LODES: employment density, commute mode share, jobs-housing balance). - Incorporation year and land-area (already partially available from the national study) for comparability with prior findings on crossing distance and municipal age. - Conduct descriptive and spatial analysis: choropleth mapping of median crossing distance by municipality; bivariate/multivariate regression of crossing distance on ADI and demographic/employment covariates, controlling for municipal age, density, and street network form. - Test for spatial autocorrelation/clustering (e.g., Moran’s I) in crossing distance across municipalities and at the sub-municipal (block group) level within suburban Cook County.</p>
 <p><strong>Deliverables:</strong> municipal-level merged dataset (crossing distance + ADI + demographics + employment); descriptive report and maps; regression results manuscript draft.</p>
 <hr>
 </section>
-<section id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" class="level2" data-number="6">
-<h2 data-number="6" class="anchored" data-anchor-id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56"><span class="header-section-number">6</span> Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)</h2>
+<section id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56" class="level2">
+<h2 class="anchored" data-anchor-id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-56">Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 5–6)</h2>
 <p><strong>Tasks</strong> - Acquire latest FARS data (NHTSA) for Cook County, filtered to pedestrian fatalities, with available geocoordinates. - Geocode/validate FARS fatality point locations; spatially join each fatality to its nearest measured crossing (or nearest intersection) within a defined buffer distance, using street-network-aware (not straight-line) distance where feasible. - Construct a matched/case-control or spatial point-pattern framework: compare crossing distances at fatality-adjacent locations to distances at a representative sample of non-fatality intersections/crossings (citywide + suburban), controlling for roadway functional class, speed limit (if available via IDOT), lighting/time-of-day, and land use. - Model relationship between crossing distance and fatality occurrence/likelihood (e.g., logistic regression, spatial Poisson/negative binomial for intersection-level fatality counts, or point-process modeling), replicating and extending the exposure-based approach used in the smaller-city case studies (Paris, San Francisco, Irvine) at Cook County scale. - Assess whether the relationship between crossing distance and fatality risk holds consistently in dense urban Chicago vs. lower-density suburban contexts (interaction term / stratified models).</p>
 <p><strong>Deliverables:</strong> FARS-crossing linked point dataset; fatality risk model results; manuscript draft (potentially standalone paper testing whether crossing-distance/safety associations found in smaller studies hold at metro scale).</p>
 <hr>
 </section>
-<section id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" class="level2" data-number="7">
-<h2 data-number="7" class="anchored" data-anchor-id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78"><span class="header-section-number">7</span> Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)</h2>
+<section id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78" class="level2">
+<h2 class="anchored" data-anchor-id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-78">Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 7–8)</h2>
 <p><strong>Tasks</strong> - Negotiate access to EMS pedestrian/motor-vehicle crash injury records (likely via Cook County EMS Resource Hospital system, individual suburban Fire/EMS departments, or IDPH’s EMS data system) — this will require a data-use/sharing agreement and may need IRB determination given proximity to identifiable health data, even if aggregated. - Aggregate EMS-reported pedestrian/MV crash injury counts (and severity, if available) to the municipal level for suburban Cook County. - Merge with Phase 2’s municipal crossing-distance and socioeconomic dataset. - Model relationship between municipal median/aggregate crossing distance and injury rates (e.g., injuries per capita, per intersection, or per VMT if exposure data available), controlling for ADI, population density, and roadway characteristics. - Compare findings to the point-level FARS fatality results (Aim 3) to assess consistency between fatality-based and injury-based safety measures.</p>
 <p><strong>Deliverables:</strong> suburban municipal EMS-crossing merged dataset; injury-rate model results; comparative memo (fatality vs. injury associations).</p>
 <p><strong>Key risk:</strong> EMS data access/timeline is the most uncertain dependency in the plan, given data-sharing agreements and potential privacy/IRB review. <em>Mitigation:</em> initiate outreach and agreement negotiation in Phase 0, in parallel with segmentation work, so Phase 4 is not blocked by Phase 1–3 timelines; identify a fallback data source (e.g., IDOT crash data with injury severity coding) if EMS-specific data proves inaccessible within the project timeline.</p>
 <hr>
 </section>
-<section id="integrated-timeline-illustrative-14-month-project" class="level2" data-number="8">
-<h2 data-number="8" class="anchored" data-anchor-id="integrated-timeline-illustrative-14-month-project"><span class="header-section-number">8</span> Integrated Timeline (Illustrative, ~14-Month Project)</h2>
+<section id="integrated-timeline-illustrative-14-month-project" class="level2">
+<h2 class="anchored" data-anchor-id="integrated-timeline-illustrative-14-month-project">Integrated Timeline (Illustrative, ~14-Month Project)</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 14%">
@@ -2427,8 +2494,8 @@ vertical-align: -.125em;
 <p><em>(Timeline should be adjusted once actual suburban tile volume and EMS data-access timelines are confirmed in Phase 0.)</em></p>
 <hr>
 </section>
-<section id="budget-considerations" class="level2" data-number="9">
-<h2 data-number="9" class="anchored" data-anchor-id="budget-considerations"><span class="header-section-number">9</span> Budget Considerations</h2>
+<section id="budget-considerations" class="level2">
+<h2 class="anchored" data-anchor-id="budget-considerations">Budget Considerations</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -2459,18 +2526,18 @@ vertical-align: -.125em;
 </tr>
 <tr class="odd">
 <td>Personnel</td>
-<td>GIS/ML engineering time (heaviest in Phase 1), analyst/statistician time (Phases 2–4).</td>
+<td>PI/Technical Lead time for GIS/ML engineering and cloud infrastructure (heaviest in Phases 0–1); Data Analyst/Quant Lead time for statistical modeling (heaviest in Phases 2–4). With only two people, plan for limited slack to absorb overlap between the end of Phase 1 and the start of Phase 2.</td>
 </tr>
 <tr class="even">
 <td>Manual validation</td>
-<td>RA time for stratified accuracy-verification sampling in suburban municipalities.</td>
+<td>Data Analyst/Quant Lead time for stratified accuracy-verification sampling in suburban municipalities, supported by the PI/Technical Lead on pipeline-side QA.</td>
 </tr>
 </tbody>
 </table>
 <hr>
 </section>
-<section id="data-sources-summary" class="level2" data-number="10">
-<h2 data-number="10" class="anchored" data-anchor-id="data-sources-summary"><span class="header-section-number">10</span> Data Sources Summary</h2>
+<section id="data-sources-summary" class="level2">
+<h2 class="anchored" data-anchor-id="data-sources-summary">Data Sources Summary</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -2539,8 +2606,8 @@ vertical-align: -.125em;
 </table>
 <hr>
 </section>
-<section id="risks-and-mitigations-summary" class="level2" data-number="11">
-<h2 data-number="11" class="anchored" data-anchor-id="risks-and-mitigations-summary"><span class="header-section-number">11</span> Risks and Mitigations Summary</h2>
+<section id="risks-and-mitigations-summary" class="level2">
+<h2 class="anchored" data-anchor-id="risks-and-mitigations-summary">Risks and Mitigations Summary</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -2581,8 +2648,8 @@ vertical-align: -.125em;
 </table>
 <hr>
 </section>
-<section id="anticipated-outputs" class="level2" data-number="12">
-<h2 data-number="12" class="anchored" data-anchor-id="anticipated-outputs"><span class="header-section-number">12</span> Anticipated Outputs</h2>
+<section id="anticipated-outputs" class="level2">
+<h2 class="anchored" data-anchor-id="anticipated-outputs">Anticipated Outputs</h2>
 <ol type="1">
 <li>Public/shareable Cook County (city + suburban) crosswalk-distance dataset, extending the existing Chicago dataset.</li>
 <li>Manuscript: municipal-level crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).</li>
@@ -2593,8 +2660,8 @@ vertical-align: -.125em;
 </ol>
 <hr>
 </section>
-<section id="open-decisions-requiring-early-input" class="level2" data-number="13">
-<h2 data-number="13" class="anchored" data-anchor-id="open-decisions-requiring-early-input"><span class="header-section-number">13</span> Open Decisions Requiring Early Input</h2>
+<section id="open-decisions-requiring-early-input" class="level2">
+<h2 class="anchored" data-anchor-id="open-decisions-requiring-early-input">Open Decisions Requiring Early Input</h2>
 <ul>
 <li>Should unincorporated Cook County areas be included, or only the ~135 incorporated municipalities?</li>
 <li>Which EMS data source is most feasible (single regional system vs. IDPH statewide extract filtered to Cook County)?</li>

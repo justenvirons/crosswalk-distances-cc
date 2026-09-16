@@ -1,12 +1,21 @@
 ---
 title: "Work Plan: Extending AI-Based Crosswalk Segmentation and Pedestrian Safety Analysis to All of Cook County"
-author: ""
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+    # email: 
 date: today
 format:
   html:
     toc: true
     toc-depth: 2
-    number-sections: true
+    number-sections: false
     theme: cosmo
     embed-resources: true
   pdf:
@@ -34,11 +43,8 @@ This project is staffed by a two-person team. All responsibilities from the broa
 
 | Role | Responsibility |
 |------------------------------------|------------------------------------|
-| PI / GIS, ML & Data Governance Lead | Overall direction and methodology oversight; OSM extraction and tile-download pipeline; cloud infrastructure provisioning and management; SAM fine-tuning/inference and grow-cut algorithm adaptation and QA; data governance and compliance (EMS data-use agreements, IRB/data-sharing review if needed); dissemination |
-| Data Analyst / Statistician & Quant Lead | Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance |
-
-**Capacity note:** the reference methodology (national 100-city study) assumed a larger team (separate GIS engineer, ML engineer, two data analysts, a statistician, research assistants, and a compliance contact). Concentrating all of that work in two people means Phase 1 (segmentation pipeline) will consume most of the PI/Technical Lead's time, and Phases 2–4 (statistical modeling across three aims) will consume most of the Analyst/Quant Lead's time nearly back-to-back. Build schedule slack into Phase 0 and expect the Integrated Timeline below to compress or extend depending on how much the two roles can work in parallel versus sequentially.
-
+| PI / GIS, ML & Data Governance Lead (Smith) | Overall direction and methodology oversight; OSM extraction and tile-download pipeline; cloud infrastructure provisioning and management; SAM fine-tuning/inference and grow-cut algorithm adaptation and QA; data governance and compliance (EMS data-use agreements, IRB/data-sharing review if needed); dissemination |
+| Data Analyst / Statistician & Quant Lead (Sufi) | Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance |
 ------------------------------------------------------------------------
 
 ## Phase 0 — Project Setup and Data Scoping (Weeks 1–4)
