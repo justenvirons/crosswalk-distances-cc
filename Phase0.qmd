@@ -153,14 +153,24 @@ library(units)
 
 reticulate::use_condaenv("osmnx-env", required = TRUE)
 
-ox <- reticulate::import("osmnx")
-gpd <- reticulate::import("geopandas")
-shapely_wkt <- reticulate::import("shapely.wkt")
+# convert = FALSE: keep everything returned by these modules as live Python
+# object references instead of letting reticulate auto-convert them to R the
+# instant a call returns. This matters because reticulate's built-in pandas/
+# GeoSeries -> R converter is unreliable on some reticulate/pandas version
+# combinations and can crash with "names() applied to a non-vector" the
+# moment a function like consolidate_intersections() returns -- before any
+# of our own R code even runs. With convert = FALSE nothing auto-converts;
+# Steps 4-5 explicitly reticulate::py_to_r() only the final, simple numeric
+# values they need (numpy arrays, not pandas Series/Index), which uses a
+# different, reliable conversion path.
+ox <- reticulate::import("osmnx", convert = FALSE)
+gpd <- reticulate::import("geopandas", convert = FALSE)
+shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
 
 ox$settings$use_cache <- TRUE
 ox$settings$log_console <- TRUE
 
-cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
+cli::cli_alert_info("osmnx version: {reticulate::py_to_r(ox$`__version__`)}")
 ```
 
 ------------------------------------------------------------------------
@@ -350,17 +360,19 @@ get_muni_intersections <- function(muni_id, muni_name, wkt,
   if (!is.null(tolerance)) consolidate_args$tolerance <- tolerance
   intersections <- do.call(ox$consolidate_intersections, consolidate_args)
 
-  # intersections is already a GeoSeries -- call .to_crs()/.get_coordinates()
-  # directly on it (matching osm_ingest.py's raw_intersection_coordinates
-  # export) rather than rebuilding a GeoDataFrame from it. Rebuilding one via
-  # gpd$GeoDataFrame(geometry = intersections, crs = intersections$crs)
-  # touches the pyproj CRS object through reticulate's automatic conversion,
-  # which breaks with "names() applied to a non-vector" -- accessing
-  # intersections$crs is what triggers the broken conversion, so avoid it.
-  coords <- reticulate::py_to_r(intersections$to_crs("EPSG:4326")$get_coordinates())
-  coords %>%
+  # intersections is a non-converting (convert = FALSE) Python GeoSeries --
+  # call .to_crs()/.get_coordinates() directly on it (matching osm_ingest.py's
+  # raw_intersection_coordinates export) rather than rebuilding a GeoDataFrame
+  # from it. Extract the x/y columns as numpy arrays (.to_numpy()) rather than
+  # converting the pandas DataFrame/Series itself -- numpy arrays have a
+  # simple, reliable reticulate conversion, whereas converting a pandas
+  # object (which carries an Index) is the operation that crashes.
+  coords_df <- intersections$to_crs("EPSG:4326")$get_coordinates()
+  lon <- as.numeric(reticulate::py_to_r(coords_df$x$to_numpy()))
+  lat <- as.numeric(reticulate::py_to_r(coords_df$y$to_numpy()))
+
+  data.frame(lon = lon, lat = lat) %>%
     as_tibble() %>%
-    rename(lon = x, lat = y) %>%
     mutate(muni_id = muni_id, muni_name = muni_name)
 }
 ```
@@ -378,13 +390,19 @@ RADIUS_M <- 25.0  # matches inference/utils.py RADIUS
 get_muni_crossing_adjacent_intersections <- function(muni_id, muni_name, wkt) {
   poly <- shapely_wkt$loads(wkt)
 
+  # crosswalk_features stays a non-converting (convert = FALSE) Python
+  # GeoDataFrame -- as in get_muni_intersections(), avoid ever converting
+  # it (or a pandas Series drawn from it) directly with py_to_r(), since
+  # that pandas/GeoSeries -> R conversion path is what crashes with
+  # "names() applied to a non-vector". Check emptiness via the plain
+  # Python bool .empty attribute instead of converting the whole frame.
   crosswalk_features <- tryCatch(
     ox$features_from_polygon(
       poly, tags = list(highway = "crossing", crossing = TRUE, disused = FALSE)
     ),
     error = function(e) NULL
   )
-  if (is.null(crosswalk_features) || nrow(reticulate::py_to_r(crosswalk_features)) == 0) {
+  if (is.null(crosswalk_features) || isTRUE(reticulate::py_to_r(crosswalk_features$empty))) {
     return(NULL)  # no tagged crossings in this municipality
   }
 
@@ -394,8 +412,14 @@ get_muni_crossing_adjacent_intersections <- function(muni_id, muni_name, wkt) {
   intersections_sf <- st_as_sf(intersections_result, coords = c("lon", "lat"), crs = 4326) %>%
     st_transform(3857)
 
-  crossings_sf <- reticulate::py_to_r(crosswalk_features$to_crs("EPSG:3857")) %>%
-    st_as_sf()
+  # Extract crossing geometries as WKT text via a numpy array (safe to
+  # convert), then build sf geometries from WKT directly -- bypassing
+  # GeoDataFrame conversion entirely, same as the coordinate extraction
+  # in get_muni_intersections().
+  crossings_wkt <- reticulate::py_to_r(
+    crosswalk_features$to_crs("EPSG:3857")$geometry$to_wkt()$to_numpy()
+  )
+  crossings_sf <- st_sf(geometry = st_as_sfc(crossings_wkt, crs = 3857))
 
   nearest <- st_is_within_distance(intersections_sf, crossings_sf, dist = RADIUS_M)
   intersections_result[lengths(nearest) > 0, ]
