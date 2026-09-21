@@ -163,61 +163,63 @@ cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
 ## Step 2 — Create Cook County Geometry Layers
 
 ```{r}
+#| label: area-sqmi-helper
+# Shared by both boundary layers below: convert Census ALAND/AWATER (m^2)
+# into land/water/total area in square miles, dropping the m^2 intermediates.
+add_area_sqmi <- function(df) {
+  df %>%
+    mutate(
+      area_land = set_units(area_land, m^2),
+      area_water = set_units(area_water, m^2),
+      area_land_sqmi = set_units(area_land, mi^2),
+      area_water_sqmi = set_units(area_water, mi^2),
+      area_sqmi = area_land_sqmi + area_water_sqmi
+    ) %>%
+    select(-c(area_land, area_water))
+}
+```
+
+```{r}
 #| label: load-boundaries
 # download latest counties data from US Census TIGER/Line data
 counties_il <- counties(state="17", cb=TRUE)
 
 # reformat data, standardize column names
 cc_boundary <- counties_il %>%
-  filter(GEOID == "17031") %>% 
+  filter(GEOID == "17031") %>%
   st_transform(3435) %>%
   st_as_sf() %>%
   select(geoid_county = GEOID,
          name_county = NAME,
          area_land = ALAND,
          area_water = AWATER) %>%
-  mutate(area_land = set_units(area_land,m^2),
-         area_water = set_units(area_water,m^2),
-         area_land_sqmi = set_units(area_land, mi^2),
-         area_water_sqmi = set_units(area_water,mi^2),
-         area_sqmi = area_land_sqmi + area_water_sqmi) %>%
-  select(-c(area_land,area_water))
+  add_area_sqmi()
 
 # write cook county boundary to data/boundaries folder
 st_write(obj = cc_boundary, dsn = "data/boundaries/cc_boundary.shp")
 
 # download latest places data from US Census TIGER/Line data
-il_places <- places(state="17", cb=TRUE) %>% 
+il_places <- places(state="17", cb=TRUE) %>%
   st_transform(3435) %>%
-  st_as_sf() 
+  st_as_sf()
 
 # cook county geometry
 cc_geom <- st_geometry(cc_boundary)
 
-# Fully within the boundary
-places_in_cc <- il_places %>%
-  filter(lengths(st_within(geometry, cc_geom)) > 0)
-
-# Any overlap
-places_touching_cc <- il_places %>%
-  filter(lengths(st_intersects(geometry, cc_geom)) > 0)
-
-# Centroid inside the boundary
+# Centroid inside the boundary -- the join rule used to assign each Census
+# place to Cook County (a cleaner one-to-one assignment than st_within()/
+# st_intersects() on the full geometry, which can multi-count a place that
+# merely touches or straddles the county line)
 places_by_centroid <- il_places %>%
   filter(lengths(st_within(st_centroid(geometry), cc_geom)) > 0)
 
 # rename and format places
-cc_municipalities <- places_by_centroid %>% 
+cc_municipalities <- places_by_centroid %>%
   select(geoid_place = GEOID,
          name_place = NAME,
          area_land = ALAND,
          area_water = AWATER) %>%
-  mutate(area_land = set_units(area_land,m^2),
-         area_water = set_units(area_water,m^2),
-         area_land_sqmi = set_units(area_land, mi^2),
-         area_water_sqmi = set_units(area_water,mi^2),
-         area_sqmi = area_land_sqmi + area_water_sqmi) %>%
-  select(-c(area_land,area_water))
+  add_area_sqmi()
 
 # write cook county boundary to data/boundaries folder
 st_write(obj = cc_municipalities, dsn = "data/boundaries/cc_municipalities.shp")
