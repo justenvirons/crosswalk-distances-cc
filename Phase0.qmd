@@ -98,7 +98,7 @@ install.packages(c(
     # Common locations:
     #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
     #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe or C:/Users/<you>/Miniconda3/Scripts/conda.exe
-    Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts")
+    Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts/conda.exe")
     ```
 
 -   **Would rather not install conda at all** — use your existing Python 3.13 via a `venv`-based environment instead of a conda one (no conda required). This replaces the `conda_create()`/`conda_install()`/`use_condaenv()` calls throughout this document with their virtualenv equivalents:
