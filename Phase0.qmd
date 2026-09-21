@@ -79,7 +79,20 @@ install.packages(c(
 
     **On Windows in particular:** after this finishes, **restart your R session** (RStudio: Session → Restart R, or close and reopen RStudio) before running `conda_create()`. Reticulate caches its conda-path lookup for the life of the R session, so if you run `install_miniconda()` and then immediately retry `conda_create()` in the *same* session, you can still get the "unable to find conda binary" error even though the install succeeded. A fresh session picks up the new install.
 
--   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the `PATH` RStudio sees). Point `reticulate` at it explicitly, using the actual path to your `conda` executable, then restart R:
+-   **`install_miniconda()` reported success, but `use_condaenv()`/`conda_create()` still fail** — with a warning like `Supplied path is not a conda binary: '.../r-miniconda'` or `'.../r-miniconda' not found`. This means something is pointing `reticulate` at the miniconda **install directory** itself (the path `install_miniconda()` printed, e.g. `C:/Users/<you>/AppData/Local/r-miniconda`) instead of the `conda` **executable** inside it — those are not the same path, and `reticulate` needs the executable. The most common cause is having previously set `RETICULATE_CONDA` (per the next bullet) to that install-root path rather than a binary. Fix: clear the override and let `reticulate` auto-manage its own miniconda install, then restart R:
+
+    ```{r}
+    #| label: clear-bad-reticulate-conda-override
+    #| eval: false
+    Sys.getenv("RETICULATE_CONDA")  # check what's currently set, if anything
+    Sys.unsetenv("RETICULATE_CONDA")
+    # If Sys.getenv() above returned something even in a fresh session, also check
+    # for a lingering RETICULATE_CONDA= line in usethis::edit_r_environ() and remove it.
+    ```
+
+    Then restart R and retry `reticulate::conda_binary()` (should now resolve to something like `.../r-miniconda/condabin/conda.bat` on Windows) before re-running `conda_create()`/`use_condaenv()`.
+
+-   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the `PATH` RStudio sees). Point `reticulate` at it explicitly, using the actual path to your `conda` **executable** (not just the install folder), then restart R:
 
     ```{r}
     #| label: point-reticulate-at-conda
