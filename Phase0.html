@@ -2212,7 +2212,7 @@ vertical-align: -.125em;
   <li><a href="#how-this-parallels-osm_ingest.py" id="toc-how-this-parallels-osm_ingest.py" class="nav-link" data-scroll-target="#how-this-parallels-osm_ingest.py"><span class="header-section-number">2</span> How this parallels <code>osm_ingest.py</code></a></li>
   <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites"><span class="header-section-number">3</span> Prerequisites</a></li>
   <li><a href="#step-1-connect-r-to-the-osmnx-python-environment" id="toc-step-1-connect-r-to-the-osmnx-python-environment" class="nav-link" data-scroll-target="#step-1-connect-r-to-the-osmnx-python-environment"><span class="header-section-number">4</span> Step 1 — Connect R to the OSMnx Python environment</a></li>
-  <li><a href="#step-2-create-load-cook-county-boundaries" id="toc-step-2-create-load-cook-county-boundaries" class="nav-link" data-scroll-target="#step-2-create-load-cook-county-boundaries"><span class="header-section-number">5</span> Step 2 — Create, Load Cook County boundaries</a></li>
+  <li><a href="#step-2-create-cook-county-geometry-layers" id="toc-step-2-create-cook-county-geometry-layers" class="nav-link" data-scroll-target="#step-2-create-cook-county-geometry-layers"><span class="header-section-number">5</span> Step 2 — Create Cook County Geometry Layers</a></li>
   <li><a href="#step-3-build-the-per-municipality-run-list-parallel-to-envs_100_cities.csv" id="toc-step-3-build-the-per-municipality-run-list-parallel-to-envs_100_cities.csv" class="nav-link" data-scroll-target="#step-3-build-the-per-municipality-run-list-parallel-to-envs_100_cities.csv"><span class="header-section-number">6</span> Step 3 — Build the per-municipality run list (parallel to <code>envs_100_cities.csv</code>)</a></li>
   <li><a href="#step-4-define-the-per-municipality-intersection-extraction-function" id="toc-step-4-define-the-per-municipality-intersection-extraction-function" class="nav-link" data-scroll-target="#step-4-define-the-per-municipality-intersection-extraction-function"><span class="header-section-number">7</span> Step 4 — Define the per-municipality intersection extraction function</a></li>
   <li><a href="#step-5-optional-refinement-filter-to-intersections-near-a-pedestrian-crossing" id="toc-step-5-optional-refinement-filter-to-intersections-near-a-pedestrian-crossing" class="nav-link" data-scroll-target="#step-5-optional-refinement-filter-to-intersections-near-a-pedestrian-crossing"><span class="header-section-number">8</span> Step 5 — (Optional refinement) Filter to intersections near a pedestrian crossing</a></li>
@@ -2258,10 +2258,10 @@ vertical-align: -.125em;
 <p>It is written to be <strong>parallel to</strong>, not a reimplementation of, the intersection-extraction logic already used in the reference methodology repository (<a href="https://github.com/agupta01/crossing-distances"><code>agupta01/crossing-distances</code></a>, specifically <code>inference/osm_ingest.py</code>). Rather than porting OSMnx’s algorithms into native R, this workflow uses <code>reticulate</code> to call the real Python <code>osmnx</code> package from R, so the intersection-consolidation results are the <em>same</em> algorithm, not an approximation of it. R’s role here is orchestration: loading the local Cook County shapefiles, looping over municipalities, and assembling the summary tables — the geometric work (<code>consolidate_intersections</code>, graph filtering) is delegated to <code>osmnx</code> itself.</p>
 <p>Two things differ deliberately from the reference repo’s approach, because this project is county-scale rather than a name-geocoded, single-city pull:</p>
 <ol type="1">
-<li><strong>Boundaries come from local shapefiles</strong>, not <code>osmnx.graph_from_place()</code>’s Nominatim geocoding. You provide <code>cc_boundary.shp</code> (Cook County outline) and <code>cc_municipalities.shp</code> (municipal polygons), and the workflow calls <code>ox.graph_from_polygon()</code> per municipality instead.</li>
+<li><strong>Boundaries come from local shapefiles</strong>, not <code>osmnx.graph_from_place()</code>’s Nominatim geocoding. Step 2 builds <code>cc_boundary.shp</code> (Cook County outline) and <code>cc_municipalities.shp</code> (municipal polygons) from Census TIGER/Line data via <code>tigris</code> and writes them under <code>data/boundaries/</code>, and the workflow calls <code>ox.graph_from_polygon()</code> per municipality against those instead.</li>
 <li><strong>One run per municipality</strong>, batched into “waves” — the same batching idea as the reference repo’s <code>config/envs_100_cities.csv</code> (<code>Code</code>/<code>Wave</code> columns), just keyed to ~135 Cook County municipalities instead of ~100 US metro areas.</li>
 </ol>
-<p>All code chunks below default to <code>eval: false</code> (see YAML header) since this document is written before the shapefiles exist in the repo. Once <code>cc_boundary.shp</code>/<code>cc_municipalities.shp</code> are added under <code>data/boundaries/</code>, flip chunks to <code>eval: true</code> (or knit interactively in RStudio) to run them.</p>
+<p>All code chunks below default to <code>eval: false</code> (see YAML header) so nothing runs unattended on open — review each chunk, then flip to <code>eval: true</code> (or knit interactively in RStudio) to run it.</p>
 <hr>
 </section>
 <section id="how-this-parallels-osm_ingest.py" class="level2" data-number="2">
@@ -2327,11 +2327,7 @@ vertical-align: -.125em;
 </section>
 <section id="prerequisites" class="level2" data-number="3">
 <h2 data-number="3" class="anchored" data-anchor-id="prerequisites"><span class="header-section-number">3</span> Prerequisites</h2>
-<p><strong>Inputs</strong> (place under <code>data/boundaries/</code> in this repo):</p>
-<ul>
-<li><code>cc_boundary.shp</code> — single-polygon Cook County outline.</li>
-<li><code>cc_municipalities.shp</code> — one polygon per incorporated municipality, with an attribute field identifying each municipality (field name unknown until the file is in hand — Step 3 below shows how to confirm it; do not assume a specific field name).</li>
-</ul>
+<p><strong>Inputs:</strong> none pre-supplied — Step 2 builds <code>data/boundaries/cc_boundary.shp</code> and <code>data/boundaries/cc_municipalities.shp</code> itself from Census TIGER/Line data via <code>tigris</code>. If you already have official Cook County GIS boundary files you’d rather use instead, drop them at those same paths and skip the <code>tigris</code> download portion of Step 2.</p>
 <p><strong>R packages:</strong></p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(</span>
@@ -2340,132 +2336,190 @@ vertical-align: -.125em;
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p><strong>Python environment (via reticulate):</strong> a conda or venv environment with <code>osmnx</code> installed. Match the version family used in the reference repo’s Modal image (<code>gboeing/osmnx:latest</code>, see <code>inference/utils.py</code>) — after installing, print <code>ox$__version__</code> and record it alongside these results for reproducibility, rather than assuming a specific pinned version here.</p>
+<p><strong>Before running the chunk below:</strong> <code>reticulate::conda_create()</code>/<code>use_condaenv()</code> need a working <strong>conda</strong> binary (from Anaconda or Miniconda) — this is a separate installer from Python itself. Having Python already installed (e.g., Python 3.13 from python.org, the Microsoft Store, or elsewhere) does <strong>not</strong> satisfy this; <code>conda_create()</code> will always throw <code>Error: Unable to find conda binary. Is Anaconda installed?</code> regardless of what Python version is already on the machine, because it’s specifically looking for <code>conda</code>, not <code>python</code>. Pick one of the two paths below:</p>
+<ul>
+<li><p><strong>No conda installed at all (recommended default)</strong> — let <code>reticulate</code> manage its own private Miniconda install, which won’t touch or conflict with your existing Python 3.13:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_create</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">packages =</span> <span class="st">&quot;python=3.11&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_install</span>(</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;osmnx-env&quot;</span>,</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">packages =</span> <span class="fu">c</span>(<span class="st">&quot;osmnx&quot;</span>, <span class="st">&quot;geopandas&quot;</span>, <span class="st">&quot;shapely&quot;</span>),</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">pip =</span> <span class="cn">TRUE</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">install_miniconda</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><strong>On Windows in particular:</strong> after this finishes, <strong>restart your R session</strong> (RStudio: Session → Restart R, or close and reopen RStudio) before running <code>conda_create()</code>. Reticulate caches its conda-path lookup for the life of the R session, so if you run <code>install_miniconda()</code> and then immediately retry <code>conda_create()</code> in the <em>same</em> session, you can still get the “unable to find conda binary” error even though the install succeeded. A fresh session picks up the new install.</p></li>
+<li><p><strong><code>install_miniconda()</code> reported success, but <code>use_condaenv()</code>/<code>conda_create()</code> still fail</strong> — with a warning like <code>Supplied path is not a conda binary: &#39;.../r-miniconda&#39;</code> or <code>&#39;.../r-miniconda&#39; not found</code>. This means something is pointing <code>reticulate</code> at the miniconda <strong>install directory</strong> itself (the path <code>install_miniconda()</code> printed, e.g. <code>C:/Users/&lt;you&gt;/AppData/Local/r-miniconda</code>) instead of the <code>conda</code> <strong>executable</strong> inside it — those are not the same path, and <code>reticulate</code> needs the executable. The most common cause is having previously set <code>RETICULATE_CONDA</code> (per the next bullet) to that install-root path rather than a binary. Fix: clear the override and let <code>reticulate</code> auto-manage its own miniconda install, then restart R:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.getenv</span>(<span class="st">&quot;RETICULATE_CONDA&quot;</span>)  <span class="co"># check what&#39;s currently set, if anything</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.unsetenv</span>(<span class="st">&quot;RETICULATE_CONDA&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># If Sys.getenv() above returned something even in a fresh session, also check</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># for a lingering RETICULATE_CONDA= line in usethis::edit_r_environ() and remove it.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Then restart R and retry <code>reticulate::conda_binary()</code> (should now resolve to something like <code>.../r-miniconda/condabin/conda.bat</code> on Windows) before re-running <code>conda_create()</code>/<code>use_condaenv()</code>.</p></li>
+<li><p><strong>Conda is installed, but <code>reticulate</code> can’t find it</strong> (common when conda isn’t on the <code>PATH</code> RStudio sees). Point <code>reticulate</code> at it explicitly, using the actual path to your <code>conda</code> <strong>executable</strong> (not just the install folder), then restart R:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Common locations:</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   Windows:     C:/Users/&lt;you&gt;/Anaconda3/Scripts/conda.exe or C:/Users/&lt;you&gt;/Miniconda3/Scripts/conda.exe</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">RETICULATE_CONDA =</span> <span class="st">&quot;/full/path/to/conda&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div></li>
+<li><p><strong>Would rather not install conda at all</strong> — use your existing Python 3.13 via a <code>venv</code>-based environment instead of a conda one (no conda required). This replaces the <code>conda_create()</code>/<code>conda_install()</code>/<code>use_condaenv()</code> calls throughout this document with their virtualenv equivalents:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">virtualenv_create</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">python =</span> <span class="st">&quot;3.13&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">virtualenv_install</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;osmnx-env&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">packages =</span> <span class="fu">c</span>(<span class="st">&quot;osmnx&quot;</span>, <span class="st">&quot;geopandas&quot;</span>, <span class="st">&quot;shapely&quot;</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># then in Step 1, use:</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># reticulate::use_virtualenv(&quot;osmnx-env&quot;, required = TRUE)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Caveat: Python 3.13 is very new, and <code>geopandas</code>’s underlying GDAL/GEOS/PROJ dependencies (via <code>fiona</code>/<code>pyproj</code>) sometimes lag behind the newest Python release in having prebuilt pip wheels on Windows. If <code>virtualenv_install()</code> fails trying to build one of these from source, that’s what’s happening — fall back to the conda path above (conda-forge reliably has these prebuilt) or point <code>virtualenv_create()</code> at an older installed Python (3.11/3.12) if you have one, rather than 3.13.</p></li>
+</ul>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_create</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">packages =</span> <span class="st">&quot;python=3.11&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_install</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;osmnx-env&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">packages =</span> <span class="fu">c</span>(<span class="st">&quot;osmnx&quot;</span>, <span class="st">&quot;geopandas&quot;</span>, <span class="st">&quot;shapely&quot;</span>),</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">pip =</span> <span class="cn">TRUE</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <hr>
 </section>
 <section id="step-1-connect-r-to-the-osmnx-python-environment" class="level2" data-number="4">
 <h2 data-number="4" class="anchored" data-anchor-id="step-1-connect-r-to-the-osmnx-python-environment"><span class="header-section-number">4</span> Step 1 — Connect R to the OSMnx Python environment</h2>
-<p><strong>Before running this chunk:</strong> <code>reticulate::use_condaenv()</code> needs a working <code>conda</code> installation on your machine. If you hit <code>Error: Unable to find conda binary. Is Anaconda installed?</code>, you’re missing one of two things:</p>
-<ul>
-<li><p><strong>No conda installed at all</strong> — the simplest fix is to let <code>reticulate</code> manage its own private Miniconda install rather than depending on a system Anaconda/Miniconda:</p>
+<p>If <code>conda_create()</code> in Prerequisites already succeeded, this chunk should just work. If you’re hitting a conda-related error here, see the troubleshooting bullets in the Prerequisites section above (a step-specific duplicate used to live here — consolidated there so there’s one place to look, and so chunk labels aren’t duplicated across the document).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">install_miniconda</span>()  <span class="co"># one-time; then re-run Step 1 and the Prerequisites conda_create/conda_install chunks</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div></li>
-<li><p><strong>Conda is installed, but <code>reticulate</code> can’t find it</strong> (common when conda isn’t on the shell <code>PATH</code> RStudio sees — e.g., installed for a different shell, or a non-default location). Point <code>reticulate</code> at it explicitly before calling <code>use_condaenv()</code>, using the actual path to your <code>conda</code> executable:</p>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Common locations:</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   Windows:     C:/Users/&lt;you&gt;/Anaconda3/Scripts/conda.exe</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">RETICULATE_CONDA =</span> <span class="st">&quot;/full/path/to/conda&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div></li>
-</ul>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(reticulate)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glue)</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cli)</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tigris)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(units)</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">use_condaenv</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">required =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>ox <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;osmnx&quot;</span>)</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>gpd <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;geopandas&quot;</span>)</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>shapely_wkt <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;shapely.wkt&quot;</span>)</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>ox<span class="sc">$</span>settings<span class="sc">$</span>use_cache <span class="ot">&lt;-</span> <span class="cn">TRUE</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>ox<span class="sc">$</span>settings<span class="sc">$</span>log_console <span class="ot">&lt;-</span> <span class="cn">TRUE</span></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>cli<span class="sc">::</span><span class="fu">cli_alert_info</span>(<span class="st">&quot;osmnx version: {ox[[&#39;__version__&#39;]]}&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(reticulate)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glue)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cli)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tigris)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(units)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">use_condaenv</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">required =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>ox <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;osmnx&quot;</span>)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>gpd <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;geopandas&quot;</span>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>shapely_wkt <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">&quot;shapely.wkt&quot;</span>)</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>ox<span class="sc">$</span>settings<span class="sc">$</span>use_cache <span class="ot">&lt;-</span> <span class="cn">TRUE</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>ox<span class="sc">$</span>settings<span class="sc">$</span>log_console <span class="ot">&lt;-</span> <span class="cn">TRUE</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>cli<span class="sc">::</span><span class="fu">cli_alert_info</span>(<span class="st">&quot;osmnx version: {ox[[&#39;__version__&#39;]]}&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <hr>
 </section>
-<section id="step-2-create-load-cook-county-boundaries" class="level2" data-number="5">
-<h2 data-number="5" class="anchored" data-anchor-id="step-2-create-load-cook-county-boundaries"><span class="header-section-number">5</span> Step 2 — Create, Load Cook County boundaries</h2>
+<section id="step-2-create-cook-county-geometry-layers" class="level2" data-number="5">
+<h2 data-number="5" class="anchored" data-anchor-id="step-2-create-cook-county-geometry-layers"><span class="header-section-number">5</span> Step 2 — Create Cook County Geometry Layers</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># download latest counties data from US Census TIGER/Line data</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>counties_il <span class="ot">&lt;-</span> <span class="fu">counties</span>(<span class="at">state=</span><span class="st">&quot;17&quot;</span>, <span class="at">cb=</span><span class="cn">TRUE</span>)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># reformat data, standardize column names</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>counties_il <span class="ot">&lt;-</span> counties_il <span class="sc">%&gt;%</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">3435</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">geoid_county =</span> GEOID,</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">name_county =</span> NAME,</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_land =</span> ALAND,</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_water =</span> AWATER) <span class="sc">%&gt;%</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">area_land =</span> <span class="fu">set_units</span>(area_land,m<span class="sc">^</span><span class="dv">2</span>),</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_water =</span> <span class="fu">set_units</span>(area_water,m<span class="sc">^</span><span class="dv">2</span>),</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_land_sqmi =</span> <span class="fu">set_units</span>(area_land, mi<span class="sc">^</span><span class="dv">2</span>),</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_water_sqmi =</span> <span class="fu">set_units</span>(area_water,mi<span class="sc">^</span><span class="dv">2</span>),</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_sqmi =</span> area_land_sqmi <span class="sc">+</span> area_water_sqmi) <span class="sc">%&gt;%</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(area_land,area_water))</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>cc_boundary <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">&quot;data/boundaries/cc_boundary.shp&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_make_valid</span>() <span class="sc">|&gt;</span></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>)  <span class="co"># osmnx expects unprojected lat/lon polygons</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>cc_municipalities <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">&quot;data/boundaries/cc_municipalities.shp&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_make_valid</span>() <span class="sc">|&gt;</span></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>)</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Confirm the attribute field(s) that identify each municipality before proceeding</span></span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(cc_municipalities)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Shared by both boundary layers below: convert Census ALAND/AWATER (m^2)</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co"># into land/water/total area in square miles, dropping the m^2 intermediates.</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>add_area_sqmi <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  df <span class="sc">%&gt;%</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>      <span class="at">area_land =</span> <span class="fu">set_units</span>(area_land, m<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">area_water =</span> <span class="fu">set_units</span>(area_water, m<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">area_land_sqmi =</span> <span class="fu">set_units</span>(area_land, mi<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">area_water_sqmi =</span> <span class="fu">set_units</span>(area_water, mi<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">area_sqmi =</span> area_land_sqmi <span class="sc">+</span> area_water_sqmi</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(area_land, area_water))</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Once you’ve confirmed the actual field names from <code>names(cc_municipalities)</code>, set them explicitly (the placeholders below are illustrative only — replace with what the shapefile actually contains):</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>MUNI_NAME_FIELD <span class="ot">&lt;-</span> <span class="st">&quot;MUNI_NAME&quot;</span>  <span class="co"># &lt;- replace with the real field</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>MUNI_ID_FIELD   <span class="ot">&lt;-</span> <span class="st">&quot;MUNI_ID&quot;</span>    <span class="co"># &lt;- replace with the real field, if one exists</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>cc_municipalities <span class="ot">&lt;-</span> cc_municipalities <span class="sc">|&gt;</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">muni_name =</span> <span class="fu">all_of</span>(MUNI_NAME_FIELD)) <span class="sc">|&gt;</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">muni_id =</span> <span class="cf">if</span> (MUNI_ID_FIELD <span class="sc">%in%</span> <span class="fu">names</span>(cc_municipalities)) {</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>      .data[[MUNI_ID_FIELD]]</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="fu">row_number</span>()</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># download latest counties data from US Census TIGER/Line data</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>counties_il <span class="ot">&lt;-</span> <span class="fu">counties</span>(<span class="at">state=</span><span class="st">&quot;17&quot;</span>, <span class="at">cb=</span><span class="cn">TRUE</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># reformat data, standardize column names</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>cc_boundary <span class="ot">&lt;-</span> counties_il <span class="sc">%&gt;%</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(GEOID <span class="sc">==</span> <span class="st">&quot;17031&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">3435</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">geoid_county =</span> GEOID,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">name_county =</span> NAME,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_land =</span> ALAND,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_water =</span> AWATER) <span class="sc">%&gt;%</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_area_sqmi</span>()</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co"># write cook county boundary to data/boundaries folder</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="fu">st_write</span>(<span class="at">obj =</span> cc_boundary, <span class="at">dsn =</span> <span class="st">&quot;data/boundaries/cc_boundary.shp&quot;</span>)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="co"># download latest places data from US Census TIGER/Line data</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>il_places <span class="ot">&lt;-</span> <span class="fu">places</span>(<span class="at">state=</span><span class="st">&quot;17&quot;</span>, <span class="at">cb=</span><span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">3435</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>()</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="co"># cook county geometry</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>cc_geom <span class="ot">&lt;-</span> <span class="fu">st_geometry</span>(cc_boundary)</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a><span class="co"># Centroid inside the boundary -- the join rule used to assign each Census</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="co"># place to Cook County (a cleaner one-to-one assignment than st_within()/</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="co"># st_intersects() on the full geometry, which can multi-count a place that</span></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="co"># merely touches or straddles the county line)</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>places_by_centroid <span class="ot">&lt;-</span> il_places <span class="sc">%&gt;%</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">lengths</span>(<span class="fu">st_within</span>(<span class="fu">st_centroid</span>(geometry), cc_geom)) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="co"># rename and format places</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>cc_municipalities <span class="ot">&lt;-</span> places_by_centroid <span class="sc">%&gt;%</span></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">geoid_place =</span> GEOID,</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>         <span class="at">name_place =</span> NAME,</span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_land =</span> ALAND,</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>         <span class="at">area_water =</span> AWATER) <span class="sc">%&gt;%</span></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_area_sqmi</span>()</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a><span class="co"># write cook county boundary to data/boundaries folder</span></span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a><span class="fu">st_write</span>(<span class="at">obj =</span> cc_municipalities, <span class="at">dsn =</span> <span class="st">&quot;data/boundaries/cc_municipalities.shp&quot;</span>)</span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a><span class="co"># read cook county boundary</span></span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>cc_boundary <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">&quot;data/boundaries/cc_boundary.shp&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_make_valid</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>)  <span class="co"># osmnx expects unprojected lat/lon polygons</span></span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a><span class="co"># read municipal layer</span></span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>cc_municipalities <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">&quot;data/boundaries/cc_municipalities.shp&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_make_valid</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>)</span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a><span class="co"># Confirm the attribute field(s) that identify each municipality before proceeding</span></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(cc_municipalities)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The <code>select()</code> step above names these fields <code>name_place</code>/<code>geoid_place</code>, but the Shapefile/DBF format truncates field names to 10 characters, so after the <code>st_write()</code>/<code>st_read()</code> round-trip above they come back truncated — confirmed here as <code>nam_plc</code>/<code>ged_plc</code> (re-check with <code>names(cc_municipalities)</code> above if you regenerate the shapefiles, since GDAL’s truncation/deduplication isn’t always the same abbreviation):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>MUNI_NAME_FIELD <span class="ot">&lt;-</span> <span class="st">&quot;nam_plc&quot;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>MUNI_ID_FIELD   <span class="ot">&lt;-</span> <span class="st">&quot;ged_plc&quot;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>cc_municipalities <span class="ot">&lt;-</span> cc_municipalities <span class="sc">%&gt;%</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">muni_name =</span> <span class="fu">all_of</span>(MUNI_NAME_FIELD),</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">muni_id =</span> <span class="fu">all_of</span>(MUNI_ID_FIELD)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>         )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p><strong>Coverage decision (see <code>plan.qmd</code>, Open Decisions):</strong> if unincorporated Cook County is in scope for this run, derive it as the remainder of the county boundary after removing all municipalities, and give it its own pseudo-municipality row so it flows through the same pipeline:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>unincorporated <span class="ot">&lt;-</span> <span class="fu">st_difference</span>(cc_boundary, <span class="fu">st_union</span>(cc_municipalities)) <span class="sc">|&gt;</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_collection_extract</span>(<span class="st">&quot;POLYGON&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">muni_id =</span> <span class="st">&quot;UNINC&quot;</span>, <span class="at">muni_name =</span> <span class="st">&quot;Unincorporated Cook County&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(muni_id, muni_name, geometry)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>study_area <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  cc_municipalities <span class="sc">|&gt;</span> <span class="fu">select</span>(muni_id, muni_name, geometry),</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  unincorporated  <span class="co"># omit this line if unincorporated areas are out of scope</span></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>unincorporated <span class="ot">&lt;-</span> <span class="fu">st_difference</span>(cc_boundary, <span class="fu">st_union</span>(cc_municipalities)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_collection_extract</span>(<span class="st">&quot;POLYGON&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">muni_id =</span> <span class="st">&quot;UNINC&quot;</span>, <span class="at">muni_name =</span> <span class="st">&quot;Unincorporated Cook County&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(muni_id, muni_name, geometry)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>study_area <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  cc_municipalities <span class="sc">%&gt;%</span> <span class="fu">select</span>(muni_id, muni_name, geometry),</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  unincorporated  <span class="co"># omit this line if unincorporated areas are out of scope</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <hr>
 </section>
 <section id="step-3-build-the-per-municipality-run-list-parallel-to-envs_100_cities.csv" class="level2" data-number="6">
 <h2 data-number="6" class="anchored" data-anchor-id="step-3-build-the-per-municipality-run-list-parallel-to-envs_100_cities.csv"><span class="header-section-number">6</span> Step 3 — Build the per-municipality run list (parallel to <code>envs_100_cities.csv</code>)</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>N_PER_WAVE <span class="ot">&lt;-</span> <span class="dv">12</span>  <span class="co"># tune based on how much Overpass load you want per batch</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>muni_run_list <span class="ot">&lt;-</span> study_area <span class="sc">|&gt;</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wkt =</span> <span class="fu">st_as_text</span>(geometry)) <span class="sc">|&gt;</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">|&gt;</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(muni_name) <span class="sc">|&gt;</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wave =</span> <span class="fu">ceiling</span>(<span class="fu">row_number</span>() <span class="sc">/</span> N_PER_WAVE))</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;config&quot;</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(muni_run_list, <span class="st">&quot;config/cc_muni_run_list.csv&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>N_PER_WAVE <span class="ot">&lt;-</span> <span class="dv">12</span>  <span class="co"># tune based on how much Overpass load you want per batch</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>muni_run_list <span class="ot">&lt;-</span> study_area <span class="sc">%&gt;%</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wkt =</span> <span class="fu">st_as_text</span>(geometry)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(muni_name) <span class="sc">%&gt;%</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wave =</span> <span class="fu">ceiling</span>(<span class="fu">row_number</span>() <span class="sc">/</span> N_PER_WAVE))</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;config&quot;</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(muni_run_list, <span class="st">&quot;config/cc_muni_run_list.csv&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Each row is one municipality’s polygon (as WKT) plus a <code>wave</code> number — directly analogous to a row in the reference repo’s <code>config/envs_100_cities.csv</code>, just keyed to Cook County municipalities instead of metro-area airport codes.</p>
 <hr>
@@ -2474,66 +2528,66 @@ vertical-align: -.125em;
 <h2 data-number="7" class="anchored" data-anchor-id="step-4-define-the-per-municipality-intersection-extraction-function"><span class="header-section-number">7</span> Step 4 — Define the per-municipality intersection extraction function</h2>
 <p>Same <code>highway_subtypes</code> / <code>service_exclusion</code> filter and the same <code>custom_filter</code> string construction as <code>osm_ingest.py</code> lines 51–71 and 127:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>highway_subtypes <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;primary&quot;</span>, <span class="st">&quot;primary_link&quot;</span>, <span class="st">&quot;unclassified&quot;</span>, <span class="st">&quot;residential&quot;</span>,</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;secondary&quot;</span>, <span class="st">&quot;secondary_link&quot;</span>, <span class="st">&quot;service&quot;</span>, <span class="st">&quot;tertiary&quot;</span>,</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;tertiary_link&quot;</span>, <span class="st">&quot;trunk&quot;</span>, <span class="st">&quot;trunk_link&quot;</span>, <span class="st">&quot;busway&quot;</span>,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;construction&quot;</span>, <span class="st">&quot;corridor&quot;</span></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>service_exclusion <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;parking_aisle&quot;</span>, <span class="st">&quot;driveway&quot;</span>)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>drive_filter <span class="ot">&lt;-</span> <span class="fu">glue</span>(</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;highway&quot;~&quot;{paste(highway_subtypes, collapse = &quot;|&quot;)}&quot;]&#39;</span>,</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;service&quot;!~&quot;{paste(service_exclusion, collapse = &quot;|&quot;)}&quot;]&#39;</span>,</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;access&quot;!~&quot;private&quot;][&quot;aeroway&quot;!~&quot;.*&quot;][&quot;indoor&quot;!~&quot;yes&quot;]&#39;</span></span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>highway_subtypes <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;primary&quot;</span>, <span class="st">&quot;primary_link&quot;</span>, <span class="st">&quot;unclassified&quot;</span>, <span class="st">&quot;residential&quot;</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;secondary&quot;</span>, <span class="st">&quot;secondary_link&quot;</span>, <span class="st">&quot;service&quot;</span>, <span class="st">&quot;tertiary&quot;</span>,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;tertiary_link&quot;</span>, <span class="st">&quot;trunk&quot;</span>, <span class="st">&quot;trunk_link&quot;</span>, <span class="st">&quot;busway&quot;</span>,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;construction&quot;</span>, <span class="st">&quot;corridor&quot;</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>service_exclusion <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;parking_aisle&quot;</span>, <span class="st">&quot;driveway&quot;</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>drive_filter <span class="ot">&lt;-</span> <span class="fu">glue</span>(</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;highway&quot;~&quot;{paste(highway_subtypes, collapse = &quot;|&quot;)}&quot;]&#39;</span>,</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;service&quot;!~&quot;{paste(service_exclusion, collapse = &quot;|&quot;)}&quot;]&#39;</span>,</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;[&quot;access&quot;!~&quot;private&quot;][&quot;aeroway&quot;!~&quot;.*&quot;][&quot;indoor&quot;!~&quot;yes&quot;]&#39;</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; Extract OSMnx-consolidated drive-network intersections for one municipality</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param muni_id,muni_name identifiers carried through to the output rows</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param wkt WKT polygon string for the municipality (EPSG:4326)</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param retain_all if TRUE, keep disconnected network components (osmnx</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   default is FALSE, matching osm_ingest.py; consider TRUE for small/exurban</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   municipalities where a fragmented street network could otherwise be</span></span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   under-counted)</span></span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param tolerance override osmnx&#39;s default consolidate_intersections</span></span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   tolerance (left NULL here to match osm_ingest.py, which does not</span></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   override it)</span></span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>get_muni_intersections <span class="ot">&lt;-</span> <span class="cf">function</span>(muni_id, muni_name, wkt,</span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">retain_all =</span> <span class="cn">FALSE</span>, <span class="at">tolerance =</span> <span class="cn">NULL</span>) {</span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>  poly <span class="ot">&lt;-</span> shapely_wkt<span class="sc">$</span><span class="fu">loads</span>(wkt)</span>
-<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  G_drive <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
-<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    ox<span class="sc">$</span><span class="fu">graph_from_polygon</span>(</span>
-<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>      poly,</span>
-<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>      <span class="at">network_type =</span> <span class="st">&quot;drive&quot;</span>,</span>
-<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>      <span class="at">custom_filter =</span> drive_filter,</span>
-<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">retain_all =</span> retain_all</span>
-<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) {</span>
-<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>      cli<span class="sc">::</span><span class="fu">cli_alert_warning</span>(<span class="st">&quot;{muni_name}: {conditionMessage(e)}&quot;</span>)</span>
-<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>      <span class="cn">NULL</span></span>
-<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(G_drive)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
-<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>  G_drive <span class="ot">&lt;-</span> ox<span class="sc">$</span><span class="fu">project_graph</span>(G_drive)</span>
-<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>  consolidate_args <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">G =</span> G_drive, <span class="at">rebuild_graph =</span> <span class="cn">FALSE</span>, <span class="at">dead_ends =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(tolerance)) consolidate_args<span class="sc">$</span>tolerance <span class="ot">&lt;-</span> tolerance</span>
-<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a>  intersections <span class="ot">&lt;-</span> <span class="fu">do.call</span>(ox<span class="sc">$</span>consolidate_intersections, consolidate_args)</span>
-<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>  intersections_gdf <span class="ot">&lt;-</span> gpd<span class="sc">$</span><span class="fu">GeoDataFrame</span>(</span>
-<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">geometry =</span> intersections, <span class="at">crs =</span> intersections<span class="sc">$</span>crs</span>
-<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">$</span><span class="fu">to_crs</span>(<span class="st">&quot;EPSG:4326&quot;</span>)</span>
-<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a>  coords <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(intersections_gdf<span class="sc">$</span><span class="fu">get_coordinates</span>())</span>
-<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a>  coords <span class="sc">|&gt;</span></span>
-<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>() <span class="sc">|&gt;</span></span>
-<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>    <span class="fu">rename</span>(<span class="at">lon =</span> x, <span class="at">lat =</span> y) <span class="sc">|&gt;</span></span>
-<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">muni_id =</span> muni_id, <span class="at">muni_name =</span> muni_name)</span>
-<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; Extract OSMnx-consolidated drive-network intersections for one municipality</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param muni_id,muni_name identifiers carried through to the output rows</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param wkt WKT polygon string for the municipality (EPSG:4326)</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param retain_all if TRUE, keep disconnected network components (osmnx</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   default is FALSE, matching osm_ingest.py; consider TRUE for small/exurban</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   municipalities where a fragmented street network could otherwise be</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   under-counted)</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39; @param tolerance override osmnx&#39;s default consolidate_intersections</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   tolerance (left NULL here to match osm_ingest.py, which does not</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&#39;   override it)</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>get_muni_intersections <span class="ot">&lt;-</span> <span class="cf">function</span>(muni_id, muni_name, wkt,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">retain_all =</span> <span class="cn">FALSE</span>, <span class="at">tolerance =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  poly <span class="ot">&lt;-</span> shapely_wkt<span class="sc">$</span><span class="fu">loads</span>(wkt)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  G_drive <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    ox<span class="sc">$</span><span class="fu">graph_from_polygon</span>(</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>      poly,</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>      <span class="at">network_type =</span> <span class="st">&quot;drive&quot;</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>      <span class="at">custom_filter =</span> drive_filter,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">retain_all =</span> retain_all</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) {</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>      cli<span class="sc">::</span><span class="fu">cli_alert_warning</span>(<span class="st">&quot;{muni_name}: {conditionMessage(e)}&quot;</span>)</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>      <span class="cn">NULL</span></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(G_drive)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>  G_drive <span class="ot">&lt;-</span> ox<span class="sc">$</span><span class="fu">project_graph</span>(G_drive)</span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>  consolidate_args <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">G =</span> G_drive, <span class="at">rebuild_graph =</span> <span class="cn">FALSE</span>, <span class="at">dead_ends =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(tolerance)) consolidate_args<span class="sc">$</span>tolerance <span class="ot">&lt;-</span> tolerance</span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>  intersections <span class="ot">&lt;-</span> <span class="fu">do.call</span>(ox<span class="sc">$</span>consolidate_intersections, consolidate_args)</span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>  intersections_gdf <span class="ot">&lt;-</span> gpd<span class="sc">$</span><span class="fu">GeoDataFrame</span>(</span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">geometry =</span> intersections, <span class="at">crs =</span> intersections<span class="sc">$</span>crs</span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">$</span><span class="fu">to_crs</span>(<span class="st">&quot;EPSG:4326&quot;</span>)</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>  coords <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(intersections_gdf<span class="sc">$</span><span class="fu">get_coordinates</span>())</span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a>  coords <span class="sc">%&gt;%</span></span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a>    <span class="fu">rename</span>(<span class="at">lon =</span> x, <span class="at">lat =</span> y) <span class="sc">%&gt;%</span></span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">muni_id =</span> muni_id, <span class="at">muni_name =</span> muni_name)</span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <hr>
 </section>
@@ -2541,33 +2595,33 @@ vertical-align: -.125em;
 <h2 data-number="8" class="anchored" data-anchor-id="step-5-optional-refinement-filter-to-intersections-near-a-pedestrian-crossing"><span class="header-section-number">8</span> Step 5 — (Optional refinement) Filter to intersections near a pedestrian crossing</h2>
 <p>Raw drive-network intersection counts overstate the true tile requirement — many suburban intersections have no marked or unmarked pedestrian crossing at all. <code>osm_ingest.py</code> (lines 140–250) filters intersections down to those within <code>RADIUS = 25</code> m of an OSM-tagged crossing before treating them as tile targets. The same join, translated:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>RADIUS_M <span class="ot">&lt;-</span> <span class="fl">25.0</span>  <span class="co"># matches inference/utils.py RADIUS</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>get_muni_crossing_adjacent_intersections <span class="ot">&lt;-</span> <span class="cf">function</span>(muni_id, muni_name, wkt) {</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  poly <span class="ot">&lt;-</span> shapely_wkt<span class="sc">$</span><span class="fu">loads</span>(wkt)</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  crosswalk_features <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    ox<span class="sc">$</span><span class="fu">features_from_polygon</span>(</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>      poly, <span class="at">tags =</span> <span class="fu">list</span>(<span class="at">highway =</span> <span class="st">&quot;crossing&quot;</span>, <span class="at">crossing =</span> <span class="cn">TRUE</span>, <span class="at">disused =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(crosswalk_features) <span class="sc">||</span> <span class="fu">nrow</span>(reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(crosswalk_features)) <span class="sc">==</span> <span class="dv">0</span>) {</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="cn">NULL</span>)  <span class="co"># no tagged crossings in this municipality</span></span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>  intersections_result <span class="ot">&lt;-</span> <span class="fu">get_muni_intersections</span>(muni_id, muni_name, wkt)</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(intersections_result)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  intersections_sf <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(intersections_result, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;lon&quot;</span>, <span class="st">&quot;lat&quot;</span>), <span class="at">crs =</span> <span class="dv">4326</span>) <span class="sc">|&gt;</span></span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_transform</span>(<span class="dv">3857</span>)</span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>  crossings_sf <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(crosswalk_features<span class="sc">$</span><span class="fu">to_crs</span>(<span class="st">&quot;EPSG:3857&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_as_sf</span>()</span>
-<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>  nearest <span class="ot">&lt;-</span> <span class="fu">st_is_within_distance</span>(intersections_sf, crossings_sf, <span class="at">dist =</span> RADIUS_M)</span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>  intersections_result[<span class="fu">lengths</span>(nearest) <span class="sc">&gt;</span> <span class="dv">0</span>, ]</span>
-<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>RADIUS_M <span class="ot">&lt;-</span> <span class="fl">25.0</span>  <span class="co"># matches inference/utils.py RADIUS</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>get_muni_crossing_adjacent_intersections <span class="ot">&lt;-</span> <span class="cf">function</span>(muni_id, muni_name, wkt) {</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  poly <span class="ot">&lt;-</span> shapely_wkt<span class="sc">$</span><span class="fu">loads</span>(wkt)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  crosswalk_features <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    ox<span class="sc">$</span><span class="fu">features_from_polygon</span>(</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>      poly, <span class="at">tags =</span> <span class="fu">list</span>(<span class="at">highway =</span> <span class="st">&quot;crossing&quot;</span>, <span class="at">crossing =</span> <span class="cn">TRUE</span>, <span class="at">disused =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(crosswalk_features) <span class="sc">||</span> <span class="fu">nrow</span>(reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(crosswalk_features)) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="cn">NULL</span>)  <span class="co"># no tagged crossings in this municipality</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  intersections_result <span class="ot">&lt;-</span> <span class="fu">get_muni_intersections</span>(muni_id, muni_name, wkt)</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(intersections_result)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>  intersections_sf <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(intersections_result, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;lon&quot;</span>, <span class="st">&quot;lat&quot;</span>), <span class="at">crs =</span> <span class="dv">4326</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_transform</span>(<span class="dv">3857</span>)</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>  crossings_sf <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(crosswalk_features<span class="sc">$</span><span class="fu">to_crs</span>(<span class="st">&quot;EPSG:3857&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_as_sf</span>()</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>  nearest <span class="ot">&lt;-</span> <span class="fu">st_is_within_distance</span>(intersections_sf, crossings_sf, <span class="at">dist =</span> RADIUS_M)</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>  intersections_result[<span class="fu">lengths</span>(nearest) <span class="sc">&gt;</span> <span class="dv">0</span>, ]</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Run this as a second pass over Step 4’s output for municipalities where a more precise tile-volume estimate is worth the extra Overpass query; the raw count from Step 4 is a reasonable, faster upper-bound estimate for initial Phase 0 sizing.</p>
 <hr>
@@ -2576,47 +2630,47 @@ vertical-align: -.125em;
 <h2 data-number="9" class="anchored" data-anchor-id="step-6-run-across-all-municipalities-wave-by-wave"><span class="header-section-number">9</span> Step 6 — Run across all municipalities, wave by wave</h2>
 <p>Unlike the GPU segmentation stage (Modal, embarrassingly parallel), this step queries the Overpass API underneath <code>osmnx</code>. The shared public Overpass endpoint has usage limits and etiquette expectations — high-concurrency requests risk 429s/timeouts and are discouraged. Process <strong>sequentially within each wave</strong>, with a short pause between municipalities, and checkpoint so a failed run can resume without redoing completed municipalities. If higher throughput is genuinely needed, stand up a private/self-hosted Overpass instance rather than hammering the public one.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;data/intersections/raw&quot;</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>run_wave <span class="ot">&lt;-</span> <span class="cf">function</span>(wave_df, <span class="at">pause_sec =</span> <span class="dv">1</span>) {</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">pwalk</span>(wave_df, <span class="cf">function</span>(muni_id, muni_name, wkt, wave, ...) {</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    out_file <span class="ot">&lt;-</span> <span class="fu">file.path</span>(out_dir, <span class="fu">glue</span>(<span class="st">&quot;{muni_id}.csv&quot;</span>))</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">file.exists</span>(out_file)) <span class="fu">return</span>(<span class="fu">invisible</span>(<span class="cn">NULL</span>))  <span class="co"># resume support</span></span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    cli<span class="sc">::</span><span class="fu">cli_progress_step</span>(<span class="st">&quot;Processing {muni_name}&quot;</span>)</span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    result <span class="ot">&lt;-</span> <span class="fu">get_muni_intersections</span>(muni_id, muni_name, wkt)</span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(result)) readr<span class="sc">::</span><span class="fu">write_csv</span>(result, out_file)</span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">Sys.sleep</span>(pause_sec)</span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  })</span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>muni_run_list <span class="sc">|&gt;</span></span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_split</span>(wave) <span class="sc">|&gt;</span></span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">walk</span>(run_wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;data/intersections/raw&quot;</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>run_wave <span class="ot">&lt;-</span> <span class="cf">function</span>(wave_df, <span class="at">pause_sec =</span> <span class="dv">1</span>) {</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">pwalk</span>(wave_df, <span class="cf">function</span>(muni_id, muni_name, wkt, wave, ...) {</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    out_file <span class="ot">&lt;-</span> <span class="fu">file.path</span>(out_dir, <span class="fu">glue</span>(<span class="st">&quot;{muni_id}.csv&quot;</span>))</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">file.exists</span>(out_file)) <span class="fu">return</span>(<span class="fu">invisible</span>(<span class="cn">NULL</span>))  <span class="co"># resume support</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    cli<span class="sc">::</span><span class="fu">cli_progress_step</span>(<span class="st">&quot;Processing {muni_name}&quot;</span>)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    result <span class="ot">&lt;-</span> <span class="fu">get_muni_intersections</span>(muni_id, muni_name, wkt)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(result)) readr<span class="sc">::</span><span class="fu">write_csv</span>(result, out_file)</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">Sys.sleep</span>(pause_sec)</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>muni_run_list <span class="sc">%&gt;%</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_split</span>(wave) <span class="sc">%&gt;%</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">walk</span>(run_wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <hr>
 </section>
 <section id="step-7-combine-and-summarize-counts" class="level2" data-number="10">
 <h2 data-number="10" class="anchored" data-anchor-id="step-7-combine-and-summarize-counts"><span class="header-section-number">10</span> Step 7 — Combine and summarize counts</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>intersection_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(out_dir, <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>all_intersections <span class="ot">&lt;-</span> <span class="fu">map_dfr</span>(intersection_files, read_csv, <span class="at">show_col_types =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>muni_summary <span class="ot">&lt;-</span> all_intersections <span class="sc">|&gt;</span></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(muni_id, muni_name, <span class="at">name =</span> <span class="st">&quot;intersection_count&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">st_drop_geometry</span>(study_area), <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;muni_id&quot;</span>, <span class="st">&quot;muni_name&quot;</span>))</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>county_total <span class="ot">&lt;-</span> <span class="fu">sum</span>(muni_summary<span class="sc">$</span>intersection_count)</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>chicago_benchmark <span class="ot">&lt;-</span> <span class="dv">80000</span></span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>scale_factor <span class="ot">&lt;-</span> county_total <span class="sc">/</span> chicago_benchmark</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>cli<span class="sc">::</span><span class="fu">cli_alert_info</span>(</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Suburban Cook County: {county_total} intersections (~{round(scale_factor, 2)}x the Chicago benchmark of {chicago_benchmark} tiles)&quot;</span></span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;output&quot;</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(muni_summary, <span class="st">&quot;output/cc_intersection_counts_by_municipality.csv&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>intersection_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(out_dir, <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>all_intersections <span class="ot">&lt;-</span> <span class="fu">map_dfr</span>(intersection_files, read_csv, <span class="at">show_col_types =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>muni_summary <span class="ot">&lt;-</span> all_intersections <span class="sc">%&gt;%</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(muni_id, muni_name, <span class="at">name =</span> <span class="st">&quot;intersection_count&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">st_drop_geometry</span>(study_area), <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;muni_id&quot;</span>, <span class="st">&quot;muni_name&quot;</span>))</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>county_total <span class="ot">&lt;-</span> <span class="fu">sum</span>(muni_summary<span class="sc">$</span>intersection_count)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>chicago_benchmark <span class="ot">&lt;-</span> <span class="dv">80000</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>scale_factor <span class="ot">&lt;-</span> county_total <span class="sc">/</span> chicago_benchmark</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>cli<span class="sc">::</span><span class="fu">cli_alert_info</span>(</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Suburban Cook County: {county_total} intersections (~{round(scale_factor, 2)}x the Chicago benchmark of {chicago_benchmark} tiles)&quot;</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;output&quot;</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(muni_summary, <span class="st">&quot;output/cc_intersection_counts_by_municipality.csv&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>This total feeds directly into <code>plan.qmd</code>’s Phase 0 deliverable (“cloud vendor selection and cost-per-tile benchmark”) and the Cloud Compute Strategy scenarios already documented there (Modal GPU-tier/concurrency choices sized off this tile-count estimate).</p>
 <hr>
@@ -2626,9 +2680,9 @@ vertical-align: -.125em;
 <ul>
 <li><p><strong>Visual check:</strong> map intersection points over municipality polygons to confirm no municipality came back empty and points fall inside their boundary.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mapview)</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>all_points_sf <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(all_intersections, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;lon&quot;</span>, <span class="st">&quot;lat&quot;</span>), <span class="at">crs =</span> <span class="dv">4326</span>)</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mapview</span>(study_area, <span class="at">alpha.regions =</span> <span class="fl">0.1</span>) <span class="sc">+</span> <span class="fu">mapview</span>(all_points_sf, <span class="at">cex =</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mapview)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>all_points_sf <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(all_intersections, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;lon&quot;</span>, <span class="st">&quot;lat&quot;</span>), <span class="at">crs =</span> <span class="dv">4326</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mapview</span>(study_area, <span class="at">alpha.regions =</span> <span class="fl">0.1</span>) <span class="sc">+</span> <span class="fu">mapview</span>(all_points_sf, <span class="at">cex =</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div></li>
 <li><p><strong>Outlier review:</strong> flag municipalities whose intersection count looks implausible relative to land area or population (from the municipality attribute table) for manual review — this feeds forward into Phase 1’s “Document OSM crossing-coverage completeness by municipality” validation task in <code>plan.qmd</code>.</p></li>
 <li><p><strong>Boundary double-counting:</strong> <code>ox.graph_from_polygon()</code> clips the network to each polygon, but nodes sitting exactly on a shared border between two municipalities could in principle appear in both extractions. If a single county-wide (not just per-municipality) point dataset is assembled later in Phase 1, snap coordinates to a small grid (e.g., 1 m) and de-duplicate before combining.</p></li>
