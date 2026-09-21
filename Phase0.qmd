@@ -89,6 +89,7 @@ library(readr)
 library(glue)
 library(janitor)
 library(cli)
+library(tigris)
 
 reticulate::use_condaenv("osmnx-env", required = TRUE)
 
@@ -104,9 +105,29 @@ cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
 
 ------------------------------------------------------------------------
 
-## Step 2 — Load Cook County boundaries
+## Step 2 — Create, Load Cook County boundaries
 
 ```{r}
+# download latest counties data from US Census TIGER/Line data
+counties_il <- counties(state="17", cb=TRUE)
+
+# reformat data, standardize column names
+counties_il <- counties_il %>%
+  st_transform(3435) %>%
+  st_as_sf() %>%
+  select(geoid_county = GEOID,
+         name_county = NAME,
+         area_land = ALAND,
+         area_water = AWATER) %>%
+  mutate(area_land = set_units(area_land,m^2),
+         area_water = set_units(area_water,m^2),
+         area_land_sqmi = set_units(area_land, mi^2),
+         area_water_sqmi = set_units(area_water,mi^2),
+         area_sqmi = area_land_sqmi + area_water_sqmi) %>%
+  select(-c(area_land,area_water))
+
+
+
 #| label: load-boundaries
 cc_boundary <- st_read("data/boundaries/cc_boundary.shp") |>
   st_make_valid() |>
