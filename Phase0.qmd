@@ -100,7 +100,7 @@ reticulate::conda_install(
     # Common locations:
     #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
     #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe
-    Sys.setenv(RETICULATE_CONDA = "/full/path/to/conda")
+    Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda")
     ```
 
 ```{r}
