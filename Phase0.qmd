@@ -1,0 +1,375 @@
+---
+title: "Phase 0 Workflow: OSMnx Intersection Counts per Cook County Municipality"
+subtitle: "An R/RStudio pipeline parallel to agupta01/crossing-distances (inference/osm_ingest.py)"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    theme: cosmo
+    embed-resources: true
+editor: source
+execute:
+  eval: false
+---
+
+## Purpose
+
+This document operationalizes one task from `plan.qmd`'s Phase 0 — *"Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality"* — as a concrete, runnable R/RStudio workflow.
+
+It is written to be **parallel to**, not a reimplementation of, the intersection-extraction logic already used in the reference methodology repository ([`agupta01/crossing-distances`](https://github.com/agupta01/crossing-distances), specifically `inference/osm_ingest.py`). Rather than porting OSMnx's algorithms into native R, this workflow uses `reticulate` to call the real Python `osmnx` package from R, so the intersection-consolidation results are the *same* algorithm, not an approximation of it. R's role here is orchestration: loading the local Cook County shapefiles, looping over municipalities, and assembling the summary tables — the geometric work (`consolidate_intersections`, graph filtering) is delegated to `osmnx` itself.
+
+Two things differ deliberately from the reference repo's approach, because this project is county-scale rather than a name-geocoded, single-city pull:
+
+1. **Boundaries come from local shapefiles**, not `osmnx.graph_from_place()`'s Nominatim geocoding. You provide `cc_boundary.shp` (Cook County outline) and `cc_municipalities.shp` (municipal polygons), and the workflow calls `ox.graph_from_polygon()` per municipality instead.
+2. **One run per municipality**, batched into "waves" — the same batching idea as the reference repo's `config/envs_100_cities.csv` (`Code`/`Wave` columns), just keyed to ~135 Cook County municipalities instead of ~100 US metro areas.
+
+All code chunks below default to `eval: false` (see YAML header) since this document is written before the shapefiles exist in the repo. Once `cc_boundary.shp`/`cc_municipalities.shp` are added under `data/boundaries/`, flip chunks to `eval: true` (or knit interactively in RStudio) to run them.
+
+------------------------------------------------------------------------
+
+## How this parallels `osm_ingest.py`
+
+| Step | This R workflow | Reference Python (`inference/osm_ingest.py`) |
+|---|---|---|
+| Study-area input | `sf::st_read()` on local shapefiles, per-municipality polygon | `place: str` argument, geocoded via Nominatim |
+| Drive-network pull | `ox$graph_from_polygon(poly, network_type="drive", custom_filter=...)` via reticulate | `ox.graph_from_place(query=place, network_type="drive", custom_filter=...)` (lines 124–128) |
+| Highway/service filter | Same `highway_subtypes` / `service_exclusion` lists, same custom_filter string | Lines 51–71, 127 |
+| Projection | `ox$project_graph(G_drive)` | Line 130 |
+| Intersection consolidation | `ox$consolidate_intersections(G_drive, rebuild_graph=FALSE, dead_ends=FALSE)` | Line 131–133 |
+| Coordinate export | `.to_crs("EPSG:4326")$get_coordinates()` converted to an R tibble | Line 136–138 |
+| Crosswalk-adjacency filter (optional refinement) | `ox$features_from_polygon()` + `gpd$sjoin_nearest()` within `RADIUS = 25` m | Lines 140–250 |
+| Per-place batching | `config/cc_muni_run_list.csv` with a `wave` column | `config/envs_100_cities.csv` with `Code`/`Wave` columns |
+
+Because Step "Intersection consolidation" calls the identical `osmnx` function, results should match what the Python pipeline would produce for the same polygon and `osmnx` version — pin and record that version (Step 1) so future re-runs stay comparable.
+
+------------------------------------------------------------------------
+
+## Prerequisites
+
+**Inputs** (place under `data/boundaries/` in this repo):
+
+-   `cc_boundary.shp` — single-polygon Cook County outline.
+-   `cc_municipalities.shp` — one polygon per incorporated municipality, with an attribute field identifying each municipality (field name unknown until the file is in hand — Step 3 below shows how to confirm it; do not assume a specific field name).
+
+**R packages:**
+
+```{r}
+#| label: r-packages
+install.packages(c(
+  "sf", "reticulate", "dplyr", "purrr", "readr", "glue",
+  "janitor", "cli", "mapview"
+))
+```
+
+**Python environment (via reticulate):** a conda or venv environment with `osmnx` installed. Match the version family used in the reference repo's Modal image (`gboeing/osmnx:latest`, see `inference/utils.py`) — after installing, print `ox$__version__` and record it alongside these results for reproducibility, rather than assuming a specific pinned version here.
+
+```{r}
+#| label: python-env-setup
+reticulate::conda_create("osmnx-env", packages = "python=3.11")
+reticulate::conda_install(
+  "osmnx-env",
+  packages = c("osmnx", "geopandas", "shapely"),
+  pip = TRUE
+)
+```
+
+------------------------------------------------------------------------
+
+## Step 1 — Connect R to the OSMnx Python environment
+
+```{r}
+#| label: setup
+library(sf)
+library(reticulate)
+library(dplyr)
+library(purrr)
+library(readr)
+library(glue)
+library(janitor)
+library(cli)
+
+reticulate::use_condaenv("osmnx-env", required = TRUE)
+
+ox <- reticulate::import("osmnx")
+gpd <- reticulate::import("geopandas")
+shapely_wkt <- reticulate::import("shapely.wkt")
+
+ox$settings$use_cache <- TRUE
+ox$settings$log_console <- TRUE
+
+cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
+```
+
+------------------------------------------------------------------------
+
+## Step 2 — Load Cook County boundaries
+
+```{r}
+#| label: load-boundaries
+cc_boundary <- st_read("data/boundaries/cc_boundary.shp") |>
+  st_make_valid() |>
+  st_transform(4326)  # osmnx expects unprojected lat/lon polygons
+
+cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") |>
+  st_make_valid() |>
+  st_transform(4326)
+
+# Confirm the attribute field(s) that identify each municipality before proceeding
+names(cc_municipalities)
+```
+
+Once you've confirmed the actual field names from `names(cc_municipalities)`, set them explicitly (the placeholders below are illustrative only — replace with what the shapefile actually contains):
+
+```{r}
+#| label: normalize-muni-fields
+MUNI_NAME_FIELD <- "MUNI_NAME"  # <- replace with the real field
+MUNI_ID_FIELD   <- "MUNI_ID"    # <- replace with the real field, if one exists
+
+cc_municipalities <- cc_municipalities |>
+  rename(muni_name = all_of(MUNI_NAME_FIELD)) |>
+  mutate(
+    muni_id = if (MUNI_ID_FIELD %in% names(cc_municipalities)) {
+      .data[[MUNI_ID_FIELD]]
+    } else {
+      row_number()
+    }
+  )
+```
+
+**Coverage decision (see `plan.qmd`, Open Decisions):** if unincorporated Cook County is in scope for this run, derive it as the remainder of the county boundary after removing all municipalities, and give it its own pseudo-municipality row so it flows through the same pipeline:
+
+```{r}
+#| label: unincorporated-remainder
+unincorporated <- st_difference(cc_boundary, st_union(cc_municipalities)) |>
+  st_collection_extract("POLYGON") |>
+  mutate(muni_id = "UNINC", muni_name = "Unincorporated Cook County") |>
+  select(muni_id, muni_name, geometry)
+
+study_area <- bind_rows(
+  cc_municipalities |> select(muni_id, muni_name, geometry),
+  unincorporated  # omit this line if unincorporated areas are out of scope
+)
+```
+
+------------------------------------------------------------------------
+
+## Step 3 — Build the per-municipality run list (parallel to `envs_100_cities.csv`)
+
+```{r}
+#| label: build-run-list
+N_PER_WAVE <- 12  # tune based on how much Overpass load you want per batch
+
+muni_run_list <- study_area |>
+  mutate(wkt = st_as_text(geometry)) |>
+  st_drop_geometry() |>
+  arrange(muni_name) |>
+  mutate(wave = ceiling(row_number() / N_PER_WAVE))
+
+dir.create("config", showWarnings = FALSE)
+write_csv(muni_run_list, "config/cc_muni_run_list.csv")
+```
+
+Each row is one municipality's polygon (as WKT) plus a `wave` number — directly analogous to a row in the reference repo's `config/envs_100_cities.csv`, just keyed to Cook County municipalities instead of metro-area airport codes.
+
+------------------------------------------------------------------------
+
+## Step 4 — Define the per-municipality intersection extraction function
+
+Same `highway_subtypes` / `service_exclusion` filter and the same `custom_filter` string construction as `osm_ingest.py` lines 51–71 and 127:
+
+```{r}
+#| label: filter-constants
+highway_subtypes <- c(
+  "primary", "primary_link", "unclassified", "residential",
+  "secondary", "secondary_link", "service", "tertiary",
+  "tertiary_link", "trunk", "trunk_link", "busway",
+  "construction", "corridor"
+)
+service_exclusion <- c("parking_aisle", "driveway")
+
+drive_filter <- glue(
+  '["highway"~"{paste(highway_subtypes, collapse = "|")}"]',
+  '["service"!~"{paste(service_exclusion, collapse = "|")}"]',
+  '["access"!~"private"]["aeroway"!~".*"]["indoor"!~"yes"]'
+)
+```
+
+```{r}
+#| label: intersection-function
+#' Extract OSMnx-consolidated drive-network intersections for one municipality
+#'
+#' @param muni_id,muni_name identifiers carried through to the output rows
+#' @param wkt WKT polygon string for the municipality (EPSG:4326)
+#' @param retain_all if TRUE, keep disconnected network components (osmnx
+#'   default is FALSE, matching osm_ingest.py; consider TRUE for small/exurban
+#'   municipalities where a fragmented street network could otherwise be
+#'   under-counted)
+#' @param tolerance override osmnx's default consolidate_intersections
+#'   tolerance (left NULL here to match osm_ingest.py, which does not
+#'   override it)
+get_muni_intersections <- function(muni_id, muni_name, wkt,
+                                    retain_all = FALSE, tolerance = NULL) {
+  poly <- shapely_wkt$loads(wkt)
+
+  G_drive <- tryCatch(
+    ox$graph_from_polygon(
+      poly,
+      network_type = "drive",
+      custom_filter = drive_filter,
+      retain_all = retain_all
+    ),
+    error = function(e) {
+      cli::cli_alert_warning("{muni_name}: {conditionMessage(e)}")
+      NULL
+    }
+  )
+  if (is.null(G_drive)) return(NULL)
+
+  G_drive <- ox$project_graph(G_drive)
+
+  consolidate_args <- list(G = G_drive, rebuild_graph = FALSE, dead_ends = FALSE)
+  if (!is.null(tolerance)) consolidate_args$tolerance <- tolerance
+  intersections <- do.call(ox$consolidate_intersections, consolidate_args)
+
+  intersections_gdf <- gpd$GeoDataFrame(
+    geometry = intersections, crs = intersections$crs
+  )$to_crs("EPSG:4326")
+
+  coords <- reticulate::py_to_r(intersections_gdf$get_coordinates())
+  coords |>
+    as_tibble() |>
+    rename(lon = x, lat = y) |>
+    mutate(muni_id = muni_id, muni_name = muni_name)
+}
+```
+
+------------------------------------------------------------------------
+
+## Step 5 — (Optional refinement) Filter to intersections near a pedestrian crossing
+
+Raw drive-network intersection counts overstate the true tile requirement — many suburban intersections have no marked or unmarked pedestrian crossing at all. `osm_ingest.py` (lines 140–250) filters intersections down to those within `RADIUS = 25` m of an OSM-tagged crossing before treating them as tile targets. The same join, translated:
+
+```{r}
+#| label: crossing-adjacency-filter
+RADIUS_M <- 25.0  # matches inference/utils.py RADIUS
+
+get_muni_crossing_adjacent_intersections <- function(muni_id, muni_name, wkt) {
+  poly <- shapely_wkt$loads(wkt)
+
+  crosswalk_features <- tryCatch(
+    ox$features_from_polygon(
+      poly, tags = list(highway = "crossing", crossing = TRUE, disused = FALSE)
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(crosswalk_features) || nrow(reticulate::py_to_r(crosswalk_features)) == 0) {
+    return(NULL)  # no tagged crossings in this municipality
+  }
+
+  intersections_result <- get_muni_intersections(muni_id, muni_name, wkt)
+  if (is.null(intersections_result)) return(NULL)
+
+  intersections_sf <- st_as_sf(intersections_result, coords = c("lon", "lat"), crs = 4326) |>
+    st_transform(3857)
+
+  crossings_sf <- reticulate::py_to_r(crosswalk_features$to_crs("EPSG:3857")) |>
+    st_as_sf()
+
+  nearest <- st_is_within_distance(intersections_sf, crossings_sf, dist = RADIUS_M)
+  intersections_result[lengths(nearest) > 0, ]
+}
+```
+
+Run this as a second pass over Step 4's output for municipalities where a more precise tile-volume estimate is worth the extra Overpass query; the raw count from Step 4 is a reasonable, faster upper-bound estimate for initial Phase 0 sizing.
+
+------------------------------------------------------------------------
+
+## Step 6 — Run across all municipalities, wave by wave
+
+Unlike the GPU segmentation stage (Modal, embarrassingly parallel), this step queries the Overpass API underneath `osmnx`. The shared public Overpass endpoint has usage limits and etiquette expectations — high-concurrency requests risk 429s/timeouts and are discouraged. Process **sequentially within each wave**, with a short pause between municipalities, and checkpoint so a failed run can resume without redoing completed municipalities. If higher throughput is genuinely needed, stand up a private/self-hosted Overpass instance rather than hammering the public one.
+
+```{r}
+#| label: run-waves
+out_dir <- "data/intersections/raw"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+run_wave <- function(wave_df, pause_sec = 1) {
+  purrr::pwalk(wave_df, function(muni_id, muni_name, wkt, wave, ...) {
+    out_file <- file.path(out_dir, glue("{muni_id}.csv"))
+    if (file.exists(out_file)) return(invisible(NULL))  # resume support
+
+    cli::cli_progress_step("Processing {muni_name}")
+    result <- get_muni_intersections(muni_id, muni_name, wkt)
+    if (!is.null(result)) readr::write_csv(result, out_file)
+    Sys.sleep(pause_sec)
+  })
+}
+
+muni_run_list |>
+  group_split(wave) |>
+  walk(run_wave)
+```
+
+------------------------------------------------------------------------
+
+## Step 7 — Combine and summarize counts
+
+```{r}
+#| label: summarize
+intersection_files <- list.files(out_dir, full.names = TRUE)
+all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALSE)
+
+muni_summary <- all_intersections |>
+  count(muni_id, muni_name, name = "intersection_count") |>
+  left_join(st_drop_geometry(study_area), by = c("muni_id", "muni_name"))
+
+county_total <- sum(muni_summary$intersection_count)
+chicago_benchmark <- 80000
+scale_factor <- county_total / chicago_benchmark
+
+cli::cli_alert_info(
+  "Suburban Cook County: {county_total} intersections (~{round(scale_factor, 2)}x the Chicago benchmark of {chicago_benchmark} tiles)"
+)
+
+dir.create("output", showWarnings = FALSE)
+write_csv(muni_summary, "output/cc_intersection_counts_by_municipality.csv")
+```
+
+This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor selection and cost-per-tile benchmark") and the Cloud Compute Strategy scenarios already documented there (Modal GPU-tier/concurrency choices sized off this tile-count estimate).
+
+------------------------------------------------------------------------
+
+## Step 8 — QA / sanity checks
+
+-   **Visual check:** map intersection points over municipality polygons to confirm no municipality came back empty and points fall inside their boundary.
+
+    ```{r}
+    #| label: qa-map
+    library(mapview)
+    all_points_sf <- st_as_sf(all_intersections, coords = c("lon", "lat"), crs = 4326)
+    mapview(study_area, alpha.regions = 0.1) + mapview(all_points_sf, cex = 1)
+    ```
+
+-   **Outlier review:** flag municipalities whose intersection count looks implausible relative to land area or population (from the municipality attribute table) for manual review — this feeds forward into Phase 1's "Document OSM crossing-coverage completeness by municipality" validation task in `plan.qmd`.
+
+-   **Boundary double-counting:** `ox.graph_from_polygon()` clips the network to each polygon, but nodes sitting exactly on a shared border between two municipalities could in principle appear in both extractions. If a single county-wide (not just per-municipality) point dataset is assembled later in Phase 1, snap coordinates to a small grid (e.g., 1 m) and de-duplicate before combining.
+
+-   **Disconnected components:** the default `retain_all = FALSE` (matching `osm_ingest.py`) keeps only the largest connected component per municipality. For small or exurban municipalities, a fragmented street network could lose a disconnected pocket of intersections — spot-check a few such municipalities with `retain_all = TRUE` and compare counts before deciding which setting to use county-wide.
+
+------------------------------------------------------------------------
+
+## Outputs
+
+-   `config/cc_muni_run_list.csv` — per-municipality run manifest (id, name, WKT polygon, wave).
+-   `data/intersections/raw/{muni_id}.csv` — one file per municipality, raw consolidated intersection coordinates.
+-   `output/cc_intersection_counts_by_municipality.csv` — municipality-level summary table (intersection count, joined attributes) and the county-wide total used for tile-volume and cloud-cost sizing in Phase 0.
+
+------------------------------------------------------------------------
+
+## Note on fidelity and alternatives
+
+Because Step 4/5 call the actual `osmnx` Python functions through `reticulate`, results should match what the Python pipeline would produce for the same polygon and `osmnx` version — R here is orchestration, not a reimplementation of OSMnx's algorithms.
+
+A pure-R alternative (no Python/reticulate) is possible using `osmdata` (an Overpass API wrapper) plus `sf`/`igraph`/`sfnetworks` for network handling, but OSMnx's `consolidate_intersections` merging algorithm would need to be reimplemented from scratch (e.g., via buffering, unioning, and centroid clustering of nearby nodes), and there's no guarantee it reproduces identical counts. Not recommended if numerical parity with the reference methodology matters, which it does here since Phase 0's tile-volume estimate is meant to be directly comparable to the Chicago benchmark produced by the Python pipeline.
