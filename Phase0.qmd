@@ -79,6 +79,28 @@ reticulate::conda_install(
 
 ## Step 1 — Connect R to the OSMnx Python environment
 
+**Before running this chunk:** `reticulate::use_condaenv()` needs a working `conda` installation on your machine. If you hit `Error: Unable to find conda binary. Is Anaconda installed?`, you're missing one of two things:
+
+-   **No conda installed at all** — the simplest fix is to let `reticulate` manage its own private Miniconda install rather than depending on a system Anaconda/Miniconda:
+
+    ```{r}
+    #| label: install-miniconda-if-needed
+    #| eval: false
+    reticulate::install_miniconda()  # one-time; then re-run Step 1 and the Prerequisites conda_create/conda_install chunks
+    ```
+
+-   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the shell `PATH` RStudio sees — e.g., installed for a different shell, or a non-default location). Point `reticulate` at it explicitly before calling `use_condaenv()`, using the actual path to your `conda` executable:
+
+    ```{r}
+    #| label: point-reticulate-at-conda
+    #| eval: false
+    # Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).
+    # Common locations:
+    #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
+    #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe
+    Sys.setenv(RETICULATE_CONDA = "/full/path/to/conda")
+    ```
+
 ```{r}
 #| label: setup
 library(sf)
@@ -90,6 +112,7 @@ library(glue)
 library(janitor)
 library(cli)
 library(tigris)
+library(units)
 
 reticulate::use_condaenv("osmnx-env", required = TRUE)
 
@@ -108,6 +131,7 @@ cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
 ## Step 2 — Create, Load Cook County boundaries
 
 ```{r}
+#| label: load-boundaries
 # download latest counties data from US Census TIGER/Line data
 counties_il <- counties(state="17", cb=TRUE)
 
@@ -126,9 +150,6 @@ counties_il <- counties_il %>%
          area_sqmi = area_land_sqmi + area_water_sqmi) %>%
   select(-c(area_land,area_water))
 
-
-
-#| label: load-boundaries
 cc_boundary <- st_read("data/boundaries/cc_boundary.shp") |>
   st_make_valid() |>
   st_transform(4326)  # osmnx expects unprojected lat/lon polygons
