@@ -130,7 +130,7 @@ cli::cli_alert_info("osmnx version: {ox[['__version__']]}")
 
 ------------------------------------------------------------------------
 
-## Step 2 — Create, Load Cook County boundaries
+## Step 2 — Create Cook County Geometry Layers
 
 ```{r}
 #| label: load-boundaries
@@ -197,17 +197,14 @@ cc_boundary <- st_read("data/boundaries/cc_boundary.shp") %>%
   st_make_valid() %>%
   st_transform(4326)  # osmnx expects unprojected lat/lon polygons
 
+# read municipal layer
 cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") %>%
   st_make_valid() %>%
   st_transform(4326)
 
 # Confirm the attribute field(s) that identify each municipality before proceeding
 names(cc_municipalities)
-```
 
-Once you've confirmed the actual field names from `names(cc_municipalities)`, set them explicitly (the placeholders below are illustrative only — replace with what the shapefile actually contains):
-
-```{r}
 #| label: normalize-muni-fields
 MUNI_NAME_FIELD <- "nam_plc"  # <- replace with the real field
 MUNI_ID_FIELD   <- "ged_plc"    # <- replace with the real field, if one exists
