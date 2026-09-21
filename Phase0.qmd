@@ -95,10 +95,15 @@ install.packages(c(
     #| label: point-reticulate-at-conda
     #| eval: false
     # Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).
+    # This must be the path to the conda EXECUTABLE FILE itself, not the folder containing it --
+    # a folder path (even the right folder) will fail with "Supplied path is not a conda binary".
     # Common locations:
     #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
-    #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe or C:/Users/<you>/Miniconda3/Scripts/conda.exe
-    Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts")
+    #   Windows (manually-installed Anaconda3/Miniconda3):
+    #     C:/Users/<you>/Anaconda3/Scripts/conda.exe or C:/Users/<you>/Miniconda3/Scripts/conda.exe
+    #   Windows (reticulate::install_miniconda()'s own private install):
+    #     C:/Users/<you>/AppData/Local/r-miniconda/Scripts/conda.exe
+    Sys.setenv(RETICULATE_CONDA = "C:/Users/<you>/AppData/Local/r-miniconda/Scripts/conda.exe")
     ```
 
 -   **Would rather not install conda at all** — use your existing Python 3.13 via a `venv`-based environment instead of a conda one (no conda required). This replaces the `conda_create()`/`conda_install()`/`use_condaenv()` calls throughout this document with their virtualenv equivalents:
