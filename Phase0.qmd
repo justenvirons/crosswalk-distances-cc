@@ -67,6 +67,46 @@ install.packages(c(
 
 **Python environment (via reticulate):** a conda or venv environment with `osmnx` installed. Match the version family used in the reference repo's Modal image (`gboeing/osmnx:latest`, see `inference/utils.py`) — after installing, print `ox$__version__` and record it alongside these results for reproducibility, rather than assuming a specific pinned version here.
 
+**Before running the chunk below:** `reticulate::conda_create()`/`use_condaenv()` need a working **conda** binary (from Anaconda or Miniconda) — this is a separate installer from Python itself. Having Python already installed (e.g., Python 3.13 from python.org, the Microsoft Store, or elsewhere) does **not** satisfy this; `conda_create()` will always throw `Error: Unable to find conda binary. Is Anaconda installed?` regardless of what Python version is already on the machine, because it's specifically looking for `conda`, not `python`. Pick one of the two paths below:
+
+-   **No conda installed at all (recommended default)** — let `reticulate` manage its own private Miniconda install, which won't touch or conflict with your existing Python 3.13:
+
+    ```{r}
+    #| label: install-miniconda-if-needed
+    #| eval: false
+    reticulate::install_miniconda()
+    ```
+
+    **On Windows in particular:** after this finishes, **restart your R session** (RStudio: Session → Restart R, or close and reopen RStudio) before running `conda_create()`. Reticulate caches its conda-path lookup for the life of the R session, so if you run `install_miniconda()` and then immediately retry `conda_create()` in the *same* session, you can still get the "unable to find conda binary" error even though the install succeeded. A fresh session picks up the new install.
+
+-   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the `PATH` RStudio sees). Point `reticulate` at it explicitly, using the actual path to your `conda` executable, then restart R:
+
+    ```{r}
+    #| label: point-reticulate-at-conda
+    #| eval: false
+    # Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).
+    # Common locations:
+    #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
+    #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe or C:/Users/<you>/Miniconda3/Scripts/conda.exe
+    Sys.setenv(RETICULATE_CONDA = "/full/path/to/conda")
+    ```
+
+-   **Would rather not install conda at all** — use your existing Python 3.13 via a `venv`-based environment instead of a conda one (no conda required). This replaces the `conda_create()`/`conda_install()`/`use_condaenv()` calls throughout this document with their virtualenv equivalents:
+
+    ```{r}
+    #| label: python-env-setup-venv-alternative
+    #| eval: false
+    reticulate::virtualenv_create("osmnx-env", python = "3.13")
+    reticulate::virtualenv_install(
+      "osmnx-env",
+      packages = c("osmnx", "geopandas", "shapely")
+    )
+    # then in Step 1, use:
+    # reticulate::use_virtualenv("osmnx-env", required = TRUE)
+    ```
+
+    Caveat: Python 3.13 is very new, and `geopandas`'s underlying GDAL/GEOS/PROJ dependencies (via `fiona`/`pyproj`) sometimes lag behind the newest Python release in having prebuilt pip wheels on Windows. If `virtualenv_install()` fails trying to build one of these from source, that's what's happening — fall back to the conda path above (conda-forge reliably has these prebuilt) or point `virtualenv_create()` at an older installed Python (3.11/3.12) if you have one, rather than 3.13.
+
 ```{r}
 #| label: python-env-setup
 reticulate::conda_create("osmnx-env", packages = "python=3.11")
@@ -81,27 +121,7 @@ reticulate::conda_install(
 
 ## Step 1 — Connect R to the OSMnx Python environment
 
-**Before running this chunk:** `reticulate::use_condaenv()` needs a working `conda` installation on your machine. If you hit `Error: Unable to find conda binary. Is Anaconda installed?`, you're missing one of two things:
-
--   **No conda installed at all** — the simplest fix is to let `reticulate` manage its own private Miniconda install rather than depending on a system Anaconda/Miniconda:
-
-    ```{r}
-    #| label: install-miniconda-if-needed
-    #| eval: false
-    reticulate::install_miniconda()  # one-time; then re-run Step 1 and the Prerequisites conda_create/conda_install chunks
-    ```
-
--   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the shell `PATH` RStudio sees — e.g., installed for a different shell, or a non-default location). Point `reticulate` at it explicitly before calling `use_condaenv()`, using the actual path to your `conda` executable:
-
-    ```{r}
-    #| label: point-reticulate-at-conda
-    #| eval: false
-    # Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).
-    # Common locations:
-    #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
-    #   Windows:     C:/Users/<you>/Anaconda3/Scripts/conda.exe
-    Sys.setenv(RETICULATE_CONDA = "/full/path/to/conda")
-    ```
+(If `conda_create()` above already succeeded, this chunk should just work. See the Prerequisites section for troubleshooting if it didn't.)
 
 ```{r}
 #| label: setup
