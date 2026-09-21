@@ -193,12 +193,12 @@ cc_municipalities <- places_by_centroid %>%
 st_write(obj = cc_municipalities, dsn = "data/boundaries/cc_municipalities.shp")
 
 # read cook county boundary
-cc_boundary <- st_read("data/boundaries/cc_boundary.shp") |>
-  st_make_valid() |>
+cc_boundary <- st_read("data/boundaries/cc_boundary.shp") %>%
+  st_make_valid() %>%
   st_transform(4326)  # osmnx expects unprojected lat/lon polygons
 
-cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") |>
-  st_make_valid() |>
+cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") %>%
+  st_make_valid() %>%
   st_transform(4326)
 
 # Confirm the attribute field(s) that identify each municipality before proceeding
@@ -212,7 +212,7 @@ Once you've confirmed the actual field names from `names(cc_municipalities)`, se
 MUNI_NAME_FIELD <- "nam_plc"  # <- replace with the real field
 MUNI_ID_FIELD   <- "ged_plc"    # <- replace with the real field, if one exists
 
-cc_municipalities <- cc_municipalities |>
+cc_municipalities <- cc_municipalities %>%
   rename(muni_name = MUNI_NAME_FIELD,
          muni_id = MUNI_ID_FIELD
          )
@@ -222,13 +222,13 @@ cc_municipalities <- cc_municipalities |>
 
 ```{r}
 #| label: unincorporated-remainder
-unincorporated <- st_difference(cc_boundary, st_union(cc_municipalities)) |>
-  st_collection_extract("POLYGON") |>
-  mutate(muni_id = "UNINC", muni_name = "Unincorporated Cook County") |>
+unincorporated <- st_difference(cc_boundary, st_union(cc_municipalities)) %>%
+  st_collection_extract("POLYGON") %>%
+  mutate(muni_id = "UNINC", muni_name = "Unincorporated Cook County") %>%
   select(muni_id, muni_name, geometry)
 
 study_area <- bind_rows(
-  cc_municipalities |> select(muni_id, muni_name, geometry),
+  cc_municipalities %>% select(muni_id, muni_name, geometry),
   unincorporated  # omit this line if unincorporated areas are out of scope
 )
 ```
@@ -241,10 +241,10 @@ study_area <- bind_rows(
 #| label: build-run-list
 N_PER_WAVE <- 12  # tune based on how much Overpass load you want per batch
 
-muni_run_list <- study_area |>
-  mutate(wkt = st_as_text(geometry)) |>
-  st_drop_geometry() |>
-  arrange(muni_name) |>
+muni_run_list <- study_area %>%
+  mutate(wkt = st_as_text(geometry)) %>%
+  st_drop_geometry() %>%
+  arrange(muni_name) %>%
   mutate(wave = ceiling(row_number() / N_PER_WAVE))
 
 dir.create("config", showWarnings = FALSE)
@@ -318,9 +318,9 @@ get_muni_intersections <- function(muni_id, muni_name, wkt,
   )$to_crs("EPSG:4326")
 
   coords <- reticulate::py_to_r(intersections_gdf$get_coordinates())
-  coords |>
-    as_tibble() |>
-    rename(lon = x, lat = y) |>
+  coords %>%
+    as_tibble() %>%
+    rename(lon = x, lat = y) %>%
     mutate(muni_id = muni_id, muni_name = muni_name)
 }
 ```
@@ -351,10 +351,10 @@ get_muni_crossing_adjacent_intersections <- function(muni_id, muni_name, wkt) {
   intersections_result <- get_muni_intersections(muni_id, muni_name, wkt)
   if (is.null(intersections_result)) return(NULL)
 
-  intersections_sf <- st_as_sf(intersections_result, coords = c("lon", "lat"), crs = 4326) |>
+  intersections_sf <- st_as_sf(intersections_result, coords = c("lon", "lat"), crs = 4326) %>%
     st_transform(3857)
 
-  crossings_sf <- reticulate::py_to_r(crosswalk_features$to_crs("EPSG:3857")) |>
+  crossings_sf <- reticulate::py_to_r(crosswalk_features$to_crs("EPSG:3857")) %>%
     st_as_sf()
 
   nearest <- st_is_within_distance(intersections_sf, crossings_sf, dist = RADIUS_M)
@@ -387,8 +387,8 @@ run_wave <- function(wave_df, pause_sec = 1) {
   })
 }
 
-muni_run_list |>
-  group_split(wave) |>
+muni_run_list %>%
+  group_split(wave) %>%
   walk(run_wave)
 ```
 
@@ -401,8 +401,8 @@ muni_run_list |>
 intersection_files <- list.files(out_dir, full.names = TRUE)
 all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALSE)
 
-muni_summary <- all_intersections |>
-  count(muni_id, muni_name, name = "intersection_count") |>
+muni_summary <- all_intersections %>%
+  count(muni_id, muni_name, name = "intersection_count") %>%
   left_join(st_drop_geometry(study_area), by = c("muni_id", "muni_name"))
 
 county_total <- sum(muni_summary$intersection_count)
