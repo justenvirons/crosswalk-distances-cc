@@ -1,5 +1,5 @@
 ---
-title: "Work Plan: Extending AI-Based Crosswalk Segmentation and Pedestrian Safety Analysis to All of Cook County"
+title: "Work Plan for <i>Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</i>"
 author:
   - name: "C. Scott Smith, PhD AICP"
     affiliations:
