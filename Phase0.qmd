@@ -350,11 +350,14 @@ get_muni_intersections <- function(muni_id, muni_name, wkt,
   if (!is.null(tolerance)) consolidate_args$tolerance <- tolerance
   intersections <- do.call(ox$consolidate_intersections, consolidate_args)
 
-  intersections_gdf <- gpd$GeoDataFrame(
-    geometry = intersections, crs = intersections$crs
-  )$to_crs("EPSG:4326")
-
-  coords <- reticulate::py_to_r(intersections_gdf$get_coordinates())
+  # intersections is already a GeoSeries -- call .to_crs()/.get_coordinates()
+  # directly on it (matching osm_ingest.py's raw_intersection_coordinates
+  # export) rather than rebuilding a GeoDataFrame from it. Rebuilding one via
+  # gpd$GeoDataFrame(geometry = intersections, crs = intersections$crs)
+  # touches the pyproj CRS object through reticulate's automatic conversion,
+  # which breaks with "names() applied to a non-vector" -- accessing
+  # intersections$crs is what triggers the broken conversion, so avoid it.
+  coords <- reticulate::py_to_r(intersections$to_crs("EPSG:4326")$get_coordinates())
   coords %>%
     as_tibble() %>%
     rename(lon = x, lat = y) %>%
