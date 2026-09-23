@@ -93,6 +93,7 @@ library(tigris)
 library(units)
 library(leaflet)
 library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+library(osmextract)
 
 # API key for leaflet maps
 CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
@@ -271,15 +272,14 @@ resolve_speed_limit <- function(highway, maxspeed_raw) {
 }
 ```
 
-**Streets, from OSM via Geofabrik (not TIGER, not a second Overpass pass):** a bulk offline extract sidesteps Overpass entirely for this layer -- no rate limits, no timeouts, no per-municipality queries. `osmextract` downloads (and caches locally, so this only happens once) the Illinois Geofabrik `.osm.pbf`, reads its `lines` layer, and pulls `maxspeed`/`oneway` as extra columns. The `query` argument filters to road ways during the GDAL `.pbf` → `.gpkg` conversion itself, before anything else loads into R memory -- much faster than reading all of Illinois' line features (railways, waterways, power lines, etc.) and filtering afterward. This is a separate extraction method from Step 4's Overpass-based graph pull, so segment boundaries won't exactly match osmnx's topologically-simplified edges, but both draw on the same underlying OSM data.
+**Streets, from OSM via Geofabrik:** a bulk offline extract. `osmextract` downloads (and caches locally, so this only happens once) the Illinois Geofabrik `.osm.pbf`, reads its `lines` layer, and pulls `maxspeed`/`oneway` as extra columns. The `query` argument filters to road ways during the GDAL `.pbf` → `.gpkg` conversion itself, before anything else loads into R memory -- much faster than reading all of Illinois' line features (railways, waterways, power lines, etc.) and filtering afterward. This is a separate extraction method from Step 4's Overpass-based graph pull, so segment boundaries won't exactly match osmnx's topologically-simplified edges, but both draw on the same underlying OSM data.
 
 ```{r}
 #| label: streets-osm
-# New dep for this chunk: install.packages("osmextract") if missing.
-library(osmextract)
+#| # https://download.geofabrik.de/north-america/us/illinois.html
 
 il_streets <- oe_read(
-  "illinois-latest.osm.pbf",
+  "https://download.geofabrik.de/north-america/us/illinois-latest.osm.pbf",
   layer = "lines",
   extra_tags = c("maxspeed", "oneway"),
   query = "SELECT * FROM lines WHERE highway IS NOT NULL",
@@ -294,9 +294,9 @@ cc_streets <- il_streets %>%
   st_collection_extract("LINESTRING") %>%        # st_intersection() can return GEOMETRYCOLLECTION at complex boundary crossings
   select(street_name = name, highway, maxspeed_raw = maxspeed, oneway) %>%
   mutate(resolve_speed_limit(highway, maxspeed_raw))
-```
 
-`st_intersection()` against the full county boundary can take a little while on a state-then-clipped dataset; if it's too slow, `st_filter(il_streets, cc_boundary, .predicate = st_intersects)` is a faster alternative that keeps whole street geometries (including the small overhang past the county line) rather than cutting them exactly at the boundary.
+st_write(cc_streets, "output/all_streets.shp")
+```
 
 ------------------------------------------------------------------------
 
@@ -522,26 +522,11 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     ```{r}
     #| label: qa-map
     # New deps for this chunk only: install.packages(c("leaflet", "leaflet.extras")) if missing.
-
-    # leaflet has no native "only render above zoom N" option for a point/line
-    # layer (that's a raster-tile-layer concept, via minZoom/maxZoom). With
-    # N ~ 170,000 intersection points and a county-wide street network both in
-    # play, the visual clutter and render cost at county-wide zoom make both
-    # layers pointless until zoomed in anyway, so each is toggled on/off as a
-    # whole group via a small JS zoomend listener below
-    # (map.layerManager.getLayerGroup() is the standard way to reach an R
-    # leaflet `group=` from custom JS). Tune ZOOM_THRESHOLD to taste -- higher
-    # = layers appear later/only when more zoomed in. Add more group names to
-    # zoomGatedGroups below if further layers need the same treatment.
+    
     ZOOM_THRESHOLD <- 14
 
     bbox <- st_bbox(study_area)
-
-    # Streets colored by resolved speed limit (cc_streets, from Step 2's
-    # streets-osm chunk -- OSM-tagged where available, class-default
-    # fallback otherwise; see Step 2's speed-limit-defaults chunk). na.color
-    # covers any segment resolve_speed_limit() couldn't assign a value to at
-    # all (an OSM highway class not in default_speed_by_highway).
+    
     speed_pal <- colorNumeric(palette = "YlOrRd", domain = cc_streets$maxspeed_mph, na.color = "#999999")
 
     qa_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%  # canvas, not SVG, for 170k markers
@@ -560,17 +545,17 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
         label = ~muni_name,
         group = "Municipalities"
       ) %>%
-      addPolylines(
-        data = cc_streets,
-        weight = 1.5,
-        opacity = 0.7,
-        color = ~speed_pal(maxspeed_mph),
-        label = ~paste0(
-          ifelse(is.na(street_name), highway, street_name),
-          " — ", maxspeed_mph, " mph (", maxspeed_source, ")"
-        ),
-        group = "Streets"
-      ) %>%
+      # addPolylines(
+      #   data = cc_streets,
+      #   weight = 1.5,
+      #   opacity = 0.7,
+      #   color = ~speed_pal(maxspeed_mph),
+      #   label = ~paste0(
+      #     ifelse(is.na(street_name), highway, street_name),
+      #     " — ", maxspeed_mph, " mph (", maxspeed_source, ")"
+      #   ),
+      #   group = "Streets"
+      # ) %>%
       addCircleMarkers(
         data = all_intersections,
         radius = 2,
@@ -579,13 +564,13 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
         fillColor = "#333",
         group = "Intersections"
       ) %>%
-      addLegend(
-        "bottomright",
-        pal = speed_pal,
-        values = cc_streets$maxspeed_mph,
-        title = "Speed limit (mph)",
-        opacity = 1
-      ) %>%
+      # addLegend(
+      #   "bottomright",
+      #   pal = speed_pal,
+      #   values = cc_streets$maxspeed_mph,
+      #   title = "Speed limit (mph)",
+      #   opacity = 1
+      # ) %>%
       fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
       addResetMapButton() %>%
       addFullscreenControl() %>%
@@ -641,10 +626,3 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
 -   `output/all_intersections.shp` — county-wide shapefile combining all municipalities' intersections (Step 7).
 -   `output/all_streets.shp` — county-wide street layer (Step 2's `cc_streets`, from a Geofabrik OSM extract) with `highway`, `maxspeed_raw`, `street_name`, `oneway`, and resolved `maxspeed_mph`/`maxspeed_source`.
 
-------------------------------------------------------------------------
-
-## Note on fidelity and alternatives
-
-Because Step 4/5 call the actual `osmnx` Python functions through `reticulate`, results should match what the Python pipeline would produce for the same polygon and `osmnx` version — R here is orchestration, not a reimplementation of OSMnx's algorithms.
-
-A pure-R alternative (no Python/reticulate) is possible using `osmdata` (an Overpass API wrapper) plus `sf`/`igraph`/`sfnetworks` for network handling, but OSMnx's `consolidate_intersections` merging algorithm would need to be reimplemented from scratch (e.g., via buffering, unioning, and centroid clustering of nearby nodes), and there's no guarantee it reproduces identical counts. Not recommended if numerical parity with the reference methodology matters, which it does here since Phase 0's tile-volume estimate is meant to be directly comparable to the Chicago benchmark produced by the Python pipeline.

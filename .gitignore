@@ -1,5 +1,6 @@
-# Folders
+# Folders, file types
 data/intersections/raw/*.csv
+output/all_streets*.*
 
 # History files
 .Rhistory
