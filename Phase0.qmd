@@ -90,6 +90,12 @@ library(janitor)
 library(cli)
 library(tigris)
 library(units)
+library(leaflet)
+library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+
+# API key for leaflet maps
+CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
+
 
 reticulate::use_condaenv("osmnx-env", required = TRUE)
 
@@ -171,6 +177,19 @@ cc_municipalities <- places_by_centroid %>%
 
 # write cook county boundary to data/boundaries folder
 st_write(obj = cc_municipalities, dsn = "data/boundaries/cc_municipalities.shp")
+
+# download Cook County streets
+options(tigris_use_cache = TRUE)
+
+cc_streets <- roads(state = "17", county = "031") %>%   # Illinois (17), Cook County (031)
+  st_transform(4326) %>%
+  select(
+    linearid      = LINEARID,
+    street_name   = FULLNAME,
+    route_type    = RTTYP,
+    feature_class = MTFCC,
+    geometry
+  )
 
 # read cook county boundary
 cc_boundary <- st_read("data/boundaries/cc_boundary.shp") %>%
@@ -437,8 +456,7 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     ```{r}
     #| label: qa-map
     # New deps for this chunk only: install.packages(c("leaflet", "leaflet.extras")) if missing.
-    library(leaflet)
-    library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+
 
     # all_points_sf comes from Step 7 (already built there for the shapefile
     # export) -- reused here rather than rebuilt from all_intersections.
@@ -456,32 +474,36 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     bbox <- st_bbox(study_area)
 
     qa_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%  # canvas, not SVG, for 170k markers
-      addProviderTiles(providers$CartoDB.Positron, group = "Positron (minimal)") %>%
-      addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery (satellite)") %>%
+      # addProviderTiles(providers$CartoDB.Positron, group = "Positron (minimal)") %>%
+      addTiles(urlTemplate = paste0(
+      "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=",
+      CARTO_API_KEY)) %>%  
+      # addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery (satellite)") %>%
       addPolygons(
         data = study_area,
-        fillColor = "transparent",
-        weight = 1,
-        opacity = 0.75,
-        color = "#444444",
-        fillOpacity = 0.05,
+        fillColor = "#777",
+        weight = 2,
+        opacity = 0.25,
+        color = "#fff",
+        fillOpacity = 0.5,
         label = ~muni_name,
         group = "Municipalities"
       ) %>%
       addCircleMarkers(
-        data = all_points_sf,
+        data = all_intersections,
         radius = 2,
         stroke = FALSE,
         fillOpacity = 0.7,
-        fillColor = "#d7301f",
+        fillColor = "#333",
         group = "Intersections"
       ) %>%
       fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
       addResetMapButton() %>%
       addFullscreenControl() %>%
       addLayersControl(
-        baseGroups = c("Positron (minimal)", "World Imagery (satellite)"),
-        overlayGroups = c("Municipalities", "Intersections"),
+        # baseGroups = c("Positron (minimal)", "World Imagery (satellite)"),
+        # overlayGroups = c("Municipalities", "Intersections"),
+        overlayGroups = c("Municipalities"),
         options = layersControlOptions(collapsed = FALSE)
       ) %>%
       htmlwidgets::onRender(sprintf(
