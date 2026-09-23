@@ -457,18 +457,16 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     #| label: qa-map
     # New deps for this chunk only: install.packages(c("leaflet", "leaflet.extras")) if missing.
 
-
-    # all_points_sf comes from Step 7 (already built there for the shapefile
-    # export) -- reused here rather than rebuilt from all_intersections.
-
-    # leaflet has no native "only render above zoom N" option for a point
+    # leaflet has no native "only render above zoom N" option for a point/line
     # layer (that's a raster-tile-layer concept, via minZoom/maxZoom). With
-    # N ~ 170,000 points, both the visual clutter and render cost at
-    # county-wide zoom make that layer pointless until zoomed in anyway, so
-    # it's toggled on/off as a whole group via a small JS zoomend listener
-    # below (map.layerManager.getLayerGroup() is the standard way to reach
-    # an R leaflet `group=` from custom JS). Tune ZOOM_THRESHOLD to taste --
-    # higher = points appear later/only when more zoomed in.
+    # N ~ 170,000 intersection points and a county-wide street network both in
+    # play, the visual clutter and render cost at county-wide zoom make both
+    # layers pointless until zoomed in anyway, so each is toggled on/off as a
+    # whole group via a small JS zoomend listener below
+    # (map.layerManager.getLayerGroup() is the standard way to reach an R
+    # leaflet `group=` from custom JS). Tune ZOOM_THRESHOLD to taste -- higher
+    # = layers appear later/only when more zoomed in. Add more group names to
+    # zoomGatedGroups below if further layers need the same treatment.
     ZOOM_THRESHOLD <- 14
 
     bbox <- st_bbox(study_area)
@@ -488,6 +486,14 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
         fillOpacity = 0.5,
         label = ~muni_name,
         group = "Municipalities"
+      ) %>%
+      addPolylines(
+        data = cc_streets,
+        weight = 1,
+        opacity = 0.6,
+        color = "#2b6cb0",
+        label = ~street_name,
+        group = "Streets"
       ) %>%
       addCircleMarkers(
         data = all_intersections,
@@ -509,16 +515,20 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
       htmlwidgets::onRender(sprintf(
         "function(el, x) {
           var map = this;
-          var group = map.layerManager.getLayerGroup('Intersections');
           var threshold = %d;
+          var zoomGatedGroups = ['Intersections', 'Streets'];
 
           function toggleByZoom() {
-            if (!group) return;
-            if (map.getZoom() >= threshold) {
-              if (!map.hasLayer(group)) map.addLayer(group);
-            } else {
-              if (map.hasLayer(group)) map.removeLayer(group);
-            }
+            var show = map.getZoom() >= threshold;
+            zoomGatedGroups.forEach(function(name) {
+              var group = map.layerManager.getLayerGroup(name);
+              if (!group) return;
+              if (show) {
+                if (!map.hasLayer(group)) map.addLayer(group);
+              } else {
+                if (map.hasLayer(group)) map.removeLayer(group);
+              }
+            });
           }
 
           map.on('zoomend', toggleByZoom);
@@ -530,7 +540,7 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     qa_map
     ```
 
-    Note: the layers-control checkbox for "Intersections" still lets you force it on/off manually — a manual toggle isn't re-corrected until the next `zoomend`, so briefly checking it on below `ZOOM_THRESHOLD` will show the layer until you zoom again. If 170k canvas markers still feel sluggish once actually zoomed in, the next escalation is marker clustering (`leaflet.extras::addCircleMarkers(clusterOptions = leaflet::markerClusterOptions())`) or WebGL point rendering (`leafgl::addGlPoints()`) instead of plain `addCircleMarkers()`.
+    Note: "Intersections" and "Streets" are deliberately left out of `overlayGroups` in `addLayersControl()` above, so there's no manual checkbox to fight with the zoom-gating JS — both are purely zoom-controlled. If 170k canvas markers and/or the county-wide street network still feel sluggish once actually zoomed in, the next escalation is marker clustering (`leaflet.extras::addCircleMarkers(clusterOptions = leaflet::markerClusterOptions())`) or WebGL rendering (`leafgl::addGlPoints()`/`leafgl::addGlPolylines()`) instead of plain `addCircleMarkers()`/`addPolylines()`.
 
 -   **Outlier review:** flag municipalities whose intersection count looks implausible relative to land area or population (from the municipality attribute table) for manual review — this feeds forward into Phase 1's "Document OSM crossing-coverage completeness by municipality" validation task in `plan.qmd`.
 
