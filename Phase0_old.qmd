@@ -6,7 +6,7 @@ format:
   html:
     toc: true
     toc-depth: 2
-    number-sections: false
+    number-sections: true
     theme: cosmo
     embed-resources: true
 editor: source
@@ -20,12 +20,14 @@ editor_options:
 
 This document operationalizes one task from `plan.qmd`'s Phase 0 — *"Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality"* — as a concrete, runnable R/RStudio workflow.
 
-It is written to be parallel to, not a reimplementation of, the intersection-extraction logic already used in the reference methodology repository ([`agupta01/crossing-distances`](https://github.com/agupta01/crossing-distances), specifically `inference/osm_ingest.py`). Rather than porting OSMnx's algorithms into native R, this workflow uses `reticulate` to call the real Python `osmnx` package from R, so the intersection-consolidation results are the *same* algorithm, not an approximation of it. R's role here is orchestration: loading the local Cook County shapefiles, looping over municipalities, and assembling the summary tables — the geometric work (`consolidate_intersections`, graph filtering) is delegated to `osmnx` itself.
+It is written to be **parallel to**, not a reimplementation of, the intersection-extraction logic already used in the reference methodology repository ([`agupta01/crossing-distances`](https://github.com/agupta01/crossing-distances), specifically `inference/osm_ingest.py`). Rather than porting OSMnx's algorithms into native R, this workflow uses `reticulate` to call the real Python `osmnx` package from R, so the intersection-consolidation results are the *same* algorithm, not an approximation of it. R's role here is orchestration: loading the local Cook County shapefiles, looping over municipalities, and assembling the summary tables — the geometric work (`consolidate_intersections`, graph filtering) is delegated to `osmnx` itself.
 
 Two things differ deliberately from the reference repo's approach, because this project is county-scale rather than a name-geocoded, single-city pull:
 
 1. **Boundaries come from local shapefiles**, not `osmnx.graph_from_place()`'s Nominatim geocoding. Step 2 builds `cc_boundary.shp` (Cook County outline) and `cc_municipalities.shp` (municipal polygons) from Census TIGER/Line data via `tigris` and writes them under `data/boundaries/`, and the workflow calls `ox.graph_from_polygon()` per municipality against those instead.
-2. **One run per municipality**, batched into "waves" — the same batching idea as the reference repo's `config/envs_100_cities.csv` (`Code`/`Wave` columns), just keyed to ~120 Cook County municipalities instead of ~100 US metro areas.
+2. **One run per municipality**, batched into "waves" — the same batching idea as the reference repo's `config/envs_100_cities.csv` (`Code`/`Wave` columns), just keyed to ~135 Cook County municipalities instead of ~100 US metro areas.
+
+All code chunks below default to `eval: false` (see YAML header) so nothing runs unattended on open — review each chunk, then flip to `eval: true` (or knit interactively in RStudio) to run it.
 
 ------------------------------------------------------------------------
 
@@ -48,21 +50,86 @@ Because Step "Intersection consolidation" calls the identical `osmnx` function, 
 
 ## Prerequisites
 
-### Python
+**Inputs:** none pre-supplied — Step 2 builds `data/boundaries/cc_boundary.shp` and `data/boundaries/cc_municipalities.shp` itself from Census TIGER/Line data via `tigris`. If you already have official Cook County GIS boundary files you'd rather use instead, drop them at those same paths and skip the `tigris` download portion of Step 2.
 
-Let `reticulate` manage its own private Miniconda install, which won't touch or conflict with locally installed Python. Once installed, restart R session. If reticulate can't find conda, set appropriate environment path using code below.
+**R packages:**
 
 ```{r}
-#| label: install-miniconda-if-needed
-#| eval: false
+#| label: r-packages
+install.packages(c(
+  "sf", "reticulate", "dplyr", "purrr", "readr", "glue",
+  "janitor", "cli", "mapview"
+))
+```
 
-reticulate::install_miniconda()
-Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts/conda.exe")
+**Python environment (via reticulate):** a conda or venv environment with `osmnx` installed. Match the version family used in the reference repo's Modal image (`gboeing/osmnx:latest`, see `inference/utils.py`) — after installing, print `ox$__version__` and record it alongside these results for reproducibility, rather than assuming a specific pinned version here.
 
+**Before running the chunk below:** `reticulate::conda_create()`/`use_condaenv()` need a working **conda** binary (from Anaconda or Miniconda) — this is a separate installer from Python itself. Having Python already installed (e.g., Python 3.13 from python.org, the Microsoft Store, or elsewhere) does **not** satisfy this; `conda_create()` will always throw `Error: Unable to find conda binary. Is Anaconda installed?` regardless of what Python version is already on the machine, because it's specifically looking for `conda`, not `python`. Pick one of the two paths below:
+
+-   **No conda installed at all (recommended default)** — let `reticulate` manage its own private Miniconda install, which won't touch or conflict with your existing Python 3.13:
+
+    ```{r}
+    #| label: install-miniconda-if-needed
+    #| eval: false
+    reticulate::install_miniconda()
+    ```
+
+    **On Windows in particular:** after this finishes, **restart your R session** (RStudio: Session → Restart R, or close and reopen RStudio) before running `conda_create()`. Reticulate caches its conda-path lookup for the life of the R session, so if you run `install_miniconda()` and then immediately retry `conda_create()` in the *same* session, you can still get the "unable to find conda binary" error even though the install succeeded. A fresh session picks up the new install.
+
+-   **`install_miniconda()` reported success, but `use_condaenv()`/`conda_create()` still fail** — with a warning like `Supplied path is not a conda binary: '.../r-miniconda'` or `'.../r-miniconda' not found`. This means something is pointing `reticulate` at the miniconda **install directory** itself (the path `install_miniconda()` printed, e.g. `C:/Users/<you>/AppData/Local/r-miniconda`) instead of the `conda` **executable** inside it — those are not the same path, and `reticulate` needs the executable. The most common cause is having previously set `RETICULATE_CONDA` (per the next bullet) to that install-root path rather than a binary. Fix: clear the override and let `reticulate` auto-manage its own miniconda install, then restart R:
+
+    ```{r}
+    #| label: clear-bad-reticulate-conda-override
+    #| eval: false
+    Sys.getenv("RETICULATE_CONDA")  # check what's currently set, if anything
+    Sys.unsetenv("RETICULATE_CONDA")
+    # If Sys.getenv() above returned something even in a fresh session, also check
+    # for a lingering RETICULATE_CONDA= line in usethis::edit_r_environ() and remove it.
+    ```
+
+    Then restart R and retry `reticulate::conda_binary()` (should now resolve to something like `.../r-miniconda/condabin/conda.bat` on Windows) before re-running `conda_create()`/`use_condaenv()`.
+
+-   **Conda is installed, but `reticulate` can't find it** (common when conda isn't on the `PATH` RStudio sees). Point `reticulate` at it explicitly, using the actual path to your `conda` **executable** (not just the install folder), then restart R:
+
+    ```{r}
+    #| label: point-reticulate-at-conda
+    #| eval: false
+    # Find your conda binary from a terminal first: `which conda` (macOS/Linux) or `where conda` (Windows).
+    # This must be the path to the conda EXECUTABLE FILE itself, not the folder containing it --
+    # a folder path (even the right folder) will fail with "Supplied path is not a conda binary".
+    # Common locations:
+    #   macOS/Linux: ~/anaconda3/bin/conda, ~/miniconda3/bin/conda, /opt/anaconda3/bin/conda
+    #   Windows (manually-installed Anaconda3/Miniconda3):
+    #     C:/Users/<you>/Anaconda3/Scripts/conda.exe or C:/Users/<you>/Miniconda3/Scripts/conda.exe
+    #   Windows (reticulate::install_miniconda()'s own private install):
+    #     C:/Users/<you>/AppData/Local/r-miniconda/Scripts/conda.exe
+    Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts/conda.exe")
+    ```
+
+-   **Would rather not install conda at all** — use your existing Python 3.13 via a `venv`-based environment instead of a conda one (no conda required). This replaces the `conda_create()`/`conda_install()`/`use_condaenv()` calls throughout this document with their virtualenv equivalents:
+
+    ```{r}
+    #| label: python-env-setup-venv-alternative
+    #| eval: false
+    reticulate::virtualenv_create("osmnx-env", python = "3.13")
+    reticulate::virtualenv_install(
+      "osmnx-env",
+      packages = c("osmnx", "geopandas", "shapely")
+    )
+    # then in Step 1, use:
+    # reticulate::use_virtualenv("osmnx-env", required = TRUE)
+    ```
+
+    Caveat: Python 3.13 is very new, and `geopandas`'s underlying GDAL/GEOS/PROJ dependencies (via `fiona`/`pyproj`) sometimes lag behind the newest Python release in having prebuilt pip wheels on Windows. If `virtualenv_install()` fails trying to build one of these from source, that's what's happening — fall back to the conda path above (conda-forge reliably has these prebuilt) or point `virtualenv_create()` at an older installed Python (3.11/3.12) if you have one, rather than 3.13.
+
+```{r}
+#| label: python-env-setup
 reticulate::conda_create("osmnx-env", packages = "python=3.11")
-reticulate::conda_install("osmnx-env",
-                          packages = c("osmnx", "geopandas", "shapely"),
-                          pip = TRUE)
+reticulate::conda_install(
+  "osmnx-env",
+  packages = c("osmnx", "geopandas", "shapely"),
+  pip = TRUE
+)
 ```
 
 ------------------------------------------------------------------------
@@ -184,8 +251,12 @@ cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") %>%
 
 # Confirm the attribute field(s) that identify each municipality before proceeding
 names(cc_municipalities)
+```
 
-# Normalize field names
+The `select()` step above names these fields `name_place`/`geoid_place`, but the Shapefile/DBF format truncates field names to 10 characters, so after the `st_write()`/`st_read()` round-trip above they come back truncated — confirmed here as `nam_plc`/`ged_plc` (re-check with `names(cc_municipalities)` above if you regenerate the shapefiles, since GDAL's truncation/deduplication isn't always the same abbreviation):
+
+```{r}
+#| label: normalize-muni-fields
 MUNI_NAME_FIELD <- "nam_plc"
 MUNI_ID_FIELD   <- "ged_plc"
 
@@ -193,8 +264,13 @@ cc_municipalities <- cc_municipalities %>%
   rename(muni_name = all_of(MUNI_NAME_FIELD),
          muni_id = all_of(MUNI_ID_FIELD)
          )
+```
 
-# Establish study area
+Establish study area
+
+```{r}
+#| label: study-area
+
 study_area <- bind_rows(
   cc_municipalities %>% select(muni_id, muni_name, geometry)
 )
@@ -202,7 +278,7 @@ study_area <- bind_rows(
 
 ------------------------------------------------------------------------
 
-## Step 3 — Build the per-municipality run list
+## Step 3 — Build the per-municipality run list (parallel to `envs_100_cities.csv`)
 
 ```{r}
 #| label: build-run-list
@@ -218,7 +294,7 @@ dir.create("config", showWarnings = FALSE)
 write_csv(muni_run_list, "config/cc_muni_run_list.csv")
 ```
 
-Each row is one municipality's polygon (as WKT) plus a `wave` number — directly analogous to a row in the Cook County municipality code.
+Each row is one municipality's polygon (as WKT) plus a `wave` number — directly analogous to a row in the reference repo's `config/envs_100_cities.csv`, just keyed to Cook County municipalities instead of metro-area airport codes.
 
 ------------------------------------------------------------------------
 
@@ -361,14 +437,9 @@ https://overpass.openstreetmap.ru/api/interpreter — Russian mirror
 https://overpass.private.coffee/api/interpreter
 https://overpass.nchc.org.tw/api/interpreter — Taiwan (NCHC) mirror, more relevant if you were routing through Asia, less likely to help here
 
-check server status by entering, "https://overpass.kumi.systems/api/status" into web browser.
-
 ```{r}
 #| label: run-waves
 out_dir <- "data/intersections/raw"
-ox$settings$overpass_url <- "https://overpass-api.de/api/interpreter"
-# ox$settings$overpass_url <- "https://overpass.kumi.systems/api/interpreter"
-# ox$settings$overpass_url <- "https://overpass.private.coffee/api/interpreter"
 # dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 run_wave <- function(wave_df, pause_sec = 1) {

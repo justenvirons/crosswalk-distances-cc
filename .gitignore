@@ -1,3 +1,6 @@
+# Folders
+data/intersections/raw/*.csv
+
 # History files
 .Rhistory
 .Rapp.history
