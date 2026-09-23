@@ -1,0 +1,213 @@
+---
+title: "Phase 1 Workflow (Draft): Remote Server Workspace & Satellite Tile Retrieval"
+subtitle: "Modal-based compute setup and Google-basemap tile-image retrieval for suburban Cook County"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+editor: source
+---
+
+## Status: draft / provisional
+
+This document is a first-pass scaffold, not a validated, run-tested pipeline. It's expected to be revised — possibly substantially — once the segmentation data pipeline and workflow are formalized (in particular, once a pilot batch has actually been run and the storage/naming conventions below are confirmed against real output). Code here is illustrative (plain fenced blocks), not live Quarto chunks: Modal apps are run via the `modal` CLI against `.py` module files (`modal run`/`modal deploy`), not rendered from a notebook document, so the actual code should live in `.py` files in this repo, with this document describing what those files do and how to run them — mirroring how the reference codebase (`agupta01/crossing-distances`) is structured.
+
+------------------------------------------------------------------------
+
+## Purpose & scope
+
+This document operationalizes the part of `plan.qmd`'s Phase 1 that runs on remote compute — setting up the Modal workspace and retrieving satellite tile images — as distinct from `Phase0.qmd`, which runs entirely locally in R/RStudio to produce the intersection coordinates that drive this stage.
+
+**In scope:**
+
+-   Provisioning a Modal workspace/environment for this project.
+-   Defining the tile-retrieval function(s) and storage (a Modal Volume for output images).
+-   Bridging `Phase0.qmd`'s per-municipality coordinate output into the format the tile-fetch step expects.
+-   Running a small pilot batch to validate connectivity and image quality, and to produce the cost/throughput-per-1,000-tiles benchmark called for in `plan.qmd`'s Phase 0 deliverables.
+
+**Out of scope (later phases/documents):** SAM segmentation and grow-cut refinement. In the reference pipeline these are separate stages (`sam_inference.py`, `grow_cut.py`) that run after tile retrieval is validated; they'll get their own document once that stage's workflow is settled, per `plan.qmd`'s Cloud Compute Strategy GPU scenarios.
+
+**Reference implementation:** [`agupta01/crossing-distances`](https://github.com/agupta01/crossing-distances), specifically `inference/crosswalk_image_ingest.py` (tile retrieval) and `inference/entrypoint.py` (orchestration pattern). This draft adapts that structure from one-Modal-environment-per-metro (the national 100-city study) to a single Cook County suburban run.
+
+------------------------------------------------------------------------
+
+## A correction to `plan.qmd`'s tile-source language
+
+The reference implementation retrieves satellite imagery via `segment-geospatial`'s `tms_to_geotiff()` (`source="Satellite"`), which pulls from Google's basemap tile server — and per the reference repo's own documentation (`inference/README.md`): **"Google Maps Tile Server - No API key required."** This is *not* the officially billed Google Maps Platform "Tile API" product that `plan.qmd`'s Background and Budget Considerations sections currently describe (e.g., "Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run"). Those two things may or may not turn out to be the same underlying cost/ToS situation — worth reconciling once this stage is actually run, but flagged here rather than silently assumed away. (Not corrected in `plan.qmd` itself as part of this document, since that wasn't asked for.)
+
+------------------------------------------------------------------------
+
+## How this parallels the reference pipeline
+
+| Step | This draft | Reference (`inference/crosswalk_image_ingest.py`) |
+|---|---|---|
+| Coordinate source | `Phase0.qmd`'s `data/intersections/raw/{muni_id}.csv` (lon/lat) | `osm_ingest.py`'s `intersection_coordinates.csv` (x/y) |
+| Per-coordinate tile fetch | `get_tile_for_intersection()` (CPU Modal function) | `get_image_for_crosswalk()` |
+| Batch dispatch | `get_tiles_batch()` (`.map()` over a batch, with redrive/retry logging) | `get_crosswalks_batch()` |
+| Image commit | `commit_images_to_volume()` writing JPEGs to a Modal Volume | Same function name/pattern |
+| Coordinate-to-filename mapping | `create_decoder()` JSON on the volume | Same function name/pattern |
+| Environment/workspace | One Modal environment for the whole Cook County suburban run (e.g. `cookcounty`) | One Modal environment per metro area (e.g. `sfo`, `irv`) |
+
+------------------------------------------------------------------------
+
+## Prerequisites
+
+-   A Modal account (modal.com), with the CLI installed and authenticated:
+
+    ```bash
+    pip install modal
+    modal setup
+    ```
+
+-   A Python environment with the same core dependency the reference repo's tile-fetch image uses — `segment-geospatial` (which provides `tms_to_geotiff`) — for local testing outside Modal. The reference repo builds this as a Modal image directly (see Step 1 below) rather than a separate local venv, which is the simpler path if all testing happens against remote Modal functions.
+
+-   `Phase0.qmd`'s output: `data/intersections/raw/{muni_id}.csv` (one file per municipality, columns `lon`, `lat`, `muni_id`, `muni_name`). Note the column name difference from the reference repo's coordinate files (`x`/`y`) — the bridging step in Step 2 below handles this rather than renaming Phase 0's output.
+
+------------------------------------------------------------------------
+
+## Step 1 — Provision the Modal workspace
+
+Unlike the reference repo's per-metro environments (`sfo`, `irv`, `ord`, ...), this project uses **one Modal environment** for the whole suburban Cook County run, since it's a single countywide dataset rather than ~100 independent city-level datasets:
+
+```bash
+modal environment create cookcounty
+```
+
+A minimal `modal_utils.py` (parallel to the reference repo's `inference/utils.py`) to anchor the app, image, and storage:
+
+```python
+import modal
+
+APP_NAME = "cook-county-tiles"
+app = modal.App(APP_NAME)
+
+RADIUS = 25.0  # meters -- matches Phase0.qmd's RADIUS_M and inference/utils.py's RADIUS
+PRECISION = 6  # decimal points, matches inference/utils.py
+
+# The reference repo builds this on top of gboeing/osmnx:latest and reuses
+# it for both tile-fetch and SAM inference. For a tile-fetch-only image we
+# only need segment-geospatial (for tms_to_geotiff), which keeps the image
+# smaller/faster to build than pulling in SAM's dependencies too.
+tile_image = (
+    modal.Image.from_registry("gboeing/osmnx:latest")
+    .pip_install("segment-geospatial")
+    .env({"TINI_SUBREAPER": "1"})
+)
+
+# One Volume for the whole county run, unlike the reference repo's
+# per-environment crosswalk-data-{city_code} volumes.
+tile_volume = modal.Volume.from_name("cc-suburban-tiles", create_if_missing=True)
+```
+
+No `modal.Secret` is needed for this stage — per `inference/README.md`, the Google basemap tile server the reference repo uses requires no API key. (Secrets would come into play for a later, separate stage — e.g., fine-tuned SAM weights access — out of scope here.)
+
+------------------------------------------------------------------------
+
+## Step 2 — Bridge Phase 0's coordinates into the tile-fetch input
+
+`Phase0.qmd` writes one CSV per municipality with `lon`/`lat` columns; the tile-fetch step needs `lat`/`long` pairs (matching the reference repo's `(lat, long)` convention, e.g. in `get_image_for_crosswalk(lat, long)`). Combine and rename rather than fetching per-municipality file-by-file:
+
+```python
+import pandas as pd
+from pathlib import Path
+
+def load_intersection_coordinates(raw_dir: str = "data/intersections/raw") -> pd.DataFrame:
+    files = list(Path(raw_dir).glob("*.csv"))
+    df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    return df.rename(columns={"lon": "long"})[["muni_id", "muni_name", "lat", "long"]]
+```
+
+Whether this runs locally (reading the R-produced CSVs directly, since they're plain files) or gets uploaded to a Modal Volume first depends on how Step 3's functions are invoked — for a `modal run` local entrypoint, reading local files directly (as above) is simplest and mirrors the reference repo's `local_main()` pattern.
+
+------------------------------------------------------------------------
+
+## Step 3 — Define the tile-fetch functions
+
+Adapted from `get_image_for_crosswalk()`/`get_crosswalks_batch()`/`commit_images_to_volume()` in `inference/crosswalk_image_ingest.py`:
+
+```python
+import math
+
+from modal_utils import app, tile_image, tile_volume, RADIUS
+
+
+def coords_from_distance(lat, long, dist, heading):
+    """Same haversine-style offset used in inference/utils.py."""
+    ...  # port directly from inference/utils.py::coords_from_distance
+
+
+@app.function(image=tile_image)
+def get_tile_for_intersection(lat: float, long: float):
+    from samgeo import tms_to_geotiff
+
+    diag_radius = math.sqrt(2) * RADIUS
+    top_left = coords_from_distance(lat, long, diag_radius, 315)
+    bottom_right = coords_from_distance(lat, long, diag_radius, 135)
+    bounding_box = [bottom_right.long, bottom_right.lat, top_left.long, top_left.lat]
+
+    try:
+        image_data = tms_to_geotiff(
+            output="./scratch.tif",
+            bbox=bounding_box,
+            crs="EPSG:3857",
+            zoom=22,
+            source="Satellite",
+            overwrite=True,
+            quiet=True,
+            return_image=True,
+        )
+        return (lat, long), image_data
+    except Exception as e:
+        return (lat, long), e
+
+
+@app.function(image=tile_image, volumes={"/data": tile_volume}, timeout=3600)
+def get_tiles_batch(lat_batch: tuple, long_batch: tuple, muni_id: str):
+    results = list(
+        get_tile_for_intersection.map(lat_batch, long_batch, return_exceptions=True)
+    )
+    saved = []
+    for (lat, long), image_data in results:
+        if isinstance(image_data, Exception):
+            continue  # TODO: redrive/retry logging, as in the reference repo's redrive_dict
+        filename = f"/data/{muni_id}_{lat}_{long}.jpeg"
+        image_data.convert("RGB").save(filename, "JPEG", optimize=True)
+        saved.append(filename)
+    tile_volume.commit()
+    return saved
+```
+
+Open questions to settle once this is actually run (not resolved in this draft): batch size per `.map()` call, retry/redrive handling for failed tiles (the reference repo logs failures to a `modal.Dict` for later reprocessing — worth carrying over), and whether to key output filenames by municipality + coordinate (as sketched above) or replicate the reference repo's `get_crosswalk_id()` hashing scheme for consistency with the existing Chicago dataset.
+
+------------------------------------------------------------------------
+
+## Step 4 — Pilot run and benchmark
+
+Before running the full suburban county:
+
+1.  Pick one municipality's coordinate file (or a small sample) as a pilot batch.
+2.  Run it through `get_tiles_batch()` and confirm: images actually arrive, look correct (right location, right zoom/resolution), and land in the Volume as expected.
+3.  Record wall-clock time and (if applicable) Modal cost for that batch, and extrapolate a cost/throughput-per-1,000-tiles figure.
+
+That figure is the direct input to `plan.qmd`'s Phase 0 deliverable ("cost-per-tile benchmark") and lets the Cloud Compute Strategy scenarios already documented there (Scenario A/B/C) be chosen from evidence rather than assumption. Note those scenarios are GPU-tier choices for the *segmentation* stage (SAM inference) — this tile-fetch stage is CPU-only, so its own scaling lever is Modal's CPU function concurrency limit, not a GPU tier pick.
+
+------------------------------------------------------------------------
+
+## Outputs (once implemented and run)
+
+-   A `cc-suburban-tiles` Modal Volume containing retrieved satellite tile JPEGs.
+-   A coordinate-to-filename decoder (parallel to the reference repo's `decoder_{call_id}.json`), so tiles can be traced back to their source municipality/coordinate.
+-   A pilot-batch cost/throughput benchmark feeding `plan.qmd`'s Phase 0 deliverable and Cloud Compute Strategy scenario selection.
+
+------------------------------------------------------------------------
+
+## Next steps
+
+-   Port `coords_from_distance()` and `get_crosswalk_id()` directly from the reference repo's `inference/utils.py` rather than reimplementing them.
+-   Decide on and implement retry/redrive handling for failed tile fetches.
+-   Run the actual pilot batch (Step 4) and update this document's benchmark numbers and any adjustments the real run reveals.
+-   Once tile retrieval is validated end-to-end, draft the follow-on document covering SAM segmentation and grow-cut, sized using the GPU scenarios already in `plan.qmd`'s Cloud Compute Strategy section.

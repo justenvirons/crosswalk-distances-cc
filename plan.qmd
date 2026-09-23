@@ -55,6 +55,8 @@ To fit an 8-month schedule (down from the 14-month illustrative timeline in the 
 
 ## Phase 0 — Project Setup and Data Scoping (Weeks 1–3)
 
+*Detailed workflow:* [`Phase0.qmd`](Phase0.qmd) — an R/RStudio pipeline for generating OSMnx intersection counts per Cook County municipality (via `reticulate` + Census TIGER/Line boundaries), operationalizing the tile-volume-estimate task below.
+
 **Tasks** - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago's \~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Continue running the segmentation pipeline on Modal, the serverless cloud platform already used (and credited for compute support) in the original methodology papers; the existing codebase's tile-fetch and inference functions are expected to already target Modal's Python SDK, making it the lowest-friction path to scale rather than porting to a different vendor. Confirm/renew the Modal workspace and any available research/in-kind credits, define GPU function tier and autoscaling limits for SAM inference and CPU-only function limits for tile fetch, and run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.
 
 **Deliverables:** finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.
@@ -62,6 +64,8 @@ To fit an 8-month schedule (down from the 14-month illustrative timeline in the 
 ------------------------------------------------------------------------
 
 ## Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–3)
+
+*Detailed workflow (draft):* [`Phase1.qmd`](Phase1.qmd) — remote server (Modal) workspace setup and satellite tile retrieval; provisional, expected to be revised once the segmentation data pipeline and workflow are formalized.
 
 ### Intersection & Tile Retrieval
 

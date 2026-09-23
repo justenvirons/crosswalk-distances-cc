@@ -39,7 +39,7 @@ Two things differ deliberately from the reference repo's approach, because this 
 | Projection | `ox$project_graph(G_drive)` | Line 130 |
 | Intersection consolidation | `ox$consolidate_intersections(G_drive, rebuild_graph=FALSE, dead_ends=FALSE)` | Line 131–133 |
 | Coordinate export | `.to_crs("EPSG:4326")$get_coordinates()` converted to an R tibble | Line 136–138 |
-| Crosswalk-adjacency filter (optional refinement) | `ox$features_from_polygon()` + `gpd$sjoin_nearest()` within `RADIUS = 25` m | Lines 140–250 |
+| Crosswalk-adjacency filter (optional refinement) | `ox$features_from_polygon()` + `sf::st_is_within_distance()` within `RADIUS = 25` m | Lines 140–250 |
 | Per-place batching | `config/cc_muni_run_list.csv` with a `wave` column | `config/envs_100_cities.csv` with `Code`/`Wave` columns |
 
 Because Step "Intersection consolidation" calls the identical `osmnx` function, results should match what the Python pipeline would produce for the same polygon and `osmnx` version — pin and record that version (Step 1) so future re-runs stay comparable.
@@ -50,13 +50,20 @@ Because Step "Intersection consolidation" calls the identical `osmnx` function, 
 
 ### Python
 
-Let `reticulate` manage its own private Miniconda install, which won't touch or conflict with locally installed Python. Once installed, restart R session. If reticulate can't find conda, set appropriate environment path using code below.
+Let `reticulate` manage its own private Miniconda install, which won't touch or conflict with locally installed Python. Once installed, restart your R session before running the rest of this chunk.
 
 ```{r}
 #| label: install-miniconda-if-needed
 #| eval: false
 
 reticulate::install_miniconda()
+
+# Only needed if reticulate still can't auto-detect the install after a
+# restart (error: "Unable to find conda binary"/"Supplied path is not a
+# conda binary") -- point it at the actual conda executable. This path is
+# machine- and username-specific; find yours with `where conda` (Windows)
+# or `which conda` (macOS/Linux) and adjust accordingly, or skip this line
+# entirely if conda_create() below already works without it.
 Sys.setenv(RETICULATE_CONDA = "C:/Users/juste/AppData/Local/r-miniconda/Scripts/conda.exe")
 
 reticulate::conda_create("osmnx-env", packages = "python=3.11")
@@ -69,7 +76,7 @@ reticulate::conda_install("osmnx-env",
 
 ## Step 1 — Connect R to the OSMnx Python environment
 
-If `conda_create()` in Prerequisites already succeeded, this chunk should just work. If you're hitting a conda-related error here, see the troubleshooting bullets in the Prerequisites section above (a step-specific duplicate used to live here — consolidated there so there's one place to look, and so chunk labels aren't duplicated across the document).
+If the Prerequisites chunk above already ran successfully, this chunk should just work.
 
 ```{r}
 #| label: setup
@@ -218,7 +225,7 @@ dir.create("config", showWarnings = FALSE)
 write_csv(muni_run_list, "config/cc_muni_run_list.csv")
 ```
 
-Each row is one municipality's polygon (as WKT) plus a `wave` number — directly analogous to a row in the Cook County municipality code.
+Each row is one municipality's polygon (as WKT) plus a `wave` number for batched, resumable processing in Step 6.
 
 ------------------------------------------------------------------------
 
@@ -354,14 +361,15 @@ Run this as a second pass over Step 4's output for municipalities where a more p
 
 Unlike the GPU segmentation stage (Modal, embarrassingly parallel), this step queries the Overpass API underneath `osmnx`. The shared public Overpass endpoint has usage limits and etiquette expectations — high-concurrency requests risk 429s/timeouts and are discouraged. Process **sequentially within each wave**, with a short pause between municipalities, and checkpoint so a failed run can resume without redoing completed municipalities. If higher throughput is genuinely needed, stand up a private/self-hosted Overpass instance rather than hammering the public one.
 
-Alternative servers:
-https://overpass.kumi.systems/api/interpreter — Kumi Systems, generally reliable, commonly recommended as a fallback
-https://overpass.openstreetmap.fr/api/interpreter — French OSM chapter mirror
-https://overpass.openstreetmap.ru/api/interpreter — Russian mirror
-https://overpass.private.coffee/api/interpreter
-https://overpass.nchc.org.tw/api/interpreter — Taiwan (NCHC) mirror, more relevant if you were routing through Asia, less likely to help here
+If the default `overpass-api.de` endpoint is timing out (a real risk — it's a shared, free, sometimes-overloaded community server), swap in one of these public mirrors by setting `ox$settings$overpass_url` before Step 6, as in the chunk below:
 
-check server status by entering, "https://overpass.kumi.systems/api/status" into web browser.
+-   `https://overpass.kumi.systems/api/interpreter` — Kumi Systems, generally reliable, commonly recommended as a fallback
+-   `https://overpass.openstreetmap.fr/api/interpreter` — French OSM chapter mirror
+-   `https://overpass.openstreetmap.ru/api/interpreter` — Russian mirror
+-   `https://overpass.private.coffee/api/interpreter`
+-   `https://overpass.nchc.org.tw/api/interpreter` — Taiwan (NCHC) mirror
+
+Check whether a mirror is up before switching to it by visiting `<mirror-base-url>/api/status` in a browser (e.g. `https://overpass.kumi.systems/api/status`).
 
 ```{r}
 #| label: run-waves
