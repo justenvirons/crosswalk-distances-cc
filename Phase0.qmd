@@ -298,6 +298,41 @@ cc_streets <- il_streets %>%
 st_write(cc_streets, "output/all_streets.shp")
 ```
 
+
+```{r}
+#| label: crashes-fars
+# Cook County, Illinois FIPS codes -- fixed constants for this project's
+# single-county scope (same codes already hardcoded elsewhere for TIGER
+# pulls in Step 2), not derived from a shapefile field. cc_boundary's own
+# GEOID field gets truncated by the Shapefile/DBF round-trip in Step 2 (like
+# cc_municipalities' nam_plc/ged_plc), so deriving from it here would be
+# fragile for no benefit when the codes are fixed and well-known anyway.
+state_fips  <- 17L  # Illinois
+county_fips <- 31L  # Cook County
+
+crashes_fars <- read_csv(paste0(
+  "https://crashviewer.nhtsa.dot.gov/crashviewer/CrashAPI/FARSData/GetFARSData?",
+  "dataset=Accident&FromYear=2010&ToYear=2024&State=", state_fips,
+  "&county=", county_fips, "&format=csv"
+), show_col_types = FALSE) %>%
+  filter(state == state_fips, county == county_fips)  # redundant with the server-side filter above; kept as a cheap safety check
+
+ped_fatalities <- crashes_fars %>%
+  filter(harm_evname == "Pedestrian") %>%
+  filter(
+    latitude  > -90,  latitude  < 90,
+    longitud  > -180, longitud  < 180,
+    !latitude  %in% c(77.7777, 88.8888, 99.9999),   # FARS sentinel values for unknown/not-reported coordinates
+    !longitud  %in% c(-77.7777, -88.8888, -99.9999)
+  ) %>%
+  # coords fixed: the actual filtered columns are longitud/latitude (FARS'
+  # own field names, "longitud" not a typo -- see the filter() above), not
+  # longitudname/latitudename, which aren't columns in this dataset at all.
+  st_as_sf(coords = c("longitud", "latitude"), crs = 4326)
+
+st_write(ped_fatalities, "output/all_ped_fatalities.shp")
+```
+
 ------------------------------------------------------------------------
 
 ## Step 3 — Build the per-municipality run list
@@ -521,34 +556,6 @@ Pulls NHTSA's Fatality Analysis Reporting System (FARS) crash data for Cook Coun
 
 ```{r}
 #| label: fars-pedestrian-fatalities
-# Cook County, Illinois FIPS codes -- fixed constants for this project's
-# single-county scope (same codes already hardcoded elsewhere for TIGER
-# pulls in Step 2), not derived from a shapefile field. cc_boundary's own
-# GEOID field gets truncated by the Shapefile/DBF round-trip in Step 2 (like
-# cc_municipalities' nam_plc/ged_plc), so deriving from it here would be
-# fragile for no benefit when the codes are fixed and well-known anyway.
-state_fips  <- 17L  # Illinois
-county_fips <- 31L  # Cook County
-
-crashes_fars <- read_csv(paste0(
-  "https://crashviewer.nhtsa.dot.gov/crashviewer/CrashAPI/FARSData/GetFARSData?",
-  "dataset=Accident&FromYear=2010&ToYear=2024&State=", state_fips,
-  "&county=", county_fips, "&format=csv"
-), show_col_types = FALSE) %>%
-  filter(state == state_fips, county == county_fips)  # redundant with the server-side filter above; kept as a cheap safety check
-
-ped_fatalities <- crashes_fars %>%
-  filter(harm_evname == "Pedestrian") %>%
-  filter(
-    latitude  > -90,  latitude  < 90,
-    longitud  > -180, longitud  < 180,
-    !latitude  %in% c(77.7777, 88.8888, 99.9999),   # FARS sentinel values for unknown/not-reported coordinates
-    !longitud  %in% c(-77.7777, -88.8888, -99.9999)
-  ) %>%
-  # coords fixed: the actual filtered columns are longitud/latitude (FARS'
-  # own field names, "longitud" not a typo -- see the filter() above), not
-  # longitudname/latitudename, which aren't columns in this dataset at all.
-  st_as_sf(coords = c("longitud", "latitude"), crs = 4326)
 
 # Build hover date/time text defensively -- the CrashAPI's exact returned
 # column set/casing for date/time isn't independently verifiable from here,
@@ -640,12 +647,12 @@ st_write(ped_fatalities, "output/ped_fatalities.shp", delete_layer = TRUE)
       ) %>%
       addCircleMarkers(
         data = ped_fatalities,
-        radius = 4,
+        radius = 3,
         stroke = TRUE,
-        color = "#000",
-        weight = 1,
-        fillOpacity = 0.85,
-        fillColor = "#7a0177",
+        color = "#FFF",
+        weight = 0.25,
+        fillOpacity = 0.5,
+        fillColor = "darkred",
         label = ~paste0("Pedestrian fatality — ", fatality_date, ", ", fatality_time),
         group = "Pedestrian Fatalities"
       ) %>%
