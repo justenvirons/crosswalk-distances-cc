@@ -656,13 +656,12 @@ st_write(ped_fatalities, "output/ped_fatalities.shp", delete_layer = TRUE)
         label = ~paste0("Pedestrian fatality — ", fatality_date, ", ", fatality_time),
         group = "Pedestrian Fatalities"
       ) %>%
-      # addLegend(
-      #   "bottomright",
-      #   pal = speed_pal,
-      #   values = cc_streets$maxspeed_mph,
-      #   title = "Speed limit (mph)",
-      #   opacity = 1
-      # ) %>%
+      addLegend(
+        "bottomleft",
+        colors = c("#777", "#333", "darkred"),
+        labels = c("Municipalities", "Intersections", "Pedestrian Fatalities"),
+        opacity = 1
+      ) %>%
       fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
       addResetMapButton() %>%
       addFullscreenControl() %>%
