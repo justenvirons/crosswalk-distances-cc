@@ -436,10 +436,79 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
 
     ```{r}
     #| label: qa-map
-    library(mapview)
-    
-    mapview(study_area, alpha.regions = 0.1) + mapview(all_intersections, cex = 1)
+    # New deps for this chunk only: install.packages(c("leaflet", "leaflet.extras")) if missing.
+    library(leaflet)
+    library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+
+    # all_points_sf comes from Step 7 (already built there for the shapefile
+    # export) -- reused here rather than rebuilt from all_intersections.
+
+    # leaflet has no native "only render above zoom N" option for a point
+    # layer (that's a raster-tile-layer concept, via minZoom/maxZoom). With
+    # N ~ 170,000 points, both the visual clutter and render cost at
+    # county-wide zoom make that layer pointless until zoomed in anyway, so
+    # it's toggled on/off as a whole group via a small JS zoomend listener
+    # below (map.layerManager.getLayerGroup() is the standard way to reach
+    # an R leaflet `group=` from custom JS). Tune ZOOM_THRESHOLD to taste --
+    # higher = points appear later/only when more zoomed in.
+    ZOOM_THRESHOLD <- 14
+
+    bbox <- st_bbox(study_area)
+
+    qa_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%  # canvas, not SVG, for 170k markers
+      addProviderTiles(providers$CartoDB.Positron, group = "Positron (minimal)") %>%
+      addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery (satellite)") %>%
+      addPolygons(
+        data = study_area,
+        fillColor = "transparent",
+        weight = 1,
+        opacity = 0.75,
+        color = "#444444",
+        fillOpacity = 0.05,
+        label = ~muni_name,
+        group = "Municipalities"
+      ) %>%
+      addCircleMarkers(
+        data = all_points_sf,
+        radius = 2,
+        stroke = FALSE,
+        fillOpacity = 0.7,
+        fillColor = "#d7301f",
+        group = "Intersections"
+      ) %>%
+      fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
+      addResetMapButton() %>%
+      addFullscreenControl() %>%
+      addLayersControl(
+        baseGroups = c("Positron (minimal)", "World Imagery (satellite)"),
+        overlayGroups = c("Municipalities", "Intersections"),
+        options = layersControlOptions(collapsed = FALSE)
+      ) %>%
+      htmlwidgets::onRender(sprintf(
+        "function(el, x) {
+          var map = this;
+          var group = map.layerManager.getLayerGroup('Intersections');
+          var threshold = %d;
+
+          function toggleByZoom() {
+            if (!group) return;
+            if (map.getZoom() >= threshold) {
+              if (!map.hasLayer(group)) map.addLayer(group);
+            } else {
+              if (map.hasLayer(group)) map.removeLayer(group);
+            }
+          }
+
+          map.on('zoomend', toggleByZoom);
+          toggleByZoom();  // apply immediately at the initial zoom too
+        }",
+        ZOOM_THRESHOLD
+      ))
+
+    qa_map
     ```
+
+    Note: the layers-control checkbox for "Intersections" still lets you force it on/off manually — a manual toggle isn't re-corrected until the next `zoomend`, so briefly checking it on below `ZOOM_THRESHOLD` will show the layer until you zoom again. If 170k canvas markers still feel sluggish once actually zoomed in, the next escalation is marker clustering (`leaflet.extras::addCircleMarkers(clusterOptions = leaflet::markerClusterOptions())`) or WebGL point rendering (`leafgl::addGlPoints()`) instead of plain `addCircleMarkers()`.
 
 -   **Outlier review:** flag municipalities whose intersection count looks implausible relative to land area or population (from the municipality attribute table) for manual review — this feeds forward into Phase 1's "Document OSM crossing-coverage completeness by municipality" validation task in `plan.qmd`.
 
