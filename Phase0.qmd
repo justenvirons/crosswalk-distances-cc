@@ -95,14 +95,7 @@ reticulate::use_condaenv("osmnx-env", required = TRUE)
 
 # convert = FALSE: keep everything returned by these modules as live Python
 # object references instead of letting reticulate auto-convert them to R the
-# instant a call returns. This matters because reticulate's built-in pandas/
-# GeoSeries -> R converter is unreliable on some reticulate/pandas version
-# combinations and can crash with "names() applied to a non-vector" the
-# moment a function like consolidate_intersections() returns -- before any
-# of our own R code even runs. With convert = FALSE nothing auto-converts;
-# Steps 4-5 explicitly reticulate::py_to_r() only the final, simple numeric
-# values they need (numpy arrays, not pandas Series/Index), which uses a
-# different, reliable conversion path.
+# instant a call returns.
 ox <- reticulate::import("osmnx", convert = FALSE)
 gpd <- reticulate::import("geopandas", convert = FALSE)
 shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
@@ -216,7 +209,14 @@ study_area <- bind_rows(
 N_PER_WAVE <- 12  # tune based on how much Overpass load you want per batch
 
 muni_run_list <- study_area %>%
-  mutate(wkt = st_as_text(geometry)) %>%
+  filter(muni_name == "Orland Park") %>%
+  st_transform(3435) %>%                       # IL State Plane East (ft), planar repair
+  st_make_valid() %>%
+  st_collection_extract("POLYGON") %>%         # drop stray lines/points from the repair
+  group_by(muni_name, muni_id) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_transform(4326) %>%                       # OSMnx expects lat/lon
+  mutate(wkt = st_as_text(geometry, digits = 15)) %>%
   st_drop_geometry() %>%
   arrange(muni_name) %>%
   mutate(wave = ceiling(row_number() / N_PER_WAVE))
@@ -406,6 +406,7 @@ intersection_files <- list.files(out_dir, full.names = TRUE)
 all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALSE)
 
 muni_summary <- all_intersections %>%
+  mutate(muni_id = as.character(muni_id)) %>% 
   count(muni_id, muni_name, name = "intersection_count") %>%
   left_join(st_drop_geometry(study_area), by = c("muni_id", "muni_name"))
 
