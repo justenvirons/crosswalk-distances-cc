@@ -39,6 +39,7 @@ Two things differ deliberately from the reference repo's approach, because this 
 | Projection | `ox$project_graph(G_drive)` | Line 130 |
 | Intersection consolidation | `ox$consolidate_intersections(G_drive, rebuild_graph=FALSE, dead_ends=FALSE)` | Line 131–133 |
 | Coordinate export | `.to_crs("EPSG:4326")$get_coordinates()` converted to an R tibble | Line 136–138 |
+| Street/edge export (this workflow adds speed-limit resolution) | `ox$graph_to_gdfs(G_drive, nodes=FALSE, edges=TRUE)` on the same already-fetched graph, with `maxspeed`/`highway` tags cleaned in Python and a class-based fallback where `maxspeed` is untagged | Not present -- this workflow's own addition |
 | Crosswalk-adjacency filter (optional refinement) | `ox$features_from_polygon()` + `sf::st_is_within_distance()` within `RADIUS = 25` m | Lines 140–250 |
 | Per-place batching | `config/cc_muni_run_list.csv` with a `wave` column | `config/envs_100_cities.csv` with `Code`/`Wave` columns |
 
@@ -105,6 +106,26 @@ reticulate::use_condaenv("osmnx-env", required = TRUE)
 ox <- reticulate::import("osmnx", convert = FALSE)
 gpd <- reticulate::import("geopandas", convert = FALSE)
 shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
+
+# Used in Step 4 to clean OSM tag columns (e.g. `highway`, `maxspeed`) before
+# they're ever converted to R. Tags on a graph edge can come back as a list
+# (e.g. a merged/simplified edge carrying two original ways' maxspeed values)
+# rather than a plain string, and pandas columns mixing scalars/lists/None
+# are exactly the kind of value reticulate's conversion has proven unreliable
+# on in this environment (see Step 4). Doing the list -> single-string
+# collapse entirely in Python, via .apply() on a Python function reference,
+# avoids both problems: no R list-columns to untangle, and no per-element
+# R/Python round-trip (pandas calls this function itself, in Python).
+reticulate::py_run_string("
+def normalize_osm_tag(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        cleaned = [str(v) for v in value if v is not None]
+        return '; '.join(cleaned) if cleaned else None
+    return str(value)
+")
+normalize_osm_tag <- reticulate::py$normalize_osm_tag
 
 ox$settings$use_cache <- TRUE
 ox$settings$log_console <- TRUE
@@ -178,7 +199,14 @@ cc_municipalities <- places_by_centroid %>%
 # write cook county boundary to data/boundaries folder
 st_write(obj = cc_municipalities, dsn = "data/boundaries/cc_municipalities.shp")
 
-# download Cook County streets
+# download Cook County streets (TIGER/Line). Kept here for its official
+# LINEARID/FULLNAME naming, but the Step 8 QA map now uses all_streets_sf
+# (Step 7, extracted from OSM in Step 4) instead of this layer -- OSM
+# carries maxspeed/highway-class tags directly, and pulling streets from
+# the same graph already fetched per-municipality for intersections avoids
+# a second, independently-sourced street geometry that would need an
+# error-prone spatial join to attach speed-limit data onto. See Step 4's
+# fetch_muni_network_data() for details.
 options(tigris_use_cache = TRUE)
 
 cc_streets <- roads(state = "17", county = "031") %>%   # Illinois (17), Cook County (031)
@@ -248,9 +276,9 @@ Each row is one municipality's polygon (as WKT) plus a `wave` number for batched
 
 ------------------------------------------------------------------------
 
-## Step 4 — Define the per-municipality intersection extraction function
+## Step 4 — Define the per-municipality intersection and street extraction function
 
-Same `highway_subtypes` / `service_exclusion` filter and the same `custom_filter` string construction as `osm_ingest.py` lines 51–71 and 127:
+Same `highway_subtypes` / `service_exclusion` filter and the same `custom_filter` string construction as `osm_ingest.py` lines 51–71 and 127. This step also extracts street geometry and speed-limit information from the same drive-network graph, rather than pulling street centerlines separately from TIGER (see the speed-limit note below the function).
 
 ```{r}
 #| label: filter-constants
@@ -269,9 +297,61 @@ drive_filter <- glue(
 )
 ```
 
+**Speed-limit resolution:** OSM's `maxspeed` tag carries a real posted speed limit where a contributor has mapped it, but coverage is uneven (better on arterials, spottier on local residential streets). Where it's missing, fall back to a default by OSM `highway` class rather than leaving it blank. These class defaults are a heuristic, not measured data — Illinois' statutory default for an urban district absent posted signage is 30 mph (625 ILCS 5/11-601(b)); many Cook County suburbs post/ordinance residential streets down to 25 mph, used here as the more common default for `residential`/`living_street`. `maxspeed_source` on the output records which applied per segment, so this approximation stays distinguishable from real tagged data downstream.
+
+```{r}
+#| label: speed-limit-defaults
+default_speed_by_highway <- c(
+  motorway = 65, motorway_link = 45,
+  trunk = 55, trunk_link = 40,
+  primary = 45, primary_link = 35,
+  secondary = 35, secondary_link = 30,
+  tertiary = 30, tertiary_link = 25,
+  unclassified = 30,
+  residential = 25,
+  living_street = 15,
+  service = 15
+)
+
+# highway/maxspeed can be semicolon-joined (see normalize_osm_tag in Step 1)
+# when a merged edge carried multiple original values -- use the first for
+# class-default lookup and mph parsing.
+first_tag_value <- function(x) sub(";.*$", "", x)
+
+parse_maxspeed_mph <- function(x) {
+  first <- first_tag_value(x)
+  # substr()/regexpr() only, not regmatches() -- regmatches() with a single
+  # regexpr() result silently *drops* non-matching elements rather than
+  # returning a same-length vector with placeholders, which would misalign
+  # this against the rest of the tibble whenever maxspeed is untagged (the
+  # common case this fallback exists for).
+  m <- regexpr("[0-9]+", first)
+  starts <- as.integer(m)
+  lens <- attr(m, "match.length")
+  digits <- ifelse(starts > 0, substr(first, starts, starts + lens - 1L), NA_character_)
+  suppressWarnings(as.numeric(digits))
+}
+
+resolve_speed_limit <- function(highway, maxspeed_raw) {
+  tagged_mph <- parse_maxspeed_mph(maxspeed_raw)
+  class_default <- unname(default_speed_by_highway[first_tag_value(highway)])
+  tibble(
+    maxspeed_mph = ifelse(!is.na(tagged_mph), tagged_mph, class_default),
+    maxspeed_source = ifelse(!is.na(tagged_mph), "osm_tagged", "class_default")
+  )
+}
+```
+
 ```{r}
 #| label: intersection-function
-#' Extract OSMnx-consolidated drive-network intersections for one municipality
+#' Extract OSMnx-consolidated drive-network intersections, plus street
+#' geometry and resolved speed limits, for one municipality -- both from a
+#' single graph_from_polygon() fetch, since intersections and streets are
+#' just two different summaries of the same drive-network graph. Avoiding a
+#' second fetch matters here because each fetch is an Overpass query, and
+#' Step 6 processes ~120 municipalities sequentially and politely (see Step
+#' 6's etiquette note) -- doubling that would roughly double the county-wide
+#' run's exposure to Overpass timeouts/flakiness.
 #'
 #' @param muni_id,muni_name identifiers carried through to the output rows
 #' @param wkt WKT polygon string for the municipality (EPSG:4326)
@@ -282,8 +362,9 @@ drive_filter <- glue(
 #' @param tolerance override osmnx's default consolidate_intersections
 #'   tolerance (left NULL here to match osm_ingest.py, which does not
 #'   override it)
-get_muni_intersections <- function(muni_id, muni_name, wkt,
-                                    retain_all = FALSE, tolerance = NULL) {
+#' @return list(intersections = tibble or NULL, streets = tibble or NULL)
+fetch_muni_network_data <- function(muni_id, muni_name, wkt,
+                                     retain_all = FALSE, tolerance = NULL) {
   poly <- shapely_wkt$loads(wkt)
 
   G_drive <- tryCatch(
@@ -298,28 +379,74 @@ get_muni_intersections <- function(muni_id, muni_name, wkt,
       NULL
     }
   )
-  if (is.null(G_drive)) return(NULL)
+  if (is.null(G_drive)) return(list(intersections = NULL, streets = NULL))
 
   G_drive <- ox$project_graph(G_drive)
 
+  # ---- Intersections ----
   consolidate_args <- list(G = G_drive, rebuild_graph = FALSE, dead_ends = FALSE)
   if (!is.null(tolerance)) consolidate_args$tolerance <- tolerance
-  intersections <- do.call(ox$consolidate_intersections, consolidate_args)
+  intersections_py <- do.call(ox$consolidate_intersections, consolidate_args)
 
-  # intersections is a non-converting (convert = FALSE) Python GeoSeries --
+  # intersections_py is a non-converting (convert = FALSE) Python GeoSeries --
   # call .to_crs()/.get_coordinates() directly on it (matching osm_ingest.py's
   # raw_intersection_coordinates export) rather than rebuilding a GeoDataFrame
   # from it. Extract the x/y columns as numpy arrays (.to_numpy()) rather than
   # converting the pandas DataFrame/Series itself -- numpy arrays have a
   # simple, reliable reticulate conversion, whereas converting a pandas
   # object (which carries an Index) is the operation that crashes.
-  coords_df <- intersections$to_crs("EPSG:4326")$get_coordinates()
+  coords_df <- intersections_py$to_crs("EPSG:4326")$get_coordinates()
   lon <- as.numeric(reticulate::py_to_r(coords_df$x$to_numpy()))
   lat <- as.numeric(reticulate::py_to_r(coords_df$y$to_numpy()))
 
-  data.frame(lon = lon, lat = lat) %>%
+  intersections <- data.frame(lon = lon, lat = lat) %>%
     as_tibble() %>%
     mutate(muni_id = muni_id, muni_name = muni_name)
+
+  # ---- Streets (edges from the same already-fetched graph) ----
+  edges_py <- ox$graph_to_gdfs(G_drive, nodes = FALSE, edges = TRUE)$to_crs("EPSG:4326")
+  edge_cols <- reticulate::py_to_r(edges_py$columns$to_list())
+
+  # Clean list-valued tag columns to single strings entirely in Python
+  # (see normalize_osm_tag in Step 1) before any R conversion is attempted.
+  for (col in intersect(c("highway", "maxspeed", "name", "oneway"), edge_cols)) {
+    edges_py[[col]] <- edges_py[[col]]$apply(normalize_osm_tag)
+  }
+
+  street_wkt <- reticulate::py_to_r(edges_py$geometry$to_wkt()$to_numpy())
+  n_edges <- length(street_wkt)
+
+  # maxspeed/name aren't always present as columns at all (only appear if at
+  # least one edge in this municipality had the tag) -- fall back to NA.
+  get_edge_col <- function(name) {
+    if (name %in% edge_cols) {
+      reticulate::py_to_r(edges_py[[name]]$to_numpy())
+    } else {
+      rep(NA_character_, n_edges)
+    }
+  }
+
+  streets <- tibble(
+    muni_id = muni_id,
+    muni_name = muni_name,
+    highway = get_edge_col("highway"),
+    maxspeed_raw = get_edge_col("maxspeed"),
+    street_name = get_edge_col("name"),
+    oneway = get_edge_col("oneway"),
+    wkt = street_wkt
+  ) %>%
+    mutate(resolve_speed_limit(highway, maxspeed_raw))
+
+  list(intersections = intersections, streets = streets)
+}
+
+#' Thin wrapper for callers (Step 5) that only need intersections -- still
+#' does the full fetch_muni_network_data() fetch+extraction internally, so
+#' prefer calling fetch_muni_network_data() directly (as Step 6 does) when
+#' both intersections and streets are needed, to avoid two Overpass queries.
+get_muni_intersections <- function(muni_id, muni_name, wkt,
+                                    retain_all = FALSE, tolerance = NULL) {
+  fetch_muni_network_data(muni_id, muni_name, wkt, retain_all, tolerance)$intersections
 }
 ```
 
@@ -393,19 +520,26 @@ Check whether a mirror is up before switching to it by visiting `<mirror-base-ur
 ```{r}
 #| label: run-waves
 out_dir <- "data/intersections/raw"
+streets_out_dir <- "data/streets/raw"
 ox$settings$overpass_url <- "https://overpass-api.de/api/interpreter"
 # ox$settings$overpass_url <- "https://overpass.kumi.systems/api/interpreter"
 # ox$settings$overpass_url <- "https://overpass.private.coffee/api/interpreter"
-# dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(streets_out_dir, recursive = TRUE, showWarnings = FALSE)
 
 run_wave <- function(wave_df, pause_sec = 1) {
   purrr::pwalk(wave_df, function(muni_id, muni_name, wkt, wave, ...) {
     out_file <- file.path(out_dir, glue("{muni_id}.csv"))
-    if (file.exists(out_file)) return(invisible(NULL))  # resume support
+    streets_file <- file.path(streets_out_dir, glue("{muni_id}.csv"))
+    # Resume support -- both files must exist to skip. A municipality
+    # processed before streets were added will be missing streets_file and
+    # gets re-fetched (one more Overpass query) to backfill it.
+    if (file.exists(out_file) && file.exists(streets_file)) return(invisible(NULL))
 
     cli::cli_progress_step("Processing {muni_name}")
-    result <- get_muni_intersections(muni_id, muni_name, wkt)
-    if (!is.null(result)) readr::write_csv(result, out_file)
+    result <- fetch_muni_network_data(muni_id, muni_name, wkt)
+    if (!is.null(result$intersections)) readr::write_csv(result$intersections, out_file)
+    if (!is.null(result$streets)) readr::write_csv(result$streets, streets_file)
     Sys.sleep(pause_sec)
   })
 }
@@ -427,6 +561,16 @@ all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALS
 # convert to shapefile
 all_points_sf <- st_as_sf(all_intersections, coords = c("lon", "lat"), crs = 4326)
 st_write(all_points_sf, "output/all_intersections.shp")
+
+# combine per-municipality street files and write a county-wide shapefile.
+# Kept in-memory as all_streets_sf for the Step 8 map too, rather than
+# reading the shapefile back -- Shapefile/DBF's 10-character field-name
+# limit would truncate maxspeed_mph/maxspeed_source/street_name on a
+# round-trip (see Step 2's nam_plc/ged_plc note for the same issue).
+street_files <- list.files(streets_out_dir, full.names = TRUE)
+all_streets <- map_dfr(street_files, read_csv, show_col_types = FALSE)
+all_streets_sf <- st_as_sf(all_streets, wkt = "wkt", crs = 4326)  # drops the wkt column by default (remove = TRUE)
+st_write(all_streets_sf, "output/all_streets.shp", delete_layer = TRUE)
 
 muni_summary <- all_intersections %>%
   mutate(muni_id = as.character(muni_id)) %>% 
@@ -471,11 +615,18 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
 
     bbox <- st_bbox(study_area)
 
+    # Streets colored by resolved speed limit (all_streets_sf, from Step 7 --
+    # OSM-tagged where available, class-default fallback otherwise; see
+    # Step 4's speed-limit-defaults chunk). na.color covers any segment
+    # resolve_speed_limit() couldn't assign a value to at all (an OSM
+    # highway class not in default_speed_by_highway).
+    speed_pal <- colorNumeric(palette = "YlOrRd", domain = all_streets_sf$maxspeed_mph, na.color = "#999999")
+
     qa_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%  # canvas, not SVG, for 170k markers
       # addProviderTiles(providers$CartoDB.Positron, group = "Positron (minimal)") %>%
       addTiles(urlTemplate = paste0(
       "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=",
-      CARTO_API_KEY)) %>%  
+      CARTO_API_KEY)) %>%
       # addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery (satellite)") %>%
       addPolygons(
         data = study_area,
@@ -488,11 +639,14 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
         group = "Municipalities"
       ) %>%
       addPolylines(
-        data = cc_streets,
-        weight = 1,
-        opacity = 0.6,
-        color = "#2b6cb0",
-        label = ~street_name,
+        data = all_streets_sf,
+        weight = 1.5,
+        opacity = 0.7,
+        color = ~speed_pal(maxspeed_mph),
+        label = ~paste0(
+          ifelse(is.na(street_name), highway, street_name),
+          " — ", maxspeed_mph, " mph (", maxspeed_source, ")"
+        ),
         group = "Streets"
       ) %>%
       addCircleMarkers(
@@ -502,6 +656,13 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
         fillOpacity = 0.7,
         fillColor = "#333",
         group = "Intersections"
+      ) %>%
+      addLegend(
+        "bottomright",
+        pal = speed_pal,
+        values = all_streets_sf$maxspeed_mph,
+        title = "Speed limit (mph)",
+        opacity = 1
       ) %>%
       fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
       addResetMapButton() %>%
@@ -554,7 +715,9 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
 
 -   `config/cc_muni_run_list.csv` — per-municipality run manifest (id, name, WKT polygon, wave).
 -   `data/intersections/raw/{muni_id}.csv` — one file per municipality, raw consolidated intersection coordinates.
+-   `data/streets/raw/{muni_id}.csv` — one file per municipality, drive-network street edges with `highway`, `maxspeed_raw`, `street_name`, `oneway`, resolved `maxspeed_mph`/`maxspeed_source`, and WKT geometry.
 -   `output/cc_intersection_counts_by_municipality.csv` — municipality-level summary table (intersection count, joined attributes) and the county-wide total used for tile-volume and cloud-cost sizing in Phase 0.
+-   `output/all_intersections.shp` / `output/all_streets.shp` — county-wide shapefiles combining all municipalities' intersections and streets, respectively.
 
 ------------------------------------------------------------------------
 
