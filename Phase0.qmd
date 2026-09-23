@@ -405,6 +405,10 @@ muni_run_list %>%
 intersection_files <- list.files(out_dir, full.names = TRUE)
 all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALSE)
 
+# convert to shapefile
+all_points_sf <- st_as_sf(all_intersections, coords = c("lon", "lat"), crs = 4326)
+st_write(all_points_sf, "output/all_intersections.shp")
+
 muni_summary <- all_intersections %>%
   mutate(muni_id = as.character(muni_id)) %>% 
   count(muni_id, muni_name, name = "intersection_count") %>%
@@ -433,8 +437,8 @@ This total feeds directly into `plan.qmd`'s Phase 0 deliverable ("cloud vendor s
     ```{r}
     #| label: qa-map
     library(mapview)
-    all_points_sf <- st_as_sf(all_intersections, coords = c("lon", "lat"), crs = 4326)
-    mapview(study_area, alpha.regions = 0.1) + mapview(all_points_sf, cex = 1)
+    
+    mapview(study_area, alpha.regions = 0.1) + mapview(all_intersections, cex = 1)
     ```
 
 -   **Outlier review:** flag municipalities whose intersection count looks implausible relative to land area or population (from the municipality attribute table) for manual review — this feeds forward into Phase 1's "Document OSM crossing-coverage completeness by municipality" validation task in `plan.qmd`.
