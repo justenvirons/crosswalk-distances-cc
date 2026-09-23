@@ -647,11 +647,11 @@ st_write(ped_fatalities, "output/ped_fatalities.shp", delete_layer = TRUE)
       ) %>%
       addCircleMarkers(
         data = ped_fatalities,
-        radius = 3,
+        radius = 4.5,
         stroke = TRUE,
         color = "#FFF",
         weight = 0.25,
-        fillOpacity = 0.5,
+        fillOpacity = 0.75,
         fillColor = "darkred",
         label = ~paste0("Pedestrian fatality — ", fatality_date, ", ", fatality_time),
         group = "Pedestrian Fatalities"
