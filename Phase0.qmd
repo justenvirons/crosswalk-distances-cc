@@ -662,6 +662,10 @@ st_write(ped_fatalities, "output/ped_fatalities.shp", delete_layer = TRUE)
         labels = c("Municipalities", "Intersections", "Pedestrian Fatalities"),
         opacity = 1
       ) %>%
+      addScaleBar(
+        position = "bottomright",  # bottomleft is taken by the legend above
+        options = scaleBarOptions(metric = TRUE, imperial = TRUE)
+      ) %>%
       fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
       addResetMapButton() %>%
       addFullscreenControl() %>%
