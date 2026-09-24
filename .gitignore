@@ -1,8 +1,11 @@
 # Folders, file types
 data/intersections/raw/*.csv
+data/boundaries/CRASHES*.*
+data/boundaries/study_area*.*
 output/all_streets*.*
 output/ped_fatalities*.*
 output/all_ped_fatalities*.*
+
 
 # History files
 .Rhistory

@@ -6,11 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="C. Scott Smith, PhD AICP">
-<meta name="author" content="Zane Sufi">
 <meta name="dcterms.date" content="2026-09-23">
 
-<title>Work Plan for Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</title>
+<title>Phase 1 Workflow (Draft): Remote Server Workspace &amp; Satellite Tile Retrieval</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -21,6 +19,41 @@ ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
 width: 0.8em;
 margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+}
+pre.numberSource { margin-left: 3em; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -2175,60 +2208,33 @@ vertical-align: -.125em;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul class="collapse">
-  <li><a href="#background-and-rationale" id="toc-background-and-rationale" class="nav-link active" data-scroll-target="#background-and-rationale">Background and Rationale</a></li>
-  <li><a href="#project-team-roles" id="toc-project-team-roles" class="nav-link" data-scroll-target="#project-team-roles">Project Team &amp; Roles</a></li>
-  <li><a href="#timeline-compression-note-8-month-project" id="toc-timeline-compression-note-8-month-project" class="nav-link" data-scroll-target="#timeline-compression-note-8-month-project">Timeline Compression Note (8-Month Project)</a></li>
-  <li><a href="#phase-0-project-setup-and-data-scoping-weeks-13" id="toc-phase-0-project-setup-and-data-scoping-weeks-13" class="nav-link" data-scroll-target="#phase-0-project-setup-and-data-scoping-weeks-13">Phase 0 — Project Setup and Data Scoping (Weeks 1–3)</a></li>
-  <li><a href="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-13" id="toc-phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-13" class="nav-link" data-scroll-target="#phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-13">Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–3)</a></li>
-  <li><a href="#cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" id="toc-cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" class="nav-link" data-scroll-target="#cloud-compute-strategy-for-the-segmentation-pipeline-phase-1">Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)</a></li>
-  <li><a href="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-16" id="toc-phase-2-municipal-level-cross-sectional-analysis-aim-2-months-16" class="nav-link" data-scroll-target="#phase-2-municipal-level-cross-sectional-analysis-aim-2-months-16">Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 1–6)</a></li>
-  <li><a href="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-16" id="toc-phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-16" class="nav-link" data-scroll-target="#phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-16">Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 1–6)</a></li>
-  <li><a href="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-17" id="toc-phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-17" class="nav-link" data-scroll-target="#phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-17">Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 1–7)</a></li>
-  <li><a href="#integrated-timeline-illustrative-8-month-project" id="toc-integrated-timeline-illustrative-8-month-project" class="nav-link" data-scroll-target="#integrated-timeline-illustrative-8-month-project">Integrated Timeline (Illustrative, ~8-Month Project)</a></li>
-  <li><a href="#budget-considerations" id="toc-budget-considerations" class="nav-link" data-scroll-target="#budget-considerations">Budget Considerations</a></li>
-  <li><a href="#data-sources-summary" id="toc-data-sources-summary" class="nav-link" data-scroll-target="#data-sources-summary">Data Sources Summary</a></li>
-  <li><a href="#risks-and-mitigations-summary" id="toc-risks-and-mitigations-summary" class="nav-link" data-scroll-target="#risks-and-mitigations-summary">Risks and Mitigations Summary</a></li>
-  <li><a href="#anticipated-outputs" id="toc-anticipated-outputs" class="nav-link" data-scroll-target="#anticipated-outputs">Anticipated Outputs</a></li>
-  <li><a href="#open-decisions-requiring-early-input" id="toc-open-decisions-requiring-early-input" class="nav-link" data-scroll-target="#open-decisions-requiring-early-input">Open Decisions Requiring Early Input</a></li>
+  <li><a href="#status-draft-provisional" id="toc-status-draft-provisional" class="nav-link active" data-scroll-target="#status-draft-provisional">Status: draft / provisional</a></li>
+  <li><a href="#purpose-scope" id="toc-purpose-scope" class="nav-link" data-scroll-target="#purpose-scope">Purpose &amp; scope</a></li>
+  <li><a href="#a-correction-to-plan.qmds-tile-source-language" id="toc-a-correction-to-plan.qmds-tile-source-language" class="nav-link" data-scroll-target="#a-correction-to-plan.qmds-tile-source-language">A correction to <code>plan.qmd</code>’s tile-source language</a></li>
+  <li><a href="#how-this-parallels-the-reference-pipeline" id="toc-how-this-parallels-the-reference-pipeline" class="nav-link" data-scroll-target="#how-this-parallels-the-reference-pipeline">How this parallels the reference pipeline</a></li>
+  <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites">Prerequisites</a></li>
+  <li><a href="#step-1-provision-the-modal-workspace" id="toc-step-1-provision-the-modal-workspace" class="nav-link" data-scroll-target="#step-1-provision-the-modal-workspace">Step 1 — Provision the Modal workspace</a></li>
+  <li><a href="#step-2-bridge-phase-0s-coordinates-into-the-tile-fetch-input" id="toc-step-2-bridge-phase-0s-coordinates-into-the-tile-fetch-input" class="nav-link" data-scroll-target="#step-2-bridge-phase-0s-coordinates-into-the-tile-fetch-input">Step 2 — Bridge Phase 0’s coordinates into the tile-fetch input</a></li>
+  <li><a href="#step-3-define-the-tile-fetch-functions" id="toc-step-3-define-the-tile-fetch-functions" class="nav-link" data-scroll-target="#step-3-define-the-tile-fetch-functions">Step 3 — Define the tile-fetch functions</a></li>
+  <li><a href="#step-4-pilot-run-and-benchmark" id="toc-step-4-pilot-run-and-benchmark" class="nav-link" data-scroll-target="#step-4-pilot-run-and-benchmark">Step 4 — Pilot run and benchmark</a></li>
+  <li><a href="#outputs-once-implemented-and-run" id="toc-outputs-once-implemented-and-run" class="nav-link" data-scroll-target="#outputs-once-implemented-and-run">Outputs (once implemented and run)</a></li>
+  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next steps</a></li>
   </ul>
-<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="plan.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+</nav>
 </div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Work Plan for <i>Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</i></h1>
+<h1 class="title">Phase 1 Workflow (Draft): Remote Server Workspace &amp; Satellite Tile Retrieval</h1>
+<p class="subtitle lead">Modal-based compute setup and Google-basemap tile-image retrieval for suburban Cook County</p>
 </div>
 
 
-<div class="quarto-title-meta-author">
-  <div class="quarto-title-meta-heading">Authors</div>
-  <div class="quarto-title-meta-heading">Affiliations</div>
-  
-    <div class="quarto-title-meta-contents">
-    <p class="author">C. Scott Smith, PhD AICP <a href="mailto:c.scott.smith@depaul.edu" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> </p>
-  </div>
-  <div class="quarto-title-meta-contents">
-        <p class="affiliation">
-            DePaul University
-          </p>
-        <p class="affiliation">
-            Cook County Department of Public Health (CCDPH)
-          </p>
-      </div>
-    <div class="quarto-title-meta-contents">
-    <p class="author">Zane Sufi </p>
-  </div>
-  <div class="quarto-title-meta-contents">
-        <p class="affiliation">
-            Oak Park River Forest High School
-          </p>
-      </div>
-  </div>
 
 <div class="quarto-title-meta">
 
-      
+    
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
@@ -2244,447 +2250,215 @@ vertical-align: -.125em;
 </header>
 
 
-<section id="background-and-rationale" class="level2">
-<h2 class="anchored" data-anchor-id="background-and-rationale">Background and Rationale</h2>
-<p>The existing methodology — developed and validated in <em>Moran &amp; Laefer (2024)</em> and scaled nationally in <em>Moran, Gupta, Qian &amp; Laefer (2025)</em> — uses OpenStreetMap (OSM) intersection coordinates, Google Maps satellite tiles, a fine-tuned Segment Anything Model (SAM 2.1), and a grow-cut algorithm to automatically measure pedestrian crossing distance at marked and unmarked crosswalks. This method has already been applied to the City of Chicago (~80,000 tiles processed in the national 100-city study). This project extends that pipeline countywide and links the resulting crossing-distance dataset to socioeconomic, crash, and fatality data to answer applied safety-policy questions across Cook County’s 135 municipalities (Chicago + ~125 suburban jurisdictions + unincorporated areas).</p>
-<p>The project has four integrated aims:</p>
+<section id="status-draft-provisional" class="level2">
+<h2 class="anchored" data-anchor-id="status-draft-provisional">Status: draft / provisional</h2>
+<p>This document is a first-pass scaffold, not a validated, run-tested pipeline. It’s expected to be revised — possibly substantially — once the segmentation data pipeline and workflow are formalized (in particular, once a pilot batch has actually been run and the storage/naming conventions below are confirmed against real output). Code here is illustrative (plain fenced blocks), not live Quarto chunks: Modal apps are run via the <code>modal</code> CLI against <code>.py</code> module files (<code>modal run</code>/<code>modal deploy</code>), not rendered from a notebook document, so the actual code should live in <code>.py</code> files in this repo, with this document describing what those files do and how to run them — mirroring how the reference codebase (<code>agupta01/crossing-distances</code>) is structured.</p>
+<hr>
+</section>
+<section id="purpose-scope" class="level2">
+<h2 class="anchored" data-anchor-id="purpose-scope">Purpose &amp; scope</h2>
+<p>This document operationalizes the part of <code>plan.qmd</code>’s Phase 1 that runs on remote compute — setting up the Modal workspace and retrieving satellite tile images — as distinct from <code>Phase0.qmd</code>, which runs entirely locally in R/RStudio to produce the intersection coordinates that drive this stage.</p>
+<p><strong>In scope:</strong></p>
+<ul>
+<li>Provisioning a Modal workspace/environment for this project.</li>
+<li>Defining the tile-retrieval function(s) and storage (a Modal Volume for output images).</li>
+<li>Bridging <code>Phase0.qmd</code>’s per-municipality coordinate output into the format the tile-fetch step expects.</li>
+<li>Running a small pilot batch to validate connectivity and image quality, and to produce the cost/throughput-per-1,000-tiles benchmark called for in <code>plan.qmd</code>’s Phase 0 deliverables.</li>
+</ul>
+<p><strong>Out of scope (later phases/documents):</strong> SAM segmentation and grow-cut refinement. In the reference pipeline these are separate stages (<code>sam_inference.py</code>, <code>grow_cut.py</code>) that run after tile retrieval is validated; they’ll get their own document once that stage’s workflow is settled, per <code>plan.qmd</code>’s Cloud Compute Strategy GPU scenarios.</p>
+<p><strong>Reference implementation:</strong> <a href="https://github.com/agupta01/crossing-distances"><code>agupta01/crossing-distances</code></a>, specifically <code>inference/crosswalk_image_ingest.py</code> (tile retrieval) and <code>inference/entrypoint.py</code> (orchestration pattern). This draft adapts that structure from one-Modal-environment-per-metro (the national 100-city study) to a single Cook County suburban run.</p>
+<hr>
+</section>
+<section id="a-correction-to-plan.qmds-tile-source-language" class="level2">
+<h2 class="anchored" data-anchor-id="a-correction-to-plan.qmds-tile-source-language">A correction to <code>plan.qmd</code>’s tile-source language</h2>
+<p>The reference implementation retrieves satellite imagery via <code>segment-geospatial</code>’s <code>tms_to_geotiff()</code> (<code>source=&quot;Satellite&quot;</code>), which pulls from Google’s basemap tile server — and per the reference repo’s own documentation (<code>inference/README.md</code>): <strong>“Google Maps Tile Server - No API key required.”</strong> This is <em>not</em> the officially billed Google Maps Platform “Tile API” product that <code>plan.qmd</code>’s Background and Budget Considerations sections currently describe (e.g., “Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run”). Those two things may or may not turn out to be the same underlying cost/ToS situation — worth reconciling once this stage is actually run, but flagged here rather than silently assumed away. (Not corrected in <code>plan.qmd</code> itself as part of this document, since that wasn’t asked for.)</p>
+<hr>
+</section>
+<section id="how-this-parallels-the-reference-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="how-this-parallels-the-reference-pipeline">How this parallels the reference pipeline</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>This draft</th>
+<th>Reference (<code>inference/crosswalk_image_ingest.py</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Coordinate source</td>
+<td><code>Phase0.qmd</code>’s <code>data/intersections/raw/{muni_id}.csv</code> (lon/lat)</td>
+<td><code>osm_ingest.py</code>’s <code>intersection_coordinates.csv</code> (x/y)</td>
+</tr>
+<tr class="even">
+<td>Per-coordinate tile fetch</td>
+<td><code>get_tile_for_intersection()</code> (CPU Modal function)</td>
+<td><code>get_image_for_crosswalk()</code></td>
+</tr>
+<tr class="odd">
+<td>Batch dispatch</td>
+<td><code>get_tiles_batch()</code> (<code>.map()</code> over a batch, with redrive/retry logging)</td>
+<td><code>get_crosswalks_batch()</code></td>
+</tr>
+<tr class="even">
+<td>Image commit</td>
+<td><code>commit_images_to_volume()</code> writing JPEGs to a Modal Volume</td>
+<td>Same function name/pattern</td>
+</tr>
+<tr class="odd">
+<td>Coordinate-to-filename mapping</td>
+<td><code>create_decoder()</code> JSON on the volume</td>
+<td>Same function name/pattern</td>
+</tr>
+<tr class="even">
+<td>Environment/workspace</td>
+<td>One Modal environment for the whole Cook County suburban run (e.g. <code>cookcounty</code>)</td>
+<td>One Modal environment per metro area (e.g. <code>sfo</code>, <code>irv</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="prerequisites" class="level2">
+<h2 class="anchored" data-anchor-id="prerequisites">Prerequisites</h2>
+<ul>
+<li><p>A Modal account (modal.com), with the CLI installed and authenticated:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install modal</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">modal</span> setup</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p>A Python environment with the same core dependency the reference repo’s tile-fetch image uses — <code>segment-geospatial</code> (which provides <code>tms_to_geotiff</code>) — for local testing outside Modal. The reference repo builds this as a Modal image directly (see Step 1 below) rather than a separate local venv, which is the simpler path if all testing happens against remote Modal functions.</p></li>
+<li><p><code>Phase0.qmd</code>’s output: <code>data/intersections/raw/{muni_id}.csv</code> (one file per municipality, columns <code>lon</code>, <code>lat</code>, <code>muni_id</code>, <code>muni_name</code>). Note the column name difference from the reference repo’s coordinate files (<code>x</code>/<code>y</code>) — the bridging step in Step 2 below handles this rather than renaming Phase 0’s output.</p></li>
+</ul>
+<hr>
+</section>
+<section id="step-1-provision-the-modal-workspace" class="level2">
+<h2 class="anchored" data-anchor-id="step-1-provision-the-modal-workspace">Step 1 — Provision the Modal workspace</h2>
+<p>Unlike the reference repo’s per-metro environments (<code>sfo</code>, <code>irv</code>, <code>ord</code>, …), this project uses <strong>one Modal environment</strong> for the whole suburban Cook County run, since it’s a single countywide dataset rather than ~100 independent city-level datasets:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">modal</span> environment create cookcounty</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A minimal <code>modal_utils.py</code> (parallel to the reference repo’s <code>inference/utils.py</code>) to anchor the app, image, and storage:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> modal</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>APP_NAME <span class="op">=</span> <span class="st">&quot;cook-county-tiles&quot;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> modal.App(APP_NAME)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>RADIUS <span class="op">=</span> <span class="fl">25.0</span>  <span class="co"># meters -- matches Phase0.qmd&#39;s RADIUS_M and inference/utils.py&#39;s RADIUS</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>PRECISION <span class="op">=</span> <span class="dv">6</span>  <span class="co"># decimal points, matches inference/utils.py</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># The reference repo builds this on top of gboeing/osmnx:latest and reuses</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># it for both tile-fetch and SAM inference. For a tile-fetch-only image we</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># only need segment-geospatial (for tms_to_geotiff), which keeps the image</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co"># smaller/faster to build than pulling in SAM&#39;s dependencies too.</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>tile_image <span class="op">=</span> (</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    modal.Image.from_registry(<span class="st">&quot;gboeing/osmnx:latest&quot;</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    .pip_install(<span class="st">&quot;segment-geospatial&quot;</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    .env({<span class="st">&quot;TINI_SUBREAPER&quot;</span>: <span class="st">&quot;1&quot;</span>})</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co"># One Volume for the whole county run, unlike the reference repo&#39;s</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co"># per-environment crosswalk-data-{city_code} volumes.</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>tile_volume <span class="op">=</span> modal.Volume.from_name(<span class="st">&quot;cc-suburban-tiles&quot;</span>, create_if_missing<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>No <code>modal.Secret</code> is needed for this stage — per <code>inference/README.md</code>, the Google basemap tile server the reference repo uses requires no API key. (Secrets would come into play for a later, separate stage — e.g., fine-tuned SAM weights access — out of scope here.)</p>
+<hr>
+</section>
+<section id="step-2-bridge-phase-0s-coordinates-into-the-tile-fetch-input" class="level2">
+<h2 class="anchored" data-anchor-id="step-2-bridge-phase-0s-coordinates-into-the-tile-fetch-input">Step 2 — Bridge Phase 0’s coordinates into the tile-fetch input</h2>
+<p><code>Phase0.qmd</code> writes one CSV per municipality with <code>lon</code>/<code>lat</code> columns; the tile-fetch step needs <code>lat</code>/<code>long</code> pairs (matching the reference repo’s <code>(lat, long)</code> convention, e.g. in <code>get_image_for_crosswalk(lat, long)</code>). Combine and rename rather than fetching per-municipality file-by-file:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_intersection_coordinates(raw_dir: <span class="bu">str</span> <span class="op">=</span> <span class="st">&quot;data/intersections/raw&quot;</span>) <span class="op">-&gt;</span> pd.DataFrame:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    files <span class="op">=</span> <span class="bu">list</span>(Path(raw_dir).glob(<span class="st">&quot;*.csv&quot;</span>))</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> pd.concat([pd.read_csv(f) <span class="cf">for</span> f <span class="kw">in</span> files], ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> df.rename(columns<span class="op">=</span>{<span class="st">&quot;lon&quot;</span>: <span class="st">&quot;long&quot;</span>})[[<span class="st">&quot;muni_id&quot;</span>, <span class="st">&quot;muni_name&quot;</span>, <span class="st">&quot;lat&quot;</span>, <span class="st">&quot;long&quot;</span>]]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Whether this runs locally (reading the R-produced CSVs directly, since they’re plain files) or gets uploaded to a Modal Volume first depends on how Step 3’s functions are invoked — for a <code>modal run</code> local entrypoint, reading local files directly (as above) is simplest and mirrors the reference repo’s <code>local_main()</code> pattern.</p>
+<hr>
+</section>
+<section id="step-3-define-the-tile-fetch-functions" class="level2">
+<h2 class="anchored" data-anchor-id="step-3-define-the-tile-fetch-functions">Step 3 — Define the tile-fetch functions</h2>
+<p>Adapted from <code>get_image_for_crosswalk()</code>/<code>get_crosswalks_batch()</code>/<code>commit_images_to_volume()</code> in <code>inference/crosswalk_image_ingest.py</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> modal_utils <span class="im">import</span> app, tile_image, tile_volume, RADIUS</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> coords_from_distance(lat, <span class="bu">long</span>, dist, heading):</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Same haversine-style offset used in inference/utils.py.&quot;&quot;&quot;</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    ...  <span class="co"># port directly from inference/utils.py::coords_from_distance</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">@app.function</span>(image<span class="op">=</span>tile_image)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_tile_for_intersection(lat: <span class="bu">float</span>, <span class="bu">long</span>: <span class="bu">float</span>):</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> samgeo <span class="im">import</span> tms_to_geotiff</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    diag_radius <span class="op">=</span> math.sqrt(<span class="dv">2</span>) <span class="op">*</span> RADIUS</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    top_left <span class="op">=</span> coords_from_distance(lat, <span class="bu">long</span>, diag_radius, <span class="dv">315</span>)</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    bottom_right <span class="op">=</span> coords_from_distance(lat, <span class="bu">long</span>, diag_radius, <span class="dv">135</span>)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    bounding_box <span class="op">=</span> [bottom_right.<span class="bu">long</span>, bottom_right.lat, top_left.<span class="bu">long</span>, top_left.lat]</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>        image_data <span class="op">=</span> tms_to_geotiff(</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>            output<span class="op">=</span><span class="st">&quot;./scratch.tif&quot;</span>,</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>            bbox<span class="op">=</span>bounding_box,</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>            crs<span class="op">=</span><span class="st">&quot;EPSG:3857&quot;</span>,</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>            zoom<span class="op">=</span><span class="dv">22</span>,</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>            source<span class="op">=</span><span class="st">&quot;Satellite&quot;</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>            overwrite<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>            quiet<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>            return_image<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (lat, <span class="bu">long</span>), image_data</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (lat, <span class="bu">long</span>), e</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="at">@app.function</span>(image<span class="op">=</span>tile_image, volumes<span class="op">=</span>{<span class="st">&quot;/data&quot;</span>: tile_volume}, timeout<span class="op">=</span><span class="dv">3600</span>)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_tiles_batch(lat_batch: <span class="bu">tuple</span>, long_batch: <span class="bu">tuple</span>, muni_id: <span class="bu">str</span>):</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> <span class="bu">list</span>(</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>        get_tile_for_intersection.<span class="bu">map</span>(lat_batch, long_batch, return_exceptions<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>    saved <span class="op">=</span> []</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (lat, <span class="bu">long</span>), image_data <span class="kw">in</span> results:</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">isinstance</span>(image_data, <span class="pp">Exception</span>):</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span>  <span class="co"># </span><span class="al">TODO</span><span class="co">: redrive/retry logging, as in the reference repo&#39;s redrive_dict</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>        filename <span class="op">=</span> <span class="ss">f&quot;/data/</span><span class="sc">{</span>muni_id<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>lat<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span><span class="bu">long</span><span class="sc">}</span><span class="ss">.jpeg&quot;</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>        image_data.convert(<span class="st">&quot;RGB&quot;</span>).save(filename, <span class="st">&quot;JPEG&quot;</span>, optimize<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>        saved.append(filename)</span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>    tile_volume.commit()</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> saved</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Open questions to settle once this is actually run (not resolved in this draft): batch size per <code>.map()</code> call, retry/redrive handling for failed tiles (the reference repo logs failures to a <code>modal.Dict</code> for later reprocessing — worth carrying over), and whether to key output filenames by municipality + coordinate (as sketched above) or replicate the reference repo’s <code>get_crosswalk_id()</code> hashing scheme for consistency with the existing Chicago dataset.</p>
+<hr>
+</section>
+<section id="step-4-pilot-run-and-benchmark" class="level2">
+<h2 class="anchored" data-anchor-id="step-4-pilot-run-and-benchmark">Step 4 — Pilot run and benchmark</h2>
+<p>Before running the full suburban county:</p>
 <ol type="1">
-<li><strong>Extend the segmentation pipeline</strong> to suburban Cook County, producing a dataset comparable in scope/rigor to the existing Chicago dataset.</li>
-<li><strong>Cross-sectional municipal analysis</strong>: compare crossing distance across all Cook County municipalities against socioeconomic indicators (Area Deprivation Index [ADI], population, housing, and employment data).</li>
-<li><strong>Point-level fatality analysis</strong>: relate crossing distance to individual pedestrian fatalities using FARS (Fatality Analysis Reporting System) data.</li>
-<li><strong>Municipal-level injury analysis</strong>: relate crossing distance to EMS-reported pedestrian/motor-vehicle crash injury data for suburban Cook County.</li>
+<li>Pick one municipality’s coordinate file (or a small sample) as a pilot batch.</li>
+<li>Run it through <code>get_tiles_batch()</code> and confirm: images actually arrive, look correct (right location, right zoom/resolution), and land in the Volume as expected.</li>
+<li>Record wall-clock time and (if applicable) Modal cost for that batch, and extrapolate a cost/throughput-per-1,000-tiles figure.</li>
 </ol>
+<p>That figure is the direct input to <code>plan.qmd</code>’s Phase 0 deliverable (“cost-per-tile benchmark”) and lets the Cloud Compute Strategy scenarios already documented there (Scenario A/B/C) be chosen from evidence rather than assumption. Note those scenarios are GPU-tier choices for the <em>segmentation</em> stage (SAM inference) — this tile-fetch stage is CPU-only, so its own scaling lever is Modal’s CPU function concurrency limit, not a GPU tier pick.</p>
 <hr>
 </section>
-<section id="project-team-roles" class="level2">
-<h2 class="anchored" data-anchor-id="project-team-roles">Project Team &amp; Roles</h2>
-<p>This project is staffed by a two-person team. All responsibilities from the broader reference methodology are consolidated into these two roles; there are no separate GIS engineer, ML engineer, statistician, research assistant, or compliance positions.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Role</th>
-<th>Responsibility</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>PI / GIS, ML &amp; Data Governance Lead (Smith)</td>
-<td>Overall direction and methodology oversight; OSM extraction and tile-download pipeline; cloud infrastructure provisioning and management; SAM fine-tuning/inference and grow-cut algorithm adaptation and QA; data governance and compliance (EMS data-use agreements, IRB/data-sharing review if needed); dissemination</td>
-</tr>
-<tr class="even">
-<td>Data Analyst / Statistician &amp; Quant Lead (Sufi)</td>
-<td>Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; FARS and EMS data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</section>
-<section id="timeline-compression-note-8-month-project" class="level2">
-<h2 class="anchored" data-anchor-id="timeline-compression-note-8-month-project">Timeline Compression Note (8-Month Project)</h2>
-<p>To fit an 8-month schedule (down from the 14-month illustrative timeline in the original reference methodology), phases run substantially in parallel rather than sequentially. Work that does not depend on the segmentation pipeline’s output — ADI/ACS/LODES assembly (Aim 2), FARS acquisition and geocoding (Aim 3), and EMS outreach (Aim 4) — starts in Month 1, alongside Phase 1, instead of waiting for the crossing-distance dataset to land. The single largest schedule risk is Phase 4 (EMS data access), since it depends on an external agency’s timeline; a hard go/no-go checkpoint is built in at Month 3 (see Phase 4) so a fallback data source can be substituted without jeopardizing the other three aims. With only two people on the team, this compressed schedule requires both roles to work across multiple phases concurrently from Month 1 rather than finishing one phase before starting the next.</p>
-<hr>
-</section>
-<section id="phase-0-project-setup-and-data-scoping-weeks-13" class="level2">
-<h2 class="anchored" data-anchor-id="phase-0-project-setup-and-data-scoping-weeks-13">Phase 0 — Project Setup and Data Scoping (Weeks 1–3)</h2>
-<p><em>Detailed workflow:</em> <a href="Phase0.qmd"><code>Phase0.qmd</code></a> — an R/RStudio pipeline for generating OSMnx intersection counts per Cook County municipality (via <code>reticulate</code> + Census TIGER/Line boundaries), operationalizing the tile-volume-estimate task below.</p>
-<p><strong>Tasks</strong> - Finalize suburban Cook County municipality boundary file (Cook County GIS / U.S. Census TIGER/Line places), reconciling with the 125+ municipality list and unincorporated township areas. - Confirm coverage decision: incorporated municipalities only, or also unincorporated Cook County (relevant for Aim 4 EMS matching). - Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality (benchmark: Chicago ≈ 80,000 tiles); project total volume and compare to Chicago’s ~8.3 TB scale for the 100-city study to size cloud storage/compute needs. - Continue running the segmentation pipeline on Modal, the serverless cloud platform already used (and credited for compute support) in the original methodology papers; the existing codebase’s tile-fetch and inference functions are expected to already target Modal’s Python SDK, making it the lowest-friction path to scale rather than porting to a different vendor. Confirm/renew the Modal workspace and any available research/in-kind credits, define GPU function tier and autoscaling limits for SAM inference and CPU-only function limits for tile fetch, and run a small pilot batch to benchmark throughput and cost per 1,000 tiles fetched/segmented before committing to the full suburban run (see Cloud Compute Strategy, below). All other phases (0, 2, 3, and 4) are expected to run on local/desktop hardware, since they involve tabular and vector-spatial data at a scale (municipal, point-level, or block-group records) well within the capacity of a standard analyst workstation. - Establish data-use agreements: NHTSA FARS (public use, no agreement needed), EMS injury data (Cook County EMS System / regional EMS agencies / Illinois Department of Public Health — will likely require a data-use agreement given patient-level fields), ADI (Neighborhood Atlas, University of Wisconsin — public download, block-group level). - Set up shared project repository (extending the existing GitHub codebase), data storage architecture, and version control for outputs.</p>
-<p><strong>Deliverables:</strong> finalized municipality boundary file; cloud vendor selection and cost-per-tile benchmark; signed/initiated data-use agreements; project repo scaffolding.</p>
-<hr>
-</section>
-<section id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-13" class="level2">
-<h2 class="anchored" data-anchor-id="phase-1-suburban-cook-county-segmentation-pipeline-aim-1-months-13">Phase 1 — Suburban Cook County Segmentation Pipeline (Aim 1) (Months 1–3)</h2>
-<p><em>Detailed workflow (draft):</em> <a href="Phase1.qmd"><code>Phase1.qmd</code></a> — remote server (Modal) workspace setup and satellite tile retrieval; provisional, expected to be revised once the segmentation data pipeline and workflow are formalized.</p>
-<section id="intersection-tile-retrieval" class="level3">
-<h3 class="anchored" data-anchor-id="intersection-tile-retrieval">Intersection &amp; Tile Retrieval</h3>
+<section id="outputs-once-implemented-and-run" class="level2">
+<h2 class="anchored" data-anchor-id="outputs-once-implemented-and-run">Outputs (once implemented and run)</h2>
 <ul>
-<li>Use OSMnx to generate coordinates for all street intersections and mid-block crossings across suburban Cook County municipalities.</li>
-<li>Retrieve satellite tiles (25 m radius, 1629×1629 px, ~30 cm/pixel) via the Google Maps Tile API using the existing parallelized serverless fetch approach, scaled to the larger geography.</li>
-<li>Monitor cloud spend against the Phase 0 benchmark; adjust worker concurrency to control cost and stay within the ~2,000 tiles/minute throughput ceiling observed previously.</li>
+<li>A <code>cc-suburban-tiles</code> Modal Volume containing retrieved satellite tile JPEGs.</li>
+<li>A coordinate-to-filename decoder (parallel to the reference repo’s <code>decoder_{call_id}.json</code>), so tiles can be traced back to their source municipality/coordinate.</li>
+<li>A pilot-batch cost/throughput benchmark feeding <code>plan.qmd</code>’s Phase 0 deliverable and Cloud Compute Strategy scenario selection.</li>
 </ul>
+<hr>
 </section>
-<section id="segmentation" class="level3">
-<h3 class="anchored" data-anchor-id="segmentation">Segmentation</h3>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">Next steps</h2>
 <ul>
-<li>Apply the existing fine-tuned SAM 2.1 model to classify drivable vs. non-drivable surfaces on all suburban tiles.</li>
-<li>Spot-check performance on suburban-specific built forms not well represented in the original 14-city training set (e.g., low-density arterial commercial strips, cul-de-sac subdivisions, strip-mall parking aprons) — supplement training data with additional manually annotated suburban intersections if accuracy degrades materially.</li>
-</ul>
-</section>
-<section id="crossing-edge-extraction-grow-cut" class="level3">
-<h3 class="anchored" data-anchor-id="crossing-edge-extraction-grow-cut">Crossing Edge Extraction &amp; Grow-Cut</h3>
-<ul>
-<li>Extract all OSM-coded pedestrian crossing edges (and generate edges from crossing nodes) for suburban municipalities.</li>
-<li>Apply the grow-cut algorithm to compute crossing distances; apply the same post-processing rules (duplicate-buffer merge at 6.5 ft/10°; distance bounds of 6–160 ft).</li>
-</ul>
-</section>
-<section id="validation" class="level3">
-<h3 class="anchored" data-anchor-id="validation">Validation</h3>
-<ul>
-<li>Manually verify a stratified random sample of crossings across a representative subset of suburban municipalities (varying density/form), targeting the same accuracy benchmark achieved for Chicago (93% accuracy; median absolute error ≈2 ft 3 in).</li>
-<li>Document OSM crossing-coverage completeness by municipality, since crowdsourced OSM density varies more in suburban areas than in the dense urban core.</li>
-</ul>
-<p><strong>Deliverables:</strong> suburban Cook County crossing-distance dataset (parcel of comparable structure/fields to the Chicago dataset); combined Cook County (city + suburban) crossing dataset; validation/accuracy report; updated codebase documentation.</p>
-<p><strong>Key risk:</strong> OSM crossing-edge sparsity in lower-density suburbs may undercount true crossings relative to Chicago. <em>Mitigation:</em> supplement with municipal GIS crosswalk inventories where available; flag municipalities with low OSM crossing density for interpretive caution in Aim 2.</p>
-<hr>
-</section>
-</section>
-<section id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1" class="level2">
-<h2 class="anchored" data-anchor-id="cloud-compute-strategy-for-the-segmentation-pipeline-phase-1">Cloud Compute Strategy for the Segmentation Pipeline (Phase 1)</h2>
-<p>Phase 1 is the only phase in this project that requires cloud GPU compute; Phases 0, 2, 3, and 4 work with municipal-, block-group-, or point-level tabular/vector data and are sized for a local analyst workstation (no GPU required).</p>
-<p><strong>Platform: Modal.</strong> The team will continue using Modal (modal.com) for tile-fetch and segmentation, the same platform already used — and credited for compute support — in the original national-study methodology papers. Modal is the lowest-friction option for extending the pipeline because the existing codebase’s tile-fetch and inference functions are expected to already be written as Modal functions. Modal supports CPU-only functions (for the tile-fetch step, which is network/API-bound) and GPU functions (L4, A10G, L40S, A100, H100) in the same codebase, bills per second of actual execution, and autoscales the number of concurrent containers up or down with load — so there is no fixed server to size, only per-function GPU-tier and concurrency-limit choices.</p>
-<p><strong>Software stack:</strong></p>
-<ul>
-<li><code>modal</code> Python SDK, with tile-fetch defined as CPU-only Modal functions and SAM inference defined as GPU Modal functions (<code>@app.function(gpu=...)</code>), matching the existing codebase’s structure.</li>
-<li><code>modal.Image</code> build spec pinning PyTorch (CUDA build), the SAM 2.1 codebase and fine-tuned checkpoint, and the existing grow-cut implementation, so every container starts from an identical, reproducible environment.</li>
-<li>OSMnx, GeoPandas, Shapely, Fiona, pyproj for intersection/crossing-edge extraction and post-processing (can run as CPU-only Modal functions or locally, since this step is lightweight).</li>
-<li><code>modal.Secret</code> for the Google Maps Tile API key and any storage credentials, rather than embedding them in code or images.</li>
-<li><code>modal.Volume</code> (or a mounted S3-/GCS-compatible bucket) for raw tiles and output masks, shared across the fetch and inference functions — provision for hundreds of GB to low TB given the projected suburban tile count.</li>
-<li>Modal’s built-in <code>max_containers</code>/concurrency-limit settings to cap simultaneous GPU containers (controls both cost and Google Maps Tile API request rate), plus Modal’s dashboard/CLI for run monitoring and spend tracking.</li>
-<li>Optional: PostGIS (local or lightly hosted) for the assembled crossing-distance dataset once it lands from Modal.</li>
-</ul>
-<p><strong>Sizing logic:</strong> the reference pipeline processed Chicago’s ~80,000 tiles in ~40 minutes using many concurrent Modal GPU containers in parallel — the same pattern to reuse here, just with more total container-time to cover a larger tile count. Suburban Cook County is estimated at several hundred thousand tiles (Phase 0 will pin this down from OSMnx intersection counts), so total GPU-container-time will scale accordingly; wall-clock turnaround is then a function of how many containers are allowed to run concurrently (<code>max_containers</code>), not of provisioning a bigger single machine. Validate the per-1,000-tile cost and throughput on a pilot batch before committing to the full run.</p>
-<p><strong>Configuration scenarios (pick one based on target turnaround and budget; all use the same codebase, just different GPU tier / concurrency settings):</strong></p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Scenario</th>
-<th>GPU function tier</th>
-<th>Max concurrent containers</th>
-<th>Best for</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>A — Pilot/dev</td>
-<td>L4</td>
-<td>Low (≈5–10)</td>
-<td>Phase 0 cost/throughput benchmark, suburban fine-tuning spot-checks, small municipality clusters</td>
-</tr>
-<tr class="even">
-<td>B — Full-county, moderate spend</td>
-<td>A10G or L40S</td>
-<td>Moderate (≈20–40)</td>
-<td>Full suburban run over a few days at controlled cost; recommended default</td>
-</tr>
-<tr class="odd">
-<td>C — Full-county, fastest turnaround</td>
-<td>A100 or H100</td>
-<td>High (≈50–100+, matching the original Chicago-scale concurrency)</td>
-<td>Compressing the full run to roughly the timescale of the original Chicago run, at higher peak spend</td>
-</tr>
-</tbody>
-</table>
-<p>Pair each GPU-tier scenario with a matched CPU-only tile-fetch concurrency so the fetch stage doesn’t idle the GPU stage (or vice versa). Start with Scenario A to get a real cost/throughput-per-1,000-tiles number (Phase 0 deliverable), then size up to B or C for the full suburban run based on the actual tile-count estimate, desired turnaround, and available Modal credits/budget.</p>
-<hr>
-</section>
-<section id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-16" class="level2">
-<h2 class="anchored" data-anchor-id="phase-2-municipal-level-cross-sectional-analysis-aim-2-months-16">Phase 2 — Municipal-Level Cross-Sectional Analysis (Aim 2) (Months 1–6)</h2>
-<p>Covariate assembly (ADI/ACS/LODES) starts in Month 1, in parallel with Phase 1; merge and modeling begin once the crossing-distance dataset lands (~Month 3).</p>
-<p><strong>Tasks</strong> - Aggregate crossing-distance statistics (median, mean, distribution, count) to the municipal level for all ~135 Cook County jurisdictions. - Assemble municipal/block-group socioeconomic covariates: - <strong>ADI</strong> (Neighborhood Atlas, block-group level, aggregated to municipality via population-weighted crosswalk). - <strong>Population and housing</strong> (ACS 5-year estimates: density, tenure, vehicle ownership, age structure, poverty rate). - <strong>Employment</strong> (ACS/LEHD LODES: employment density, commute mode share, jobs-housing balance). - Incorporation year and land-area (already partially available from the national study) for comparability with prior findings on crossing distance and municipal age. - Conduct descriptive and spatial analysis: choropleth mapping of median crossing distance by municipality; bivariate/multivariate regression of crossing distance on ADI and demographic/employment covariates, controlling for municipal age, density, and street network form. - Test for spatial autocorrelation/clustering (e.g., Moran’s I) in crossing distance across municipalities and at the sub-municipal (block group) level within suburban Cook County.</p>
-<p><strong>Deliverables:</strong> municipal-level merged dataset (crossing distance + ADI + demographics + employment); descriptive report and maps; regression results manuscript draft.</p>
-<hr>
-</section>
-<section id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-16" class="level2">
-<h2 class="anchored" data-anchor-id="phase-3-point-level-pedestrian-fatality-analysis-aim-3-months-16">Phase 3 — Point-Level Pedestrian Fatality Analysis (Aim 3) (Months 1–6)</h2>
-<p>FARS acquisition and geocoding starts in Month 1, in parallel with Phase 1; spatial matching and modeling begin once the crossing-distance dataset lands (~Month 3).</p>
-<p><strong>Tasks</strong> - Acquire latest FARS data (NHTSA) for Cook County, filtered to pedestrian fatalities, with available geocoordinates. - Geocode/validate FARS fatality point locations; spatially join each fatality to its nearest measured crossing (or nearest intersection) within a defined buffer distance, using street-network-aware (not straight-line) distance where feasible. - Construct a matched/case-control or spatial point-pattern framework: compare crossing distances at fatality-adjacent locations to distances at a representative sample of non-fatality intersections/crossings (citywide + suburban), controlling for roadway functional class, speed limit (if available via IDOT), lighting/time-of-day, and land use. - Model relationship between crossing distance and fatality occurrence/likelihood (e.g., logistic regression, spatial Poisson/negative binomial for intersection-level fatality counts, or point-process modeling), replicating and extending the exposure-based approach used in the smaller-city case studies (Paris, San Francisco, Irvine) at Cook County scale. - Assess whether the relationship between crossing distance and fatality risk holds consistently in dense urban Chicago vs. lower-density suburban contexts (interaction term / stratified models).</p>
-<p><strong>Deliverables:</strong> FARS-crossing linked point dataset; fatality risk model results; manuscript draft (potentially standalone paper testing whether crossing-distance/safety associations found in smaller studies hold at metro scale).</p>
-<hr>
-</section>
-<section id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-17" class="level2">
-<h2 class="anchored" data-anchor-id="phase-4-municipal-level-ems-injury-analysis-for-suburban-cook-county-aim-4-months-17">Phase 4 — Municipal-Level EMS Injury Analysis for Suburban Cook County (Aim 4) (Months 1–7)</h2>
-<p><strong>Tasks</strong> - Negotiate access to EMS pedestrian/motor-vehicle crash injury records (likely via Cook County EMS Resource Hospital system, individual suburban Fire/EMS departments, or IDPH’s EMS data system) — this will require a data-use/sharing agreement and may need IRB determination given proximity to identifiable health data, even if aggregated. - Aggregate EMS-reported pedestrian/MV crash injury counts (and severity, if available) to the municipal level for suburban Cook County. - Merge with Phase 2’s municipal crossing-distance and socioeconomic dataset. - Model relationship between municipal median/aggregate crossing distance and injury rates (e.g., injuries per capita, per intersection, or per VMT if exposure data available), controlling for ADI, population density, and roadway characteristics. - Compare findings to the point-level FARS fatality results (Aim 3) to assess consistency between fatality-based and injury-based safety measures.</p>
-<p><strong>Deliverables:</strong> suburban municipal EMS-crossing merged dataset; injury-rate model results; comparative memo (fatality vs. injury associations).</p>
-<p><strong>Key risk:</strong> EMS data access/timeline is the most uncertain dependency in the plan, and the tightest constraint on an 8-month schedule, given data-sharing agreements and potential privacy/IRB review. <em>Mitigation:</em> initiate outreach and agreement negotiation in Month 1, in parallel with segmentation work, so Phase 4 is not blocked by Phase 1–3 timelines. Set a hard <strong>go/no-go checkpoint at Month 3</strong>: if a signed data-use agreement and data delivery timeline are not in hand by then, pivot immediately to the fallback data source (e.g., IDOT crash data with injury severity coding) so Aim 4 modeling can still start on schedule in Month 4 and the 8-month completion date is not put at risk by an external agency’s timeline.</p>
-<hr>
-</section>
-<section id="integrated-timeline-illustrative-8-month-project" class="level2">
-<h2 class="anchored" data-anchor-id="integrated-timeline-illustrative-8-month-project">Integrated Timeline (Illustrative, ~8-Month Project)</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-<col style="width: 14%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Month</th>
-<th>Phase 0</th>
-<th>Phase 1 (Segmentation)</th>
-<th>Phase 2 (Municipal/ADI)</th>
-<th>Phase 3 (FARS)</th>
-<th>Phase 4 (EMS)</th>
-<th>Dissemination</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>1</td>
-<td>Setup, boundaries, Modal provisioning/benchmark, data-use agreements initiated</td>
-<td>Intersection extraction &amp; tile retrieval begin</td>
-<td>Begin ADI/ACS/LODES assembly</td>
-<td>Acquire &amp; begin geocoding FARS data</td>
-<td>Begin EMS data agreement outreach</td>
-<td>—</td>
-</tr>
-<tr class="even">
-<td>2</td>
-<td>—</td>
-<td>Tile retrieval &amp; SAM segmentation at scale; suburban fine-tuning spot-checks</td>
-<td>Continue ADI/ACS/LODES assembly; prep merge scripts</td>
-<td>Continue geocoding/validation; prep matching framework</td>
-<td>Continue negotiation</td>
-<td>—</td>
-</tr>
-<tr class="odd">
-<td>3</td>
-<td>—</td>
-<td>Grow-cut, QA/validation, final combined dataset delivered</td>
-<td>Merge crossing + socioeconomic data; begin descriptive/spatial analysis</td>
-<td>Spatial-match fatalities to crossings; begin model framework</td>
-<td><strong>Go/no-go checkpoint</strong> — pivot to IDOT fallback if no agreement in hand</td>
-<td>—</td>
-</tr>
-<tr class="even">
-<td>4</td>
-<td>—</td>
-<td>—</td>
-<td>Regression modeling; begin manuscript drafting</td>
-<td>Fatality risk modeling; begin manuscript drafting</td>
-<td>EMS data aggregation (or IDOT fallback aggregation) and merge</td>
-<td>—</td>
-</tr>
-<tr class="odd">
-<td>5</td>
-<td>—</td>
-<td>—</td>
-<td>Manuscript drafting continues</td>
-<td>Model refinement, drafting continues</td>
-<td>Injury-rate modeling begins</td>
-<td>—</td>
-</tr>
-<tr class="even">
-<td>6</td>
-<td>—</td>
-<td>—</td>
-<td>Manuscript finalization</td>
-<td>Manuscript finalization</td>
-<td>Injury-rate modeling, comparative memo drafting</td>
-<td>Interim report; draft Aim 2/3 manuscripts circulated</td>
-</tr>
-<tr class="odd">
-<td>7</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>Manuscript/technical report finalization</td>
-<td>Draft Aim 4 manuscript circulated; codebase documentation &amp; dataset packaging</td>
-</tr>
-<tr class="even">
-<td>8</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>Manuscript submission(s); public dataset release</td>
-</tr>
-</tbody>
-</table>
-<p><em>(Timeline should be adjusted once actual suburban tile volume and EMS data-access timelines are confirmed in Phase 0; the Month 3 EMS go/no-go checkpoint is the key control point for holding this schedule.)</em></p>
-<hr>
-</section>
-<section id="budget-considerations" class="level2">
-<h2 class="anchored" data-anchor-id="budget-considerations">Budget Considerations</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Category</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Cloud compute (tile fetch + GPU inference)</td>
-<td>Scale from Chicago benchmark (~80,000 tiles/40 min); suburban Cook County likely requires several hundred thousand tiles given ~125 municipalities. Obtain vendor quote/credits (cf. prior in-kind credits from Modal) before committing; budget contingency for reprocessing/QA passes.</td>
-</tr>
-<tr class="even">
-<td>Satellite imagery API costs</td>
-<td>Google Maps Tile API usage fees scale with tile count; confirm current per-tile pricing before full-scale run.</td>
-</tr>
-<tr class="odd">
-<td>Cloud storage</td>
-<td>Prior 100-city study totaled 8.3 TB for ~3M tiles; suburban Cook County volume will be a small fraction of that but should be estimated in Phase 0.</td>
-</tr>
-<tr class="even">
-<td>Data acquisition</td>
-<td>ADI (free), FARS (free), EMS data (may involve access/processing fees or require data-use agreement administrative time).</td>
-</tr>
-<tr class="odd">
-<td>Personnel</td>
-<td>PI/Technical Lead time for GIS/ML engineering and cloud infrastructure (heaviest in Phases 0–1); Data Analyst/Quant Lead time for statistical modeling and data assembly (Phases 2–4). On the 8-month schedule, both roles carry work concurrently starting Month 1 (segmentation plus parallel covariate/FARS/EMS groundwork), not just at hand-off points, so plan for near-full-time commitment from both people for most of the project rather than staggered phase-by-phase effort.</td>
-</tr>
-<tr class="even">
-<td>Manual validation</td>
-<td>Data Analyst/Quant Lead time for stratified accuracy-verification sampling in suburban municipalities, supported by the PI/Technical Lead on pipeline-side QA.</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</section>
-<section id="data-sources-summary" class="level2">
-<h2 class="anchored" data-anchor-id="data-sources-summary">Data Sources Summary</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Data</th>
-<th>Source</th>
-<th>Aim(s)</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Intersection coordinates, crossing edges</td>
-<td>OpenStreetMap via OSMnx</td>
-<td>1</td>
-<td>Coverage varies by municipality</td>
-</tr>
-<tr class="even">
-<td>Satellite imagery</td>
-<td>Google Maps Tile API</td>
-<td>1</td>
-<td>Cost scales with tile volume</td>
-</tr>
-<tr class="odd">
-<td>Segmentation model</td>
-<td>Meta SAM 2.1 (fine-tuned)</td>
-<td>1</td>
-<td>May need suburban-specific fine-tuning</td>
-</tr>
-<tr class="even">
-<td>ADI</td>
-<td>Neighborhood Atlas (Univ. of Wisconsin)</td>
-<td>2</td>
-<td>Block-group level</td>
-</tr>
-<tr class="odd">
-<td>Population/housing</td>
-<td>U.S. Census ACS 5-year</td>
-<td>2</td>
-<td>Municipal or block-group</td>
-</tr>
-<tr class="even">
-<td>Employment</td>
-<td>ACS / LEHD LODES</td>
-<td>2</td>
-<td>Jobs-housing balance, commute mode</td>
-</tr>
-<tr class="odd">
-<td>Pedestrian fatalities</td>
-<td>NHTSA FARS</td>
-<td>3</td>
-<td>Point-level, latest available year(s)</td>
-</tr>
-<tr class="even">
-<td>EMS crash injury data</td>
-<td>Cook County EMS system / IDPH</td>
-<td>4</td>
-<td>Requires data-use agreement; municipal-level aggregation</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</section>
-<section id="risks-and-mitigations-summary" class="level2">
-<h2 class="anchored" data-anchor-id="risks-and-mitigations-summary">Risks and Mitigations Summary</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Risk</th>
-<th>Mitigation</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Cloud cost overrun at suburban scale</td>
-<td>Phase 0 cost-per-tile benchmark; incremental rollout by municipality cluster rather than all at once</td>
-</tr>
-<tr class="even">
-<td>Sparse/inconsistent OSM crossing data in low-density suburbs</td>
-<td>Supplement with municipal GIS inventories; flag data-sparse municipalities</td>
-</tr>
-<tr class="odd">
-<td>SAM accuracy degradation on suburban built forms</td>
-<td>Additional manual annotation/fine-tuning; validation sampling before full-scale run</td>
-</tr>
-<tr class="even">
-<td>EMS data access delays</td>
-<td>Begin negotiation in Phase 0; identify IDOT crash data as fallback</td>
-</tr>
-<tr class="odd">
-<td>Municipal boundary/ADI aggregation mismatches (MAUP concerns)</td>
-<td>Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels</td>
-</tr>
-<tr class="even">
-<td>FARS-to-crossing spatial matching ambiguity (which crossing a fatality is “near”)</td>
-<td>Predefine buffer distance and network-distance rules; sensitivity analysis on buffer size</td>
-</tr>
-<tr class="odd">
-<td>Compressed 8-month schedule leaves little slack, with a 2-person team running Phases 1–4 largely in parallel from Month 1</td>
-<td>Front-load all non-segmentation-dependent work (ADI/ACS/LODES assembly, FARS acquisition, EMS outreach) to Month 1; enforce the Month 3 EMS go/no-go checkpoint; treat full manuscript submission as a stretch goal that can extend slightly past Month 8 if a phase slips, without delaying the public dataset release</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</section>
-<section id="anticipated-outputs" class="level2">
-<h2 class="anchored" data-anchor-id="anticipated-outputs">Anticipated Outputs</h2>
-<ol type="1">
-<li>Public/shareable Cook County (city + suburban) crosswalk-distance dataset, extending the existing Chicago dataset.</li>
-<li>Manuscript: municipal-level crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).</li>
-<li>Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).</li>
-<li>Manuscript or technical report: crossing distance and EMS-reported injury rates in suburban Cook County (Aim 4).</li>
-<li>Updated open-source codebase (GitHub) reflecting suburban-scale pipeline modifications.</li>
-<li>Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).</li>
-</ol>
-<hr>
-</section>
-<section id="open-decisions-requiring-early-input" class="level2">
-<h2 class="anchored" data-anchor-id="open-decisions-requiring-early-input">Open Decisions Requiring Early Input</h2>
-<ul>
-<li>Should unincorporated Cook County areas be included, or only the ~135 incorporated municipalities?</li>
-<li>Which EMS data source is most feasible (single regional system vs. IDPH statewide extract filtered to Cook County)?</li>
-<li>What buffer/matching rule will be used to associate FARS point fatalities with specific measured crossings?</li>
-<li>Target FARS year range (single most recent year vs. multi-year pooled for statistical power)?</li>
+<li>Port <code>coords_from_distance()</code> and <code>get_crosswalk_id()</code> directly from the reference repo’s <code>inference/utils.py</code> rather than reimplementing them.</li>
+<li>Decide on and implement retry/redrive handling for failed tile fetches.</li>
+<li>Run the actual pilot batch (Step 4) and update this document’s benchmark numbers and any adjustments the real run reveals.</li>
+<li>Once tile retrieval is validated end-to-end, draft the follow-on document covering SAM segmentation and grow-cut, sized using the GPU scenarios already in <code>plan.qmd</code>’s Cloud Compute Strategy section.</li>
 </ul>
 </section>
 

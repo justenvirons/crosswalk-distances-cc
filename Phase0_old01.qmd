@@ -22,7 +22,36 @@ editor_options:
 
 This document operationalizes one task from `plan.qmd`'s Phase 0 — *"Estimate imagery/tile volume needed for suburban Cook County using OSMnx intersection counts per municipality"* — as a concrete, runnable R/RStudio workflow.
 
+It is written to be parallel to, not a reimplementation of, the intersection-extraction logic already used in the reference methodology repository ([`agupta01/crossing-distances`](https://github.com/agupta01/crossing-distances), specifically `inference/osm_ingest.py`). Rather than porting OSMnx's algorithms into native R, this workflow uses `reticulate` to call the real Python `osmnx` package from R, so the intersection-consolidation results are the *same* algorithm, not an approximation of it. R's role here is orchestration: loading the local Cook County shapefiles, looping over municipalities, and assembling the summary tables — the geometric work (`consolidate_intersections`, graph filtering) is delegated to `osmnx` itself.
+
+Two things differ deliberately from the reference repo's approach, because this project is county-scale rather than a name-geocoded, single-city pull:
+
+1. **Boundaries come from local shapefiles**, not `osmnx.graph_from_place()`'s Nominatim geocoding. Step 2 builds `cc_boundary.shp` (Cook County outline) and `cc_municipalities.shp` (municipal polygons) from Census TIGER/Line data via `tigris` and writes them under `data/boundaries/`, and the workflow calls `ox.graph_from_polygon()` per municipality against those instead.
+2. **One run per municipality**, batched into "waves" — the same batching idea as the reference repo's `config/envs_100_cities.csv` (`Code`/`Wave` columns), just keyed to ~120 Cook County municipalities instead of ~100 US metro areas.
+
+------------------------------------------------------------------------
+
+## How this parallels `osm_ingest.py`
+
+| Step | This R workflow | Reference Python (`inference/osm_ingest.py`) |
+|---|---|---|
+| Study-area input | `sf::st_read()` on local shapefiles, per-municipality polygon | `place: str` argument, geocoded via Nominatim |
+| Drive-network pull | `ox$graph_from_polygon(poly, network_type="drive", custom_filter=...)` via reticulate | `ox.graph_from_place(query=place, network_type="drive", custom_filter=...)` (lines 124–128) |
+| Highway/service filter | Same `highway_subtypes` / `service_exclusion` lists, same custom_filter string | Lines 51–71, 127 |
+| Projection | `ox$project_graph(G_drive)` | Line 130 |
+| Intersection consolidation | `ox$consolidate_intersections(G_drive, rebuild_graph=FALSE, dead_ends=FALSE)` | Line 131–133 |
+| Coordinate export | `.to_crs("EPSG:4326")$get_coordinates()` converted to an R tibble | Line 136–138 |
+| Street/speed-limit export (this workflow's own addition) | `osmextract::oe_read()` against a Geofabrik Illinois `.osm.pbf` extract (Step 2) -- independent of the Overpass-based graph above, with a class-based fallback where `maxspeed` is untagged | Not present |
+| Crosswalk-adjacency filter (optional refinement) | `ox$features_from_polygon()` + `sf::st_is_within_distance()` within `RADIUS = 25` m | Lines 140–250 |
+| Per-place batching | `config/cc_muni_run_list.csv` with a `wave` column | `config/envs_100_cities.csv` with `Code`/`Wave` columns |
+
+Because Step "Intersection consolidation" calls the identical `osmnx` function, results should match what the Python pipeline would produce for the same polygon and `osmnx` version — pin and record that version (Step 1) so future re-runs stay comparable.
+
+------------------------------------------------------------------------
+
 ## Prerequisites
+
+### Python
 
 Let `reticulate` manage its own private Miniconda install, which won't touch or conflict with locally installed Python. Once installed, restart your R session before running the rest of this chunk.
 
@@ -45,6 +74,8 @@ reticulate::conda_install("osmnx-env",
                           packages = c("osmnx", "geopandas", "shapely"),
                           pip = TRUE)
 ```
+
+------------------------------------------------------------------------
 
 ## Step 1 — Activate R Packages, Connect R to the OSMnx Python environment
 
@@ -70,7 +101,6 @@ library(dplyr)
 library(sf)
 library(lubridate)
 library(purrr)
-library(stringr)
 
 # API key for leaflet maps
 CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
@@ -97,15 +127,30 @@ cli::cli_alert_info("osmnx version: {reticulate::py_to_r(ox$`__version__`)}")
 
 ```
 
+------------------------------------------------------------------------
+
 ## Step 2 — Create, process geographic layers
 
-### Boundaries
+```{r}
+#| label: area-sqmi-helper
+# Shared by both boundary layers below: convert Census ALAND/AWATER (m^2)
+# into land/water/total area in square miles, dropping the m^2 intermediates.
+add_area_sqmi <- function(df) {
+  df %>%
+    mutate(
+      area_land = set_units(area_land, m^2),
+      area_water = set_units(area_water, m^2),
+      area_land_sqmi = set_units(area_land, mi^2),
+      area_water_sqmi = set_units(area_water, mi^2),
+      area_sqmi = area_land_sqmi + area_water_sqmi
+    ) %>%
+    select(-c(area_land, area_water))
+}
+```
 
 ```{r}
 #| label: load-boundaries
 # download latest counties data from US Census TIGER/Line data
-
-# Cook County Boundary
 counties_il <- counties(state="17", cb=TRUE)
 
 # reformat data, standardize column names
@@ -117,65 +162,79 @@ cc_boundary <- counties_il %>%
          name_county = NAME,
          area_land = ALAND,
          area_water = AWATER) %>%
-    mutate(
-      area_land = set_units(area_land, m^2),
-      area_water = set_units(area_water, m^2),
-      area_land_sqmi = set_units(area_land, mi^2),
-      area_water_sqmi = set_units(area_water, mi^2),
-      area_sqmi = area_land_sqmi + area_water_sqmi
-    ) %>%
-    select(-c(area_land, area_water))
+  add_area_sqmi()
 
 # write cook county boundary to data/boundaries folder
 st_write(obj = cc_boundary, dsn = "data/boundaries/cc_boundary.shp")
 
-# Community areas
-community_areas <- st_read("https://metopio.blob.core.windows.net/lalage/atlas/3/shapes/communityareas.topo.json", quiet=TRUE) %>% 
-  st_as_sf() %>% 
-  st_set_crs(4326) %>% 
-  st_transform(3435) %>% 
-  rename(geoid = id) %>% 
-  mutate(geoid= str_replace(geoid,"1714000-",""),
-         location = "Chicago, IL",
-         type = "community area")
+# download latest places data from US Census TIGER/Line data
+il_places <- places(state="17", cb=TRUE) %>%
+  st_transform(3435) %>%
+  st_as_sf()
 
-# Places
-places_cook_county <- st_read("https://metopio.blob.core.windows.net/lalage/atlas/6/shapes/SCC-place.topo.json", quiet=TRUE) %>% 
-  st_as_sf() %>% 
-  st_set_crs(4326) %>% 
-  st_transform(3435) %>% 
-  rename(geoid = id) %>% 
-  mutate(sqmi = as.numeric(st_area(geometry)) * 0.0000003861,
-         location = "suburban Cook County",
-         type = "municipality") %>% 
-  filter(sqmi >= 4) %>% 
-  select(-sqmi)
+# cook county geometry
+cc_geom <- st_geometry(cc_boundary)
 
-# create a novel geography in Cook County which combines both municipalities in suburban Cook County and communities areas in Chicago
-study_area <- places_cook_county %>% 
-  bind_rows(community_areas) %>% 
-  st_as_sf() %>% 
-  st_make_valid()
+# Centroid inside the boundary -- the join rule used to assign each Census
+# place to Cook County (a cleaner one-to-one assignment than st_within()/
+# st_intersects() on the full geometry, which can multi-count a place that
+# merely touches or straddles the county line)
+places_by_centroid <- il_places %>%
+  filter(lengths(st_within(st_centroid(geometry), cc_geom)) > 0)
+
+# rename and format places
+cc_municipalities <- places_by_centroid %>%
+  select(geoid_place = GEOID,
+         name_place = NAME,
+         area_land = ALAND,
+         area_water = AWATER) %>%
+  add_area_sqmi()
 
 # write cook county municipalities to data/boundaries folder
-st_write(obj = study_area, dsn = "data/boundaries/study_area.shp")
+st_write(obj = cc_municipalities, dsn = "data/boundaries/cc_municipalities.shp")
 
 # read cook county boundary
 cc_boundary <- st_read("data/boundaries/cc_boundary.shp") %>%
   st_make_valid() %>%
   st_transform(4326)  # osmnx expects unprojected lat/lon polygons
 
-# read study area layer
-study_area <- st_read("data/boundaries/study_area.shp") %>%
+# read municipal layer
+cc_municipalities <- st_read("data/boundaries/cc_municipalities.shp") %>%
   st_make_valid() %>%
   st_transform(4326)
 
 # Confirm the attribute field(s) that identify each municipality before proceeding
 names(cc_municipalities)
 
+# Normalize field names
+MUNI_NAME_FIELD <- "nam_plc"
+MUNI_ID_FIELD   <- "ged_plc"
+
+cc_municipalities <- cc_municipalities %>%
+  rename(muni_name = all_of(MUNI_NAME_FIELD),
+         muni_id = all_of(MUNI_ID_FIELD)
+         )
+
+# Establish study area
+study_area <- bind_rows(
+  cc_municipalities %>% select(muni_id, muni_name, geometry)
+)
 ```
 
-### Streets
+
+```{r}
+#| label: crashes-idot
+
+crashes_idot_2024 <- read.csv("data/boundaries/CRASHES_2024.csv")
+crashes_idot_2023 <- read.csv("data/boundaries/CRASHES_2023.csv")
+crashes_idot_2022 <- read.csv("data/boundaries/CRASHES_2022.csv")
+
+
+
+
+
+```
+
 Road-class filter shared by the drive-network pull below (Step 4's osmnx `custom_filter`) and the street layer built next -- same `highway_subtypes`/`service_exclusion` lists as `osm_ingest.py` lines 51–71, 127:
 
 ```{r}
@@ -266,17 +325,7 @@ cc_streets <- il_streets %>%
 st_write(cc_streets, "output/all_streets.shp")
 ```
 
-### ILDOT Crashes
-```{r}
-#| label: crashes-idot
 
-crashes_idot_2024 <- read.csv("data/boundaries/CRASHES_2024.csv")
-crashes_idot_2023 <- read.csv("data/boundaries/CRASHES_2023.csv")
-crashes_idot_2022 <- read.csv("data/boundaries/CRASHES_2022.csv")
-
-```
-
-### FARS Crashes
 ```{r}
 #| label: crashes-fars
 # Cook County, Illinois FIPS codes -- fixed constants for this project's

@@ -1,0 +1,234 @@
+---
+title: "Processing IDOT Crash Data (2022–2024)"
+subtitle: "From yearly CSV exports to a clean sf data frame"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    code-tools: true
+    df-print: paged
+execute:
+  warning: true
+  message: true
+params:
+  data_dir: "path/to/crash_csvs"
+  years: [2022, 2023, 2024]
+---
+
+## Overview
+
+This document reads Illinois Department of Transportation (IDOT) crash
+records exported as CSV files from the IDOT open data portal. It stacks
+several years, converts all column names to lowercase, cleans key fields,
+and converts the result to an `sf` point data frame. It also produces a
+subset of pedestrian and bicycle crashes.
+
+Each yearly CSV should sit in the folder set by `params$data_dir`, with
+the year somewhere in its file name (for example, `Crashes_2023.csv`).
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+
+library(readr)
+library(dplyr)
+library(sf)
+library(lubridate)
+library(purrr)
+
+data_dir <- params$data_dir
+years    <- unlist(params$years)
+```
+
+## Functions
+
+### Read one year
+
+`read_crash_year()` finds the CSV for a given year and reads every column
+as character. Reading as character lets years with different column types
+be stacked without errors; types are restored later with `type_convert()`.
+Column names are converted to lowercase here.
+
+```{r}
+#| label: fn-read
+
+read_crash_year <- function(year, dir) {
+  file <- list.files(dir, pattern = paste0(year, ".*\\.csv$"),
+                     full.names = TRUE, ignore.case = TRUE)
+
+  if (length(file) == 0) {
+    warning("No CSV found for ", year, " in ", dir, "; skipping.")
+    return(NULL)
+  }
+  if (length(file) > 1) {
+    warning("Multiple CSVs match ", year, "; using ", basename(file[1]))
+    file <- file[1]
+  }
+
+  read_csv(file, col_types = cols(.default = col_character()),
+           show_col_types = FALSE) %>%
+    rename_with(tolower) %>%
+    mutate(source_file = basename(file))
+}
+```
+
+### Process multiple years
+
+`process_crashes()` stacks the years, cleans the data, and returns an `sf`
+object. Its arguments are:
+
+- `years`: a vector of years, such as `2022:2024`.
+- `dir`: the folder containing the yearly CSVs.
+- `crs_out`: the output coordinate reference system. Use 4326 for
+  longitude/latitude, or 3435 for Illinois State Plane East in feet
+  (3436 for Illinois West).
+- `ped_bike_only`: if `TRUE`, returns only pedestrian and bicycle crashes.
+
+A few cleaning choices are worth noting:
+
+- **Coordinates.** For each row, the ArcGIS `x`/`y` columns are used when
+  they fall inside Illinois. Otherwise the function falls back to IDOT's
+  `tscrashlongitude`/`tscrashlatitude`. Records with neither are dropped
+  and counted by year.
+- **Dates.** The crash date is built from `crashyr`, `crashmonth`, and
+  `crashday` rather than parsed from `crashdate`, because exported dates
+  are often stored in UTC and can shift late-evening crashes to the next
+  day.
+- **Pedestrian and bicycle crashes.** These are identified from
+  `typeoffirstcrash`. This field records only the *first* harmful event,
+  so crashes where a pedestrian or cyclist was struck later in the crash
+  sequence are not captured.
+- **KSI.** A crash is flagged as killed or seriously injured when it has
+  at least one fatality or A-level (incapacitating) injury.
+
+```{r}
+#| label: fn-process
+
+process_crashes <- function(years, dir, crs_out = 4326,
+                            ped_bike_only = FALSE) {
+
+  crash_raw <- years %>%
+    map(read_crash_year, dir = dir) %>%
+    compact() %>%
+    bind_rows() %>%
+    type_convert(col_types = cols())
+
+  in_il <- function(lon, lat) {
+    !is.na(lon) & !is.na(lat) &
+      between(lon, -91.6, -87.0) & between(lat, 36.9, 42.6)
+  }
+
+  crash_df <- crash_raw %>%
+    mutate(
+      lon = if_else(in_il(x, y), x, tscrashlongitude),
+      lat = if_else(in_il(x, y), y, tscrashlatitude),
+
+      crash_date = make_date(crashyr, crashmonth, crashday),
+      crash_dt   = crash_date + hours(crashhour),
+
+      ped_bike = case_when(
+        typeoffirstcrash == "Pedestrian"   ~ "Pedestrian",
+        typeoffirstcrash == "Pedalcyclist" ~ "Bicycle",
+        TRUE                               ~ NA_character_
+      ),
+      ksi = totalfatals > 0 | ainjuries > 0
+    ) %>%
+    select(-any_of("crash_hour"))
+
+  crash <- crash_df %>%
+    filter(in_il(lon, lat)) %>%
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+
+  dropped <- crash_df %>%
+    filter(!in_il(lon, lat)) %>%
+    count(crashyr, name = "dropped_no_coords")
+  if (nrow(dropped) > 0) {
+    message("Records dropped for missing/invalid coordinates:")
+    print(dropped)
+  }
+
+  if (ped_bike_only) crash <- filter(crash, !is.na(ped_bike))
+
+  st_transform(crash, crs_out)
+}
+```
+
+## Process the data
+
+### All crashes
+
+```{r}
+#| label: run-all
+
+crash <- process_crashes(years, dir = data_dir)
+
+crash %>%
+  st_drop_geometry() %>%
+  count(crashyr, name = "crashes")
+```
+
+### Pedestrian and bicycle crashes
+
+This subset is projected to Illinois State Plane East so that distances
+and buffers are in feet.
+
+```{r}
+#| label: run-pedbike
+
+ped_bike <- process_crashes(years, dir = data_dir,
+                            crs_out = 3435, ped_bike_only = TRUE)
+
+ped_bike %>%
+  st_drop_geometry() %>%
+  count(crashyr, ped_bike, crashseverity)
+```
+
+## Checks
+
+Confirm that the severity label and code columns line up, and that
+`crashday` is the day of the month (values 1–31) rather than a day of
+the week.
+
+```{r}
+#| label: checks
+
+crash %>% st_drop_geometry() %>% count(crashseveritycd, crashseverity)
+
+crash %>% st_drop_geometry() %>% summarise(min_day = min(crashday),
+                                           max_day = max(crashday))
+```
+
+A quick map of pedestrian and bicycle crashes:
+
+```{r}
+#| label: map
+#| fig-width: 7
+#| fig-height: 8
+
+plot(st_geometry(ped_bike), pch = 20, cex = 0.3,
+     col = ifelse(ped_bike$ped_bike == "Pedestrian", "firebrick", "steelblue"),
+     main = "Pedestrian (red) and bicycle (blue) crashes")
+```
+
+## Save
+
+```{r}
+#| label: save
+#| eval: false
+
+st_write(crash, "idot_crashes_2022_2024.gpkg", delete_dsn = TRUE)
+saveRDS(ped_bike, "ped_bike_2022_2024.rds")
+```
+
+## Notes
+
+- Police-reported crash data undercounts pedestrian and bicycle crashes,
+  especially cyclist falls and minor injuries with no police report.
+- Injury counts (`totalfatals`, `ainjuries`, and so on) cover everyone
+  involved in the crash, not only the pedestrian or cyclist.
+- Variable definitions are in IDOT's *Dictionary of Data Elements:
+  Illinois Traffic Crash Report (SR 1050) and Crash Information System
+  (CIS)*.
