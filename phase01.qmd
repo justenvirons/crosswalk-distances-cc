@@ -1,0 +1,95 @@
+---
+title: "Phase 1 — Dataset Development"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+---
+
+## Overview
+
+This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.qmd`](phase00.qmd): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
+
+Implementation code lives in [`Phase0.qmd`](Phase0.qmd) (study-area geography, intersections, streets, FARS fatalities) and [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd) (IDOT crash processing); this document describes what each step produces and why, not the implementation detail itself.
+
+## Study Area Geography
+
+Supports **Aims 1–4** (defines the unit of geography used to organize and aggregate every other data layer).
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Combine Chicago community areas and suburban municipalities | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
+| Reconcile boundary source and projection | Source boundaries from Cook County/Chicago health-atlas geographies; standardize to a common projected CRS for area and distance calculations | Projected study-area boundary file | Complete |
+
+## Street Intersections
+
+Supports **Aim 1** (defines candidate crossing locations for the segmentation pipeline) and **Aims 3–4** (defines the spatial units fatality/crash records are matched to).
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Extract street network per study-area unit | Pull the OSM drive network for each municipality/community area via OSMnx | Per-unit street network graphs | Complete |
+| Consolidate intersections | Merge closely spaced OSM nodes into single intersection points, consistent with the reference methodology's approach | Countywide consolidated-intersection point layer (~170,000 points) | Complete |
+| Cache/skip already-downloaded units | Avoid re-downloading intersections for study-area units already processed in an earlier run | Resumable run list | Complete |
+
+## Streets and Speed Limits
+
+Supports **Aims 3–4** (roadway functional class and speed limit are control variables in the fatality/injury models).
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Retrieve countywide street centerlines | Download Illinois streets via Geofabrik (`osmextract`) rather than per-municipality OSMnx calls, then clip to the study area | Countywide street centerline layer | Complete |
+| Parse speed limits | Extract and standardize OSM `maxspeed` tags to miles per hour | Street segments attributed with posted speed limit | Complete |
+
+## Pedestrian Fatalities (FARS)
+
+Supports **Aim 3** directly.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Download FARS records | Pull NHTSA FARS data for Illinois/Cook County, 2010–2024 | Raw FARS extract | Complete |
+| Filter to pedestrian fatalities | Subset to pedestrian-involved fatalities with valid coordinates | Pedestrian-fatality point layer, with date/time-of-day attributes | Complete |
+
+## Crash Records (IDOT)
+
+Supports **Aim 4** directly (as the primary crash-injury data source; see *Open Items* below regarding EMS data).
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Stack yearly CSV exports | Combine 2022–2024 IDOT crash-report exports into a single table | Combined raw crash table | Complete |
+| Clean coordinates and dates | Prefer in-state ArcGIS `x`/`y` coordinates, falling back to IDOT's reported longitude/latitude; reconstruct crash date/time from `crashyr`/`crashmonth`/`crashday`/`crashhour` rather than the raw `crashdate` field (which is UTC-shifted) | Cleaned crash table with valid point geometry | Complete |
+| Identify pedestrian/bicycle crashes and severity | Flag pedestrian- and bicycle-involved crashes from `typeoffirstcrash`; flag killed-or-seriously-injured (KSI) crashes from fatality/A-injury counts | `sf` point layer of pedestrian/bicycle crashes, with severity and KSI flags | Complete |
+| Extend to additional crash years | Add IDOT crash-year extracts beyond 2022–2024 as they become available, to increase statistical power for Aim 4 | Extended multi-year crash table | In progress |
+
+## Socioeconomic and Contextual Data
+
+Supports **Aim 2** directly (ADI, demographics) and provides control variables for **Aims 3–4**.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Assemble Area Deprivation Index (ADI) | Download block-group ADI (Neighborhood Atlas, University of Wisconsin) and aggregate to municipality/community area via a population-weighted crosswalk | Municipality/community-area ADI table | Not started |
+| Assemble Census demographic covariates | Download ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate) | Municipality/community-area demographic covariate table | Not started |
+| Assemble employment covariates | Download ACS/LEHD LODES data (employment density, commute mode share, jobs-housing balance) | Municipality/community-area employment covariate table | Not started |
+| Assemble other contextual covariates | Incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability | Supplementary covariate table | Not started |
+
+## Open Items
+
+- **EMS injury data.** The original plan identified Cook County/regional EMS-reported pedestrian injury data as a possible input to Aim 4, pending a data-use agreement. IDOT crash records (above) are the working primary data source for Aim 4; EMS data will be incorporated only if access is secured, without blocking dataset development or downstream analysis.
+- **Downstream phases.** Once the tables above are complete, dataset assembly and joins (study area + intersections + streets + crashes/fatalities + socioeconomic covariates) feed directly into `phase02.qmd` (data presentation and analysis).

@@ -1,0 +1,95 @@
+---
+title: "Work Plan for <i>Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</i>"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+    # email:
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+---
+
+## Overview
+
+This project extends a validated satellite-imagery-based crosswalk-geometry measurement methodology countywide across Cook County, Illinois, and links the resulting crossing-distance dataset to socioeconomic deprivation, pedestrian fatality, and crash-injury data to answer applied pedestrian-safety questions. Full background, literature review, and the study's research aims and working hypotheses are documented in [`phase00.qmd`](phase00.qmd).
+
+**Research aims:**
+
+1. Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities.
+2. Compare crossing distance across municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.
+3. Relate crossing distance to point-level pedestrian fatalities (NHTSA FARS).
+4. Relate crossing distance to crash-reported pedestrian injury outcomes (IDOT crash records).
+
+## Project Structure
+
+This plan is organized into five phases, mirroring the structure of an academic paper. Each phase has (or will have) its own detailed working document.
+
+| Phase | Focus | Document | Status |
+|---|---|---|---|
+| 0 | Background, literature review, gaps in past research, study purpose, aims and hypotheses | [`phase00.qmd`](phase00.qmd) | Complete |
+| 1 | Dataset development: study area boundaries, intersections, streets, crashes, fatalities, ADI, census, and other contextual data | [`phase01.qmd`](phase01.qmd) | In progress |
+| 2 | Data presentation and analysis: descriptive statistics and statistical model specification/execution | `phase02.qmd` | Not started |
+| 3 | Results, interpretation, and discussion of statistical tests | `phase03.qmd` | Not started |
+| 4 | Study limitations, implications, conclusion, and next steps | `phase04.qmd` | Not started |
+
+## Project Team & Roles
+
+| Role | Responsibility |
+|---|---|
+| PI / GIS, ML & Data Governance Lead (Smith) | Overall direction and methodology oversight; geospatial data pipeline development and QA; data governance and compliance (data-use agreements, IRB/data-sharing review if needed); dissemination |
+| Data Analyst / Statistician & Quant Lead (Sufi) | Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; crash and fatality data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance |
+
+## Data Sources Summary
+
+| Data | Source | Aim(s) | Status |
+|---|---|---|---|
+| Study area geography (community areas + municipalities) | Chicago/Cook County health atlases | 1–4 | Complete |
+| Street intersections | OpenStreetMap via OSMnx | 1, 3, 4 | Complete |
+| Street network and speed limits | OpenStreetMap via Geofabrik/`osmextract` | 3, 4 | Complete |
+| Pedestrian fatalities | NHTSA FARS | 3 | Complete |
+| Crash records | Illinois Department of Transportation (IDOT) | 4 | In progress |
+| Area Deprivation Index (ADI) | Neighborhood Atlas (Univ. of Wisconsin) | 2 | Not started |
+| Population, housing, employment | U.S. Census ACS 5-year / LEHD LODES | 2 | Not started |
+| Crossing-distance imagery/segmentation | Satellite imagery + segmentation pipeline | 1 | Not started |
+
+See [`phase01.qmd`](phase01.qmd) for the detailed, task-level status of each data layer.
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| OSM crossing-edge data is sparser and less consistent in lower-density suburbs than in Chicago's dense urban core | Document coverage completeness by municipality/community area; flag low-coverage units for interpretive caution in Aim 2 |
+| Municipal/community-area aggregation of block-group data (ADI, demographics) is sensitive to boundary choice (modifiable areal unit problem) | Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels |
+| Ambiguity in matching FARS fatality points to a specific measured crossing | Predefine a buffer/network-distance matching rule; run a sensitivity analysis on buffer size |
+| EMS injury data access/timeline is uncertain, given the need for a data-use agreement | IDOT crash data (already in development, see `phase01.qmd`) is the working primary source for Aim 4; EMS data is incorporated only if/when access is secured |
+
+## Anticipated Outputs
+
+1. Public/shareable Cook County crosswalk-distance dataset spanning Chicago community areas and suburban municipalities.
+2. Manuscript: municipal/community-area crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).
+3. Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).
+4. Manuscript or technical report: crossing distance and crash-reported pedestrian injury rates across Cook County (Aim 4).
+5. Updated open-source codebase reflecting the countywide pipeline.
+6. Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).
+
+## Open Decisions Requiring Early Input
+
+- Should unincorporated Cook County areas be included, or only incorporated municipalities and Chicago community areas?
+- Which EMS data source, if any, is feasible as a supplement to IDOT crash data for Aim 4?
+- What buffer/matching rule will be used to associate FARS point fatalities with specific measured crossings?
+- Target FARS and IDOT crash year range (most recent years only, vs. multi-year pooled for statistical power)?

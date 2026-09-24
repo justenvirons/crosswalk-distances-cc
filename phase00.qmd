@@ -1,0 +1,65 @@
+---
+title: "Phase 0 — Background, Literature Review, and Study Purpose"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+---
+
+## Background
+
+Crosswalk geometry — how far a pedestrian must travel to cross a street at a marked or unmarked crossing — is a measurable, modifiable element of street design with a direct link to pedestrian exposure. Longer crossing distances increase the time a pedestrian spends in conflict with vehicle traffic and are associated with wider, faster roadways generally built to accommodate vehicle throughput rather than pedestrian safety. As a determinant of pedestrian injury and fatality risk, crossing distance sits at the intersection of transportation engineering and public health, and is one of the few street-design variables that can be measured consistently and at scale from remotely sensed imagery rather than requiring field survey.
+
+Recent work has demonstrated that crossing distance can be extracted automatically and accurately from satellite imagery. *Moran & Laefer (2024)* developed and validated a pipeline that combines OpenStreetMap (OSM) intersection and crossing-edge data, high-resolution satellite tiles, a fine-tuned Segment Anything Model (SAM 2.1), and a grow-cut algorithm to measure crossing distance at marked and unmarked crosswalks, achieving approximately 93% accuracy against manually measured ground truth (median absolute error ≈ 2 ft 3 in). *Moran, Gupta, Qian & Laefer (2025)* scaled this methodology to roughly 100 cities nationally — including the City of Chicago, where the pipeline processed approximately 80,000 satellite tiles — establishing that the approach generalizes across a range of urban street-network forms.
+
+A separate body of work has linked intersection- and street-network-level design characteristics to pedestrian collision and injury outcomes using structural equation modeling and related statistical frameworks (e.g., *Ihssan, Ali — "Understanding Pedestrian Collisions at Intersections and Traffic Analysis Zones Using Structural Equation Modelling Analysis"*), reinforcing that intersection geometry is a plausible causal factor in pedestrian safety outcomes, distinct from — and interacting with — traffic volume, land use, and socioeconomic context.
+
+## Gaps in Past Research
+
+Three gaps in the existing literature motivate this study:
+
+1. **Limited geographic scope and urban/suburban comparison.** The validated crossing-distance methodology has been applied to dense urban cores (Chicago, Paris, San Francisco) and a small number of additional case-study cities, but has not been applied consistently across a single metropolitan county that spans both a dense urban core and a large number of lower-density suburban jurisdictions with materially different street-network design eras and built forms. It is therefore unknown whether crossing-distance patterns — and their relationship to safety outcomes — observed in dense urban contexts hold in suburban arterial and cul-de-sac-subdivision contexts.
+2. **No direct linkage to socioeconomic deprivation.** Prior crossing-distance studies have not tested whether measured crossing geometry co-varies with area-level socioeconomic deprivation, despite a well-established literature linking deprivation to disparities in built-environment safety investment.
+3. **Limited linkage to observed injury and fatality outcomes at scale.** Existing applications of the segmentation methodology have produced crossing-distance datasets as a standalone product; few studies have joined the resulting crossing-distance measurements to point-level fatality records (e.g., FARS) or aggregate injury/crash records at a scale larger than a handful of case-study cities, which limits statistical power to detect an association between crossing geometry and safety outcomes.
+
+## Purpose of the Current Study
+
+This study extends the validated crossing-distance segmentation methodology across a countywide study area covering all of Cook County, Illinois — combining the City of Chicago's 77 community areas with suburban Cook County's incorporated municipalities (limited to those ≥4 square miles) into a single, internally consistent geography. It links the resulting crossing-distance dataset to municipal/community-area socioeconomic deprivation (Area Deprivation Index), point-level pedestrian fatality records (NHTSA FARS), and crash records (Illinois Department of Transportation, IDOT) to test whether crossing geometry is systematically associated with socioeconomic context and with pedestrian injury and fatality risk, at a scale (one large, geographically diverse county) not previously studied.
+
+Dataset development for this study is documented in [`phase01.qmd`](phase01.qmd); it is currently in progress, with study-area geography, street-intersection extraction, street network/speed-limit data, and FARS fatality data assembled, and IDOT crash-record processing and socioeconomic/contextual data (ADI, Census) actively underway.
+
+## Aims
+
+1. **Aim 1 — Countywide crossing-distance dataset.** Produce a geographically consistent crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities, extending the previously validated segmentation methodology.
+2. **Aim 2 — Municipal/community-area cross-sectional analysis.** Compare crossing distance across all Cook County municipalities and community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.
+3. **Aim 3 — Point-level fatality analysis.** Relate measured crossing distance to individual pedestrian fatalities using FARS data.
+4. **Aim 4 — Crash/injury analysis.** Relate crossing distance to crash-reported pedestrian injury outcomes (IDOT crash records, with EMS-reported injury data as a possible supplement where accessible) across Cook County.
+
+## Working Hypotheses
+
+- **H1 (built-form variation):** Measured crossing distance varies systematically with municipal/community-area built-environment characteristics, producing longer average crossings in lower-density suburban arterial contexts than in Chicago's dense urban core.
+- **H2 (deprivation association):** Longer municipal/community-area median crossing distance is associated with higher socioeconomic deprivation (higher ADI), consistent with disparities in pedestrian-infrastructure investment.
+- **H3 (fatality association):** Locations with longer measured crossing distance are associated with a higher likelihood of a nearby pedestrian fatality, controlling for roadway functional class and speed limit.
+- **H4 (injury association):** Municipal/community-area pedestrian crash-injury rates increase with municipal median crossing distance, independent of deprivation and density, consistent in direction with the fatality-based association tested in H3.
+
+## Next Steps
+
+Subsequent phases of this project (documented in `phase02.qmd` through `phase04.qmd`, to be added as work progresses) will cover descriptive and statistical analysis of the assembled dataset, presentation and interpretation of results, and discussion of study limitations, implications, and conclusions.
