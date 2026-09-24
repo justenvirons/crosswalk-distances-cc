@@ -30,10 +30,10 @@ This project extends a validated satellite-imagery-based crosswalk-geometry meas
 
 **Research aims:**
 
-1. Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities.
+1. Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities (~200 areal units).
 2. Compare crossing distance across municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.
 3. Relate crossing distance to point-level pedestrian fatalities (NHTSA FARS).
-4. Relate crossing distance to crash-reported pedestrian injury outcomes (IDOT crash records).
+4. Model the areal rate of pedestrian crashes (IDOT crash records) as a function of median crossing distance, population density, median age, ADI, and other covariates identified in the literature.
 
 ## Project Structure
 
