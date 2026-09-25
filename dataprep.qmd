@@ -1,0 +1,494 @@
+---
+title: "Data Preparation for Phase 1 — Dataset Development"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+    warning: false
+editor: source
+execute:
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+## Purpose
+
+This document builds the `sf` data tables that support [`phase01.qmd`](phase01.qmd)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase1_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
+
+This is dataset-creation code, not a narrative workflow — for first-time environment setup (conda/osmnx), see [`Phase0.qmd`](Phase0.qmd)'s Prerequisites section; this document assumes that `osmnx-env` conda environment already exists.
+
+## Setup
+
+```{r}
+#| label: r-packages
+#| eval: true
+
+library(sf)
+library(reticulate)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readr)
+library(glue)
+library(cli)
+library(tigris)
+library(units)
+library(osmextract)
+library(lubridate)
+library(stringr)
+```
+
+```{r}
+#| label: osmnx-setup
+
+reticulate::use_condaenv("osmnx-env", required = TRUE)
+
+# convert = FALSE: keep everything returned by these modules as live Python
+# object references rather than letting reticulate auto-convert them to R
+# the instant a call returns (see get_area_intersections() below for why).
+ox <- reticulate::import("osmnx", convert = FALSE)
+shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
+
+ox$settings$use_cache <- TRUE
+ox$settings$log_console <- TRUE
+```
+
+## Study Area Geography
+
+Supports `phase01.qmd`'s *Study Area Geography* table. Combines the City of Chicago's 77 community areas with suburban Cook County's incorporated municipalities (≥4 sq mi) into a single, internally consistent geography (`study_area`, N ≈ 200), identified by `geoid` and `name`, with a `type` field distinguishing the two.
+
+```{r}
+#| label: study-area
+
+counties_il <- counties(state = "17", cb = TRUE)
+
+cc_boundary <- counties_il %>%
+  filter(GEOID == "17031") %>%
+  st_transform(3435) %>%
+  select(geoid_county = GEOID, name_county = NAME,
+         area_land = ALAND, area_water = AWATER) %>%
+  mutate(
+    area_land_sqmi  = set_units(set_units(area_land, m^2), mi^2),
+    area_water_sqmi = set_units(set_units(area_water, m^2), mi^2),
+    area_sqmi = area_land_sqmi + area_water_sqmi
+  ) %>%
+  select(-area_land, -area_water)
+
+st_write(cc_boundary, "data/boundaries/cc_boundary.shp", delete_dsn = TRUE)
+
+community_areas <- st_read(
+  "https://metopio.blob.core.windows.net/lalage/atlas/3/shapes/communityareas.topo.json",
+  quiet = TRUE
+) %>%
+  st_as_sf() %>%
+  st_set_crs(4326) %>%
+  st_transform(3435) %>%
+  rename(geoid = id) %>%
+  mutate(
+    geoid = str_replace(geoid, "1714000-", ""),
+    location = "Chicago, IL",
+    type = "community area"
+  )
+
+places_cook_county <- st_read(
+  "https://metopio.blob.core.windows.net/lalage/atlas/6/shapes/SCC-place.topo.json",
+  quiet = TRUE
+) %>%
+  st_as_sf() %>%
+  st_set_crs(4326) %>%
+  st_transform(3435) %>%
+  rename(geoid = id) %>%
+  mutate(
+    sqmi = as.numeric(st_area(geometry)) * 0.0000003861,
+    location = "suburban Cook County",
+    type = "municipality"
+  ) %>%
+  filter(sqmi >= 4) %>%
+  select(-sqmi)
+
+study_area <- places_cook_county %>%
+  bind_rows(community_areas) %>%
+  st_as_sf() %>%
+  st_make_valid()
+
+st_write(study_area, "data/boundaries/study_area.shp", delete_dsn = TRUE)
+
+# Re-project back to unprojected lat/lon: osmnx (Step "Street Intersections",
+# below) and leaflet (phase01.qmd's map) both expect EPSG:4326, not the
+# EPSG:3435 (feet) projection used above for area/distance calculations.
+cc_boundary <- st_transform(cc_boundary, 4326)
+study_area  <- st_transform(study_area, 4326)
+```
+
+::: {.callout-note collapse="true"}
+## Note: superseding the pre-community-area run
+An earlier version of this pipeline built the run list from `cc_municipalities.shp` (suburban municipalities plus a single, undivided "Chicago" polygon, columns `muni_id`/`muni_name`) rather than from `study_area` above. The already-committed `output/all_intersections.shp` and `config/cc_muni_run_list.csv` reflect that earlier geography. The run list, intersection function, and downstream tables below use `study_area`'s `geoid`/`name` columns instead, and its **77 separate Chicago community areas** rather than one citywide polygon — re-running Step 3 onward is needed to bring the committed intersection output in line with the current study-area definition.
+:::
+
+## Street Intersections
+
+Supports `phase01.qmd`'s *Street Intersections* table (candidate crossing locations for Aim 1; spatial units for Aims 3–4).
+
+Road-class filter shared with the Streets section below, matching the reference pipeline's `osm_ingest.py` (lines 51–71, 127):
+
+```{r}
+#| label: filter-constants
+
+highway_subtypes <- c(
+  "primary", "primary_link", "unclassified", "residential",
+  "secondary", "secondary_link", "service", "tertiary",
+  "tertiary_link", "trunk", "trunk_link", "busway",
+  "construction", "corridor"
+)
+service_exclusion <- c("parking_aisle", "driveway")
+
+drive_filter <- glue(
+  '["highway"~"{paste(highway_subtypes, collapse = "|")}"]',
+  '["service"!~"{paste(service_exclusion, collapse = "|")}"]',
+  '["access"!~"private"]["aeroway"!~".*"]["indoor"!~"yes"]'
+)
+```
+
+Build the per-area run list — one row per `study_area` unit, with a WKT polygon and a `wave` number for batched, resumable processing:
+
+```{r}
+#| label: build-run-list
+
+N_PER_WAVE <- 12  # tune based on how much Overpass load you want per batch
+
+run_list <- study_area %>%
+  st_transform(3435) %>%                       # IL State Plane East (ft), planar repair
+  st_make_valid() %>%
+  st_collection_extract("POLYGON") %>%         # drop stray lines/points from the repair
+  group_by(geoid, name, type) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_transform(4326) %>%                       # OSMnx expects lat/lon
+  mutate(wkt = st_as_text(geometry, digits = 15)) %>%
+  st_drop_geometry() %>%
+  arrange(name) %>%
+  mutate(wave = ceiling(row_number() / N_PER_WAVE))
+
+dir.create("config", showWarnings = FALSE)
+write_csv(run_list, "config/cc_run_list.csv")
+```
+
+Extract OSMnx-consolidated drive-network intersections for one study-area unit:
+
+```{r}
+#| label: intersection-function
+
+get_area_intersections <- function(geoid, name, wkt,
+                                    retain_all = FALSE, tolerance = NULL) {
+  poly <- shapely_wkt$loads(wkt)
+
+  G_drive <- tryCatch(
+    ox$graph_from_polygon(
+      poly,
+      network_type = "drive",
+      custom_filter = drive_filter,
+      retain_all = retain_all
+    ),
+    error = function(e) {
+      cli::cli_alert_warning("{name}: {conditionMessage(e)}")
+      NULL
+    }
+  )
+  if (is.null(G_drive)) return(NULL)
+
+  G_drive <- ox$project_graph(G_drive)
+
+  consolidate_args <- list(G = G_drive, rebuild_graph = FALSE, dead_ends = FALSE)
+  if (!is.null(tolerance)) consolidate_args$tolerance <- tolerance
+  intersections <- do.call(ox$consolidate_intersections, consolidate_args)
+
+  # intersections is a non-converting (convert = FALSE) Python GeoSeries --
+  # extract x/y as numpy arrays (.to_numpy()) rather than converting the
+  # pandas object itself, which is the operation that crashes reticulate.
+  coords_df <- intersections$to_crs("EPSG:4326")$get_coordinates()
+  lon <- as.numeric(reticulate::py_to_r(coords_df$x$to_numpy()))
+  lat <- as.numeric(reticulate::py_to_r(coords_df$y$to_numpy()))
+
+  tibble(lon = lon, lat = lat, geoid = geoid, name = name)
+}
+```
+
+Run across all study-area units, wave by wave. This queries the shared public Overpass API underneath `osmnx` — process sequentially within each wave, with a short pause between units, and skip units already written so a failed run can resume without redoing completed ones. See `Phase0.qmd`'s Step 6 for a list of alternate Overpass mirrors if the default endpoint is timing out.
+
+```{r}
+#| label: run-waves
+
+out_dir <- "data/intersections/raw"
+ox$settings$overpass_url <- "https://overpass-api.de/api/interpreter"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+run_wave <- function(wave_df, pause_sec = 1) {
+  purrr::pwalk(wave_df, function(geoid, name, wkt, wave, ...) {
+    out_file <- file.path(out_dir, glue("{geoid}.csv"))
+    if (file.exists(out_file)) return(invisible(NULL))  # resume support
+
+    cli::cli_progress_step("Processing {name}")
+    result <- get_area_intersections(geoid, name, wkt)
+    if (!is.null(result)) readr::write_csv(result, out_file)
+    Sys.sleep(pause_sec)
+  })
+}
+
+run_list %>%
+  group_split(wave) %>%
+  walk(run_wave)
+```
+
+Combine per-unit results into a single countywide layer:
+
+```{r}
+#| label: combine-intersections
+
+intersection_files <- list.files(out_dir, full.names = TRUE)
+all_intersections <- map_dfr(intersection_files, read_csv, show_col_types = FALSE)
+
+all_intersections_sf <- st_as_sf(all_intersections, coords = c("lon", "lat"), crs = 4326)
+st_write(all_intersections_sf, "output/all_intersections.shp", delete_dsn = TRUE)
+```
+
+## Streets and Speed Limits
+
+Supports `phase01.qmd`'s *Streets and Speed Limits* table (roadway functional class/speed limit as control variables for Aims 3–4).
+
+**Speed-limit resolution:** OSM's `maxspeed` tag carries a real posted speed limit where mapped, but coverage is uneven. Where it's missing, fall back to a default by OSM `highway` class. These class defaults are a heuristic, not measured data — Illinois' statutory default for an urban district absent posted signage is 30 mph (625 ILCS 5/11-601(b)); many Cook County suburbs post/ordinance residential streets down to 25 mph, used here as the more common default for `residential`/`living_street`. `maxspeed_source` records which applied per segment.
+
+```{r}
+#| label: speed-limit-defaults
+
+default_speed_by_highway <- c(
+  motorway = 65, motorway_link = 45,
+  trunk = 55, trunk_link = 40,
+  primary = 45, primary_link = 35,
+  secondary = 35, secondary_link = 30,
+  tertiary = 30, tertiary_link = 25,
+  unclassified = 30,
+  residential = 25,
+  living_street = 15,
+  service = 15
+)
+
+# OSM tag values can themselves be semicolon-joined (e.g. "30;20") -- use
+# the first for class-default lookup and mph parsing.
+first_tag_value <- function(x) sub(";.*$", "", x)
+
+parse_maxspeed_mph <- function(x) {
+  first <- first_tag_value(x)
+  # substr()/regexpr() only, not regmatches() -- regmatches() with a single
+  # regexpr() result silently drops non-matching elements rather than
+  # returning a same-length vector, which would misalign this against the
+  # rest of the tibble whenever maxspeed is untagged (the common case).
+  m <- regexpr("[0-9]+", first)
+  starts <- as.integer(m)
+  lens <- attr(m, "match.length")
+  digits <- ifelse(starts > 0, substr(first, starts, starts + lens - 1L), NA_character_)
+  suppressWarnings(as.numeric(digits))
+}
+
+resolve_speed_limit <- function(highway, maxspeed_raw) {
+  tagged_mph <- parse_maxspeed_mph(maxspeed_raw)
+  class_default <- unname(default_speed_by_highway[first_tag_value(highway)])
+  tibble(
+    maxspeed_mph = ifelse(!is.na(tagged_mph), tagged_mph, class_default),
+    maxspeed_source = ifelse(!is.na(tagged_mph), "osm_tagged", "class_default")
+  )
+}
+```
+
+**Streets, from OSM via Geofabrik:** a bulk offline extract, filtered to road ways during the GDAL `.pbf` → `.gpkg` conversion itself (much faster than reading all of Illinois' line features and filtering afterward), then clipped to the county boundary.
+
+```{r}
+#| label: streets-osm
+#| # https://download.geofabrik.de/north-america/us/illinois.html
+
+il_streets <- oe_read(
+  "https://download.geofabrik.de/north-america/us/illinois-latest.osm.pbf",
+  layer = "lines",
+  extra_tags = c("maxspeed", "oneway"),
+  query = "SELECT * FROM lines WHERE highway IS NOT NULL",
+  quiet = TRUE
+)
+
+cc_streets <- il_streets %>%
+  filter(highway %in% highway_subtypes) %>%
+  st_transform(4326) %>%
+  st_make_valid() %>%
+  st_intersection(st_geometry(cc_boundary)) %>%
+  st_collection_extract("LINESTRING") %>%
+  select(street_name = name, highway, maxspeed_raw = maxspeed, oneway) %>%
+  mutate(resolve_speed_limit(highway, maxspeed_raw))
+
+st_write(cc_streets, "output/all_streets.shp", delete_dsn = TRUE)
+```
+
+## Pedestrian Fatalities (FARS)
+
+Supports `phase01.qmd`'s *Pedestrian Fatalities (FARS)* table (Aim 3).
+
+```{r}
+#| label: crashes-fars
+
+# Cook County, Illinois FIPS codes -- fixed constants for this project's
+# single-county scope.
+state_fips  <- 17L  # Illinois
+county_fips <- 31L  # Cook County
+
+crashes_fars <- read_csv(paste0(
+  "https://crashviewer.nhtsa.dot.gov/crashviewer/CrashAPI/FARSData/GetFARSData?",
+  "dataset=Accident&FromYear=2010&ToYear=2024&State=", state_fips,
+  "&county=", county_fips, "&format=csv"
+), show_col_types = FALSE) %>%
+  filter(state == state_fips, county == county_fips)
+
+ped_fatalities <- crashes_fars %>%
+  filter(harm_evname == "Pedestrian") %>%
+  filter(
+    latitude  > -90,  latitude  < 90,
+    longitud  > -180, longitud  < 180,
+    !latitude  %in% c(77.7777, 88.8888, 99.9999),   # FARS sentinels for unknown/not-reported coordinates
+    !longitud  %in% c(-77.7777, -88.8888, -99.9999)
+  ) %>%
+  st_as_sf(coords = c("longitud", "latitude"), crs = 4326)
+
+# Build hover date/time text defensively -- check what's actually present
+# in the CrashAPI response rather than assuming specific column names.
+get_col_or_null <- function(df, col) if (col %in% names(df)) df[[col]] else NULL
+
+monthname <- get_col_or_null(ped_fatalities, "monthname")
+month_num <- get_col_or_null(ped_fatalities, "month")
+day       <- get_col_or_null(ped_fatalities, "day")
+year      <- get_col_or_null(ped_fatalities, "year")
+hourname  <- get_col_or_null(ped_fatalities, "hourname")
+hour_num  <- get_col_or_null(ped_fatalities, "hour")
+minute    <- get_col_or_null(ped_fatalities, "minute")
+
+fatality_date <- if (!is.null(monthname) && !is.null(day) && !is.null(year)) {
+  paste(monthname, day, year)
+} else if (!is.null(month_num) && !is.null(day) && !is.null(year)) {
+  sprintf("%02d/%02d/%d", month_num, day, year)
+} else {
+  NA_character_
+}
+
+fatality_time <- if (!is.null(hourname)) {
+  as.character(hourname)
+} else if (!is.null(hour_num) && !is.null(minute)) {
+  sprintf("%02d:%02d", hour_num, minute)
+} else {
+  NA_character_
+}
+
+ped_fatalities <- ped_fatalities %>%
+  mutate(fatality_date = fatality_date, fatality_time = fatality_time)
+
+st_write(ped_fatalities, "output/ped_fatalities.shp", delete_dsn = TRUE)
+```
+
+## Crash Records (IDOT)
+
+Supports `phase01.qmd`'s *Crash Records (IDOT)* table (Aim 4). Stacks yearly IDOT crash-report CSV exports, cleans coordinates and dates, and identifies pedestrian/bicycle crashes and KSI (killed-or-seriously-injured) severity. Adapted from [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd), pointed at this project's `data/boundaries/CRASHES_*.csv` files rather than a parameterized directory.
+
+```{r}
+#| label: idot-crashes
+
+read_crash_year <- function(year, dir) {
+  file <- list.files(dir, pattern = paste0(year, ".*\\.csv$"),
+                     full.names = TRUE, ignore.case = TRUE)
+  if (length(file) == 0) {
+    warning("No CSV found for ", year, " in ", dir, "; skipping.")
+    return(NULL)
+  }
+  if (length(file) > 1) {
+    warning("Multiple CSVs match ", year, "; using ", basename(file[1]))
+    file <- file[1]
+  }
+  read_csv(file, col_types = cols(.default = col_character()),
+           show_col_types = FALSE) %>%
+    rename_with(tolower) %>%
+    mutate(source_file = basename(file))
+}
+
+process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
+  crash_raw <- years %>%
+    map(read_crash_year, dir = dir) %>%
+    compact() %>%
+    bind_rows() %>%
+    type_convert(col_types = cols())
+
+  in_il <- function(lon, lat) {
+    !is.na(lon) & !is.na(lat) &
+      between(lon, -91.6, -87.0) & between(lat, 36.9, 42.6)
+  }
+
+  crash_df <- crash_raw %>%
+    mutate(
+      lon = if_else(in_il(x, y), x, tscrashlongitude),
+      lat = if_else(in_il(x, y), y, tscrashlatitude),
+      # crash date/time built from crashyr/crashmonth/crashday/crashhour
+      # rather than the raw crashdate field, which is UTC-shifted and can
+      # move late-evening crashes to the next calendar day.
+      crash_date = make_date(crashyr, crashmonth, crashday),
+      crash_dt   = crash_date + hours(crashhour),
+      ped_bike = case_when(
+        typeoffirstcrash == "Pedestrian"   ~ "Pedestrian",
+        typeoffirstcrash == "Pedalcyclist" ~ "Bicycle",
+        TRUE                               ~ NA_character_
+      ),
+      ksi = totalfatals > 0 | ainjuries > 0
+    ) %>%
+    select(-any_of("crash_hour"))
+
+  crash <- crash_df %>%
+    filter(in_il(lon, lat)) %>%
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+
+  if (ped_bike_only) crash <- filter(crash, !is.na(ped_bike))
+
+  st_transform(crash, crs_out)
+}
+
+idot_years <- 2022:2024
+idot_dir   <- "data/boundaries"
+
+crash <- process_crashes(idot_years, dir = idot_dir)
+ped_bike <- process_crashes(idot_years, dir = idot_dir, ped_bike_only = TRUE)
+
+st_write(crash, "output/idot_crashes_2022_2024.shp", delete_dsn = TRUE)
+st_write(ped_bike, "output/idot_ped_bike_crashes_2022_2024.shp", delete_dsn = TRUE)
+```
+
+## Save
+
+Save the assembled `sf` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles under `output/`).
+
+```{r}
+#| label: save-dataprep
+
+save(
+  study_area, cc_boundary, cc_streets,
+  all_intersections_sf, ped_fatalities,
+  crash, ped_bike,
+  file = "data/phase1_dataprep.RData"
+)
+```
+
+## Outputs
+
+- `data/boundaries/study_area.shp` — countywide study-area geography (Chicago community areas + suburban municipalities).
+- `config/cc_run_list.csv` — per-study-area-unit run manifest (geoid, name, type, WKT polygon, wave).
+- `data/intersections/raw/{geoid}.csv` — one file per study-area unit, raw consolidated intersection coordinates.
+- `output/all_intersections.shp` — countywide consolidated-intersection layer.
+- `output/all_streets.shp` — countywide street layer with `highway`, `maxspeed_raw`, `street_name`, `oneway`, and resolved `maxspeed_mph`/`maxspeed_source`.
+- `output/ped_fatalities.shp` — Cook County pedestrian fatalities from FARS, 2010–2024.
+- `output/idot_crashes_2022_2024.shp` / `output/idot_ped_bike_crashes_2022_2024.shp` — IDOT crash records, all crashes and the pedestrian/bicycle subset.
+- `data/phase1_dataprep.RData` — `study_area`, `cc_boundary`, `cc_streets`, `all_intersections_sf`, `ped_fatalities`, `crash`, `ped_bike`, loaded by `phase01.qmd`'s interactive map.

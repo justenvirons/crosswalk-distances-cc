@@ -29,7 +29,7 @@ editor: source
 
 This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.qmd`](phase00.qmd): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
 
-Implementation code lives in [`Phase0.qmd`](Phase0.qmd) (study-area geography, intersections, streets, FARS fatalities) and [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd) (IDOT crash processing); this document describes what each step produces and why, not the implementation detail itself.
+Implementation (dataset-creation) code lives in [`dataprep.qmd`](dataprep.qmd), which saves the resulting `sf` tables to `data/phase1_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`Phase0.qmd`](Phase0.qmd) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd).
 
 ## Study Area Geography
 
@@ -92,6 +92,120 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 | Assemble Census demographic covariates | Download ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate) | Municipality/community-area demographic covariate table | Not started |
 | Assemble employment covariates | Download ACS/LEHD LODES data (employment density, commute mode share, jobs-housing balance) | Municipality/community-area employment covariate table | Not started |
 | Assemble other contextual covariates | Incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability | Supplementary covariate table | Not started |
+
+## Interactive Map (Data Exploration)
+
+Loads a subset of `dataprep.qmd`'s saved tables (`data/phase1_dataprep.RData`) to explore the assembled data layers together: the study-area geography, street intersections, and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian/bicycle crashes). This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of `phase02.qmd`.
+
+```{r}
+#| label: dataprep-map
+#| eval: true
+#| echo: true
+
+library(sf)
+library(dplyr)
+library(leaflet)
+library(leaflet.extras)
+
+load("data/phase1_dataprep.RData")
+
+CARTO_API_KEY <- Sys.getenv("CARTO_API_KEY", unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
+ZOOM_THRESHOLD <- 14
+
+bbox <- st_bbox(study_area)
+type_pal <- colorFactor(c("#9e9e9e", "#616161"), domain = c("community area", "municipality"))
+
+exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addTiles(
+    urlTemplate = paste0(
+      "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=",
+      CARTO_API_KEY
+    )
+  ) %>%
+  addPolygons(
+    data = study_area,
+    fillColor = ~type_pal(type),
+    weight = 1,
+    opacity = 0.5,
+    color = "#fff",
+    fillOpacity = 0.5,
+    label = ~ paste0(name, " (", type, ")"),
+    group = "Study Area"
+  ) %>%
+  addCircleMarkers(
+    data = all_intersections_sf,
+    radius = 2,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    fillColor = "#333",
+    group = "Intersections"
+  ) %>%
+  addCircleMarkers(
+    data = ped_fatalities,
+    radius = 4.5,
+    stroke = TRUE,
+    color = "#FFF",
+    weight = 0.25,
+    fillOpacity = 0.8,
+    fillColor = "darkred",
+    label = ~ paste0("Pedestrian fatality (FARS) — ", fatality_date, ", ", fatality_time),
+    group = "FARS Pedestrian Fatalities"
+  ) %>%
+  addCircleMarkers(
+    data = ped_bike,
+    radius = 3.5,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    fillColor = ~ ifelse(ped_bike == "Pedestrian", "#e6550d", "#3182bd"),
+    label = ~ paste0(ped_bike, " crash — ", crashseverity),
+    group = "IDOT Pedestrian/Bicycle Crashes"
+  ) %>%
+  addLegend(
+    "bottomleft",
+    colors = c("#9e9e9e", "#333", "darkred", "#e6550d", "#3182bd"),
+    labels = c("Study area", "Intersections", "FARS fatality", "IDOT pedestrian crash", "IDOT bicycle crash"),
+    opacity = 1
+  ) %>%
+  addScaleBar(
+    position = "bottomright",
+    options = scaleBarOptions(metric = TRUE, imperial = TRUE)
+  ) %>%
+  fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
+  addResetMapButton() %>%
+  addFullscreenControl() %>%
+  addLayersControl(
+    overlayGroups = c("Study Area", "FARS Pedestrian Fatalities", "IDOT Pedestrian/Bicycle Crashes"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  htmlwidgets::onRender(
+    sprintf(
+      "function(el, x) {
+          var map = this;
+          var threshold = %d;
+          var zoomGatedGroups = ['Intersections'];
+          function toggleByZoom() {
+            var show = map.getZoom() >= threshold;
+            zoomGatedGroups.forEach(function(name) {
+              var group = map.layerManager.getLayerGroup(name);
+              if (!group) return;
+              if (show) {
+                if (!map.hasLayer(group)) map.addLayer(group);
+              } else {
+                if (map.hasLayer(group)) map.removeLayer(group);
+              }
+            });
+          }
+          map.on('zoomend', toggleByZoom);
+          toggleByZoom();
+        }",
+      ZOOM_THRESHOLD
+    )
+  )
+
+exploration_map
+```
+
+`Intersections` is deliberately left out of `overlayGroups` above (as in `Phase0.qmd`'s map) so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
 
 ## Open Items
 
