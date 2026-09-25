@@ -1,0 +1,169 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# activate packages
+
+```{r}
+
+library(censusapi)
+library(tidyverse)
+library(dplyr)
+library(dbplyr)
+library(stringr)
+library(keyring)
+library("odbc") # connections to database
+library("DBI") # connections to database
+library(tidycensus)
+library(findSVI)
+library(purrr)
+library(dplyr)
+library(sociome)
+library(scales)
+
+
+setwd("C:/Users/christopher.smith/OneDrive - Cook County Health/git_repos/justenvirons/ccdph-documents/documents/reports/area_deprivation_index")
+```
+
+
+```{r}
+con_inter_census <- dbConnect(odbc::odbc(),
+                        Driver   = "SQL Server",
+                        Server   = key_get("ccdph_sql_server"),
+                        Database = "inter-census")
+
+# import deaths data dictionary table from epi-vitals database
+munis_scc <- dbReadTable(conn = con_inter_census,
+            Id(schema = "ref", 
+               table = "decennial-2020-total-by-muni"))
+
+# import deaths data dictionary table from epi-vitals database
+zctas_pop_cc <- dbReadTable(conn = con_inter_census,
+            Id(schema = "ref", 
+               table = "decennial-2020-total-by-zcta"))
+
+
+con_inter_spatial <- dbConnect(odbc::odbc(),
+                        Driver   = "SQL Server",
+                        Server   = key_get("ccdph_sql_server"),
+                        Database = "inter-spatial")
+
+# import deaths data dictionary table from epi-vitals database
+zctas_cc <- dbReadTable(conn = con_inter_spatial,
+            Id(schema = "ref", 
+               table = "zctas_cook_county_clipped")) 
+
+# remove zctas with low population
+zctas_cc_list <- zctas_cc %>% 
+  select(geoid_zcta) %>% 
+  left_join(zctas_pop_cc %>% mutate(geoid_zcta = as.character(geoid_zcta)), by="geoid_zcta") %>% 
+  filter(str_sub(geoid_zcta, 1, 3) != "606",
+         pop_in_cook >= 500,
+         percent_pop >= 50) 
+
+# set geographic and dataset parameters
+state = "17" # Illinois
+county = "031" # Cook County
+akey = key_get("census_api_key")
+years = 2010:2024
+dataset = "acs5"
+```
+
+# by tract
+```{r}
+
+# Function to get ADI for a given year
+get_county_adi <- function(y) {
+  tryCatch({
+    df <- get_adi(
+      geography = "tract",
+      dataset = dataset,
+      year = y,
+      state = state,
+      county = county
+    )
+    df$year <- y
+    return(df)
+  }, error = function(e) {
+    message(paste("Year", y, "not available:", e$message))
+    return(NULL)
+  })
+}
+
+# Run loop for all years and bind results
+adi_cook <- map_dfr(years, get_county_adi)
+
+# 
+scc_adi_tract <- adi_cook %>% 
+  pivot_longer(cols = c(ADI:Educational_Attainment),
+               names_to = "domain") %>% 
+  mutate(layer = case_when(year < 2020 ~ "tract-2010",
+                           year >= 2020 ~ "tract-2020"),
+         metopio_key = case_when(str_detect(domain, pattern="ADI") ~ "ADICCDPH",
+                                 str_detect(domain, pattern="Financial") ~ "ADIFIN",
+                                 str_detect(domain, pattern="Economic") ~ "ADIECON",
+                                 str_detect(domain, pattern="Educational") ~ "ADIEDU",
+                                 .default = NA),
+         metopio_column_name = paste0(metopio_key,"_",year)) %>%
+  select(-c(NAME, year, domain, metopio_key),
+         geoid = GEOID) 
+
+scc_adi_tract_2010 <- scc_adi_tract %>% 
+  filter(layer == "tract-2010") %>% 
+  pivot_wider(names_from = metopio_column_name, values_from = value)
+
+scc_adi_tract_2020 <- scc_adi_tract %>% 
+  filter(layer == "tract-2020") %>% 
+  pivot_wider(names_from = metopio_column_name, values_from = value)
+
+write_csv(scc_adi_tract_2010, "data/scc_adi_tract_2010_atlas.csv")
+
+write_csv(scc_adi_tract_2020, "data/scc_adi_tract_2020_atlas.csv")
+
+```
+
+# Zip code (zcta)
+```{r}
+# ---- Setup ----
+# ZCTAs of interest (keep them as character to preserve leading zeros)
+zctas <- c(zctas_cc_list$geoid_zcta)
+
+# Years to compute (set a single year like 2017 if you prefer)
+years <- 2010:2024
+
+# ---- Helper: fetch ADI for ZCTAs in a given year ----
+
+get_zcta_adi <- function(y) {
+  tryCatch({
+    df <- get_adi(
+      geography = "zcta",
+      dataset = dataset,
+      zcta = zctas,
+      state = NULL,
+      county = NULL,
+      year = y,
+      raw_data_only = TRUE
+    )
+    df$year <- y
+    return(df)
+  }, error = function(e) {
+    message(paste("Year", y, "not available:", e$message))
+    return(NULL)
+  })
+}
+
+# ---- Run for all years & bind ----
+adi_zcta_raw_data_only <- map_dfr(years,get_zcta_adi)
+
+test <- calculate_adi(adi_zcta_raw_data_only %>% filter(year == 2024) , keep_indicators = TRUE)
+
+test <- test %>% 
+  ungroup() %>% 
+  mutate(ADI_rescale = rescale(ADI, to=c(min(ADI*ADI/max(ADI)),100)))
+
+test_adi <- test %>% 
+  select(GEOID, ADI, ADI_rescale)
+  
+```
+
