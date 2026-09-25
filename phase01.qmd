@@ -88,7 +88,7 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 
 | Task | Description | Output | Status |
 |---|---|---|---|
-| Assemble Area Deprivation Index (ADI) | Download block-group ADI (Neighborhood Atlas, University of Wisconsin) and aggregate to municipality/community area via a population-weighted crosswalk | Municipality/community-area ADI table | Not started |
+| Assemble Area Deprivation Index (ADI) | Download 2024 ACS variables via the `sociome`/`tidycensus` packages; aggregate 2020 census tracts (via a Chicago Data Portal tract-to-community-area lookup) to compute ADI by community area, and compute ADI directly by Census place for suburban municipalities | Community-area and suburban-municipality ADI tables | In progress |
 | Assemble Census demographic covariates | Download ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate) | Municipality/community-area demographic covariate table | Not started |
 | Assemble employment covariates | Download ACS/LEHD LODES data (employment density, commute mode share, jobs-housing balance) | Municipality/community-area employment covariate table | Not started |
 | Assemble other contextual covariates | Incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability | Supplementary covariate table | Not started |

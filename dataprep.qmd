@@ -499,9 +499,162 @@ st_write(crash, "output/idot_crashes_2022_2024.shp", delete_dsn = TRUE)
 st_write(ped_bike, "output/idot_ped_bike_crashes_2022_2024.shp", delete_dsn = TRUE)
 ```
 
+## Area Deprivation Index (ADI)
+
+Supports `phase01.qmd`'s *Socioeconomic and Contextual Data* table (Aim 2). Adapted from [`scripts/QMD/adi_calculations.qmd`](scripts/QMD/adi_calculations.qmd), using the `sociome` package to download 2024 ACS 5-year variables and compute ADI -- by Chicago community area (aggregated up from 2020 census tracts) and by suburban Cook County municipality (Census place).
+
+`sociome::get_adi()` only supports `geography = "state"`, `"county"`, `"tract"`, `"block group"`, or `"zcta"` -- **not `"place"`**, and it has no built-in way to aggregate to a custom geography like a community area. So rather than calling `get_adi()` directly, this section calls `sociome::calculate_adi()` directly on ACS variables pulled with `tidycensus::get_acs()` -- the "bring your own tidycensus data" pathway `calculate_adi()`'s own documentation describes (`get_adi(raw_data_only = TRUE)` is exactly this pathway, just restricted to `get_adi()`'s five supported geographies). `adi_acs_vars` below reproduces `sociome`'s internal "set1" variable list -- the exact ACS5 variables `get_adi()` itself requests for 2011+ ACS5/ACS1/ACS3 data (confirmed against `sociome`'s own `data-raw/acs_vars.R` and `get_tidycensus.R` source, since neither is exported) -- so both ADI calculations below stay methodologically identical to what `get_adi()` would produce at tract/county level.
+
+```{r}
+#| label: adi-setup
+
+library(tidycensus)
+library(sociome)
+library(tidyr)
+
+# Set once per machine: tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"), install = TRUE)
+if (Sys.getenv("CENSUS_API_KEY") != "") {
+  tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"))
+}
+
+adi_year   <- 2024
+adi_survey <- "acs5"
+
+# sociome's internal "set1" ACS variable list, reconstructed from
+# data-raw/acs_vars.R (github.com/ClevelandClinicQHS/sociome) -- the set
+# get_adi() uses for ACS5/ACS3/ACS1 data, year >= 2011 (excluding the
+# 2015-2016-at-block-group exception, which doesn't apply here).
+# calculate_adi() requires these exact column names (no "E"/"M" suffix), so
+# the pull below uses output = "tidy" and pivots to wide manually rather
+# than tidycensus::get_acs(output = "wide")'s "<var>E"/"<var>M" columns.
+adi_acs_vars <- c(
+  "B11005_001", "B15003_001", "B15003_002", "B15003_003", "B15003_004",
+  "B15003_005", "B15003_006", "B15003_007", "B15003_008", "B15003_009",
+  "B15003_010", "B15003_011", "B15003_012", "B15003_017", "B15003_018",
+  "B15003_019", "B15003_020", "B15003_021", "B15003_022", "B15003_023",
+  "B15003_024", "B15003_025", "B17010_001", "B17010_002", "B19001_002",
+  "B19001_011", "B19001_012", "B19001_013", "B19001_014", "B19001_015",
+  "B19001_016", "B19001_017", "B19113_001", "B11005_002", "B11005_005",
+  "B23025_003", "B23025_005", "B25003_001", "B25003_002", "B25014_001",
+  "B25014_005", "B25014_006", "B25014_007", "B25014_011", "B25014_012",
+  "B25014_013", "B25044_001", "B25044_003", "B25044_010", "B25064_001",
+  "B25077_001", "B25088_002", "C17002_001", "C17002_002", "C17002_003",
+  "C17002_004", "C17002_005", "C24010_001", "C24010_003", "C24010_039"
+)
+
+# Four of the above are medians (dollar values), which can't be summed when
+# aggregating tracts up to a community area -- a population-weighted mean of
+# the tract medians approximates the aggregate median instead. Every other
+# variable is a count, and gets summed.
+adi_median_vars <- c("B19113_001", "B25064_001", "B25077_001", "B25088_002")
+adi_sum_vars    <- setdiff(adi_acs_vars, adi_median_vars)
+
+get_acs_tidy_wide <- function(..., variables) {
+  tidycensus::get_acs(
+    ...,
+    variables = variables,
+    year = adi_year,
+    survey = adi_survey,
+    output = "tidy"
+  ) %>%
+    select(GEOID, NAME, variable, estimate) %>%
+    pivot_wider(names_from = variable, values_from = estimate)
+}
+```
+
+### By Chicago Community Area
+
+Pulls 2024 ACS estimates for every Cook County census tract (2020 tract boundaries, per `adi_year`), assigns each tract to a community area, aggregates, and calculates ADI. The tract-to-community-area assignment uses a spatial join (each tract's point-on-surface against the `community_areas` polygons from *Study Area Geography*, above) against the [Chicago Data Portal's 2020 Census Tract boundaries](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Census-Tracts-2020/7qjk-677h/about_data) -- `data.cityofchicago.org` wasn't reachable to confirm this file's exact column names from this environment, so `tract_geoid_col` below guesses among the common TIGER-style spellings; check `names(tract_boundaries)` on a real run and adjust if needed. If this portal file turns out to already carry its own community-area attribute, joining on that directly would be simpler and more precise than the spatial join used here.
+
+```{r}
+#| label: adi-community-areas
+
+tracts_raw <- get_acs_tidy_wide(
+  geography = "tract",
+  state = "17",
+  county = "031",
+  variables = c(adi_acs_vars, "B01003_001")  # + total population, to weight the medians below
+)
+
+tract_boundaries <- st_read(
+  "https://data.cityofchicago.org/resource/7qjk-677h.geojson",
+  quiet = TRUE
+) %>%
+  st_transform(3435)
+
+tract_geoid_col <- intersect(
+  names(tract_boundaries), c("geoid20", "GEOID20", "geoid", "GEOID")
+)[1]
+
+tract_ca_lookup <- tract_boundaries %>%
+  mutate(GEOID = as.character(.data[[tract_geoid_col]])) %>%
+  st_point_on_surface() %>%
+  st_join(community_areas %>% select(commarea_geoid = geoid, commarea_name = name)) %>%
+  st_drop_geometry() %>%
+  select(GEOID, commarea_geoid, commarea_name) %>%
+  filter(!is.na(commarea_geoid))  # tract centroids outside any community area
+
+tracts_with_ca <- tracts_raw %>%
+  mutate(GEOID = as.character(GEOID)) %>%
+  inner_join(tract_ca_lookup, by = "GEOID")
+
+adi_ca_agg <- tracts_with_ca %>%
+  group_by(commarea_geoid, commarea_name) %>%
+  summarise(
+    across(all_of(adi_sum_vars), \(x) sum(x, na.rm = TRUE)),
+    across(all_of(adi_median_vars), \(x) weighted.mean(x, w = B01003_001, na.rm = TRUE)),
+    .groups = "drop"
+  ) %>%
+  rename(GEOID = commarea_geoid, NAME = commarea_name) %>%
+  relocate(GEOID, NAME)
+
+adi_community_areas <- calculate_adi(adi_ca_agg, keep_indicators = TRUE)
+
+write_csv(adi_community_areas, "output/adi_community_areas.csv")
+```
+
+### By Suburban Municipality (Census Place)
+
+`get_acs(geography = "place")` returns all Illinois places (place doesn't nest under `county`), so this restricts to `places_cook_county`'s GEOIDs (*Study Area Geography*, above) before calculating ADI -- keeping the reference area suburban Cook County's municipalities, not all ~1,300 Illinois places.
+
+```{r}
+#| label: adi-places
+
+places_raw <- get_acs_tidy_wide(
+  geography = "place",
+  state = "17",
+  variables = adi_acs_vars
+)
+
+suburban_place_geoids <- places_cook_county$geoid
+
+places_cc_raw <- places_raw %>%
+  mutate(GEOID = as.character(GEOID)) %>%
+  filter(GEOID %in% suburban_place_geoids)
+
+# places_cook_county$geoid's exact provenance (Metopio's place topojson,
+# Study Area Geography above) wasn't independently verified as matching
+# tidycensus's Census Place GEOIDs from this environment -- if this warns,
+# check that assumption before trusting adi_places.
+if (nrow(places_cc_raw) < length(suburban_place_geoids) * 0.9) {
+  cli::cli_alert_warning(
+    "Matched only {nrow(places_cc_raw)} of {length(suburban_place_geoids)} suburban municipalities to Census place GEOIDs."
+  )
+}
+
+adi_places <- calculate_adi(places_cc_raw, keep_indicators = TRUE)
+
+write_csv(adi_places, "output/adi_suburban_places.csv")
+```
+
+::: {.callout-note collapse="true"}
+## Note: two separate reference areas
+ADI is a relative measure -- its value for a given area depends on which other areas were included in the same `calculate_adi()` call (its "reference area"). The two calculations above use separate reference areas (77 community areas; suburban municipalities), so `adi_community_areas$ADI` and `adi_places$ADI` are not on a directly comparable scale, even though both used the same ACS variables/year. Combining them into one reference area (one `calculate_adi()` call over all ~200 units) would make them comparable, at the cost of mixing a tract-aggregated construct with a directly-measured one -- worth resolving explicitly in `phase02.qmd` before Aim 2 analysis, rather than assumed away here.
+:::
+
 ## Save
 
-Save the assembled `sf` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles under `output/`).
+Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles/CSVs under `output/`).
 
 ```{r}
 #| label: save-dataprep
@@ -510,6 +663,7 @@ save(
   study_area, cc_boundary, cc_streets,
   all_intersections_sf, ped_fatalities,
   crash, ped_bike,
+  adi_community_areas, adi_places,
   file = "data/phase1_dataprep.RData"
 )
 ```
@@ -523,4 +677,6 @@ save(
 - `output/all_streets.shp` — countywide street layer with `highway`, `maxspeed_raw`, `street_name`, `oneway`, and resolved `maxspeed_mph`/`maxspeed_source`.
 - `output/ped_fatalities.shp` — Cook County pedestrian fatalities from FARS, 2010–2024.
 - `output/idot_crashes_2022_2024.shp` / `output/idot_ped_bike_crashes_2022_2024.shp` — IDOT crash records, all crashes and the pedestrian/bicycle subset.
-- `data/phase1_dataprep.RData` — `study_area`, `cc_boundary`, `cc_streets`, `all_intersections_sf`, `ped_fatalities`, `crash`, `ped_bike`, loaded by `phase01.qmd`'s interactive map.
+- `output/adi_community_areas.csv` — ADI and ADI-3 (Financial Strength, Economic Hardship and Inequality, Educational Attainment) by Chicago community area.
+- `output/adi_suburban_places.csv` — ADI and ADI-3 by suburban Cook County municipality (Census place).
+- `data/phase1_dataprep.RData` — `study_area`, `cc_boundary`, `cc_streets`, `all_intersections_sf`, `ped_fatalities`, `crash`, `ped_bike`, `adi_community_areas`, `adi_places`, loaded by `phase01.qmd`'s interactive map.
