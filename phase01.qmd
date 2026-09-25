@@ -92,6 +92,7 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 | Assemble Census demographic covariates | Download ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate) | Municipality/community-area demographic covariate table | Not started |
 | Assemble employment covariates | Download ACS/LEHD LODES data (employment density, commute mode share, jobs-housing balance) | Municipality/community-area employment covariate table | Not started |
 | Assemble other contextual covariates | Incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability | Supplementary covariate table | Not started |
+| Assemble transportation investment/obligations data | Extract CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) to Cook County municipality/project-type level, flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects) | [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx) — candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations) | Complete (FFY2025 only; extend with future years' reports) |
 
 ## Interactive Map (Data Exploration)
 
