@@ -53,6 +53,17 @@ Supports **Aim 1** (defines candidate crossing locations for the segmentation pi
 | Consolidate intersections | Merge closely spaced OSM nodes into single intersection points, consistent with the reference methodology's approach | Countywide consolidated-intersection point layer (~170,000 points) | Complete |
 | Cache/skip already-downloaded units | Avoid re-downloading intersections for study-area units already processed in an earlier run | Resumable run list | Complete |
 
+## Crossing Distance (Segmentation Models)
+
+Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.
+
+Per Aim 1a (`phase00.qmd`), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [`phase01_crosswalk_models.qmd`](phase01_crosswalk_models.qmd) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Imagery/model comparison (Aim 1a) | Measure crossing distance at a sample of intersections using all three imagery/model approaches; compare against manually measured ground truth | Comparison dataset and selected approach for full-scale production | Not started |
+| Countywide production run (Aim 1b) | Apply the approach Aim 1a's results support, at full scale across all study-area intersections | Countywide crossing-distance dataset | Not started (gated on Aim 1a) |
+
 ## Streets and Speed Limits
 
 Supports **Aims 3–4** (roadway functional class and speed limit are control variables in the fatality/injury models).

@@ -1,0 +1,129 @@
+---
+title: "Phase 1 — Crosswalk Distance: Imagery Source and Segmentation Model Comparison"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+bibliography: references.bib
+---
+
+## Purpose
+
+This document operationalizes Aim 1a (`phase00.qmd`): before producing the countywide crossing-distance dataset (Aim 1b), compare three imagery/segmentation-model approaches against manually measured ground truth on a sample of intersections across the study area, and use that comparison's results to decide which approach Aim 1b should run at full scale. It is a planning document — it lays out the comparison design and the steps to operationalize each approach in enough detail to implement, not runnable pipeline code (that will live alongside `dataprep.qmd` once an approach is selected and implemented).
+
+This comparison is also designed to stand on its own as a methods contribution: a rigorous, ground-truth-validated test of whether a documented, single-vintage, leaf-off county orthoimagery product outperforms the commercial satellite basemap imagery the reference methodology [@moran2024multiscale; @moran2026scaling] was built on — independent of this project's applied safety analyses in Aims 2–4.
+
+## Background: Why Compare Imagery Sources at All
+
+The reference methodology measures crossing distance from Google Maps satellite/aerial basemap tiles. Three open questions about that choice motivate this comparison (Gap 4, `phase00.qmd`), and this document treats all three as testable, not assumed:
+
+1. **Vintage/temporal consistency.** Google's basemap for a metro area is a mosaic assembled from multiple providers and capture dates that are not uniformly disclosed per-tile; adjacent tiles can represent different years. It is not established what year(s) of imagery any given Google-derived crossing-distance measurement actually represents.
+2. **Geometric integrity.** It is not established in this literature whether Google's basemap imagery is processed to survey-grade orthorectification — i.e., corrected for terrain- and building-lean-induced displacement so that a measured pixel distance equals the true ground distance everywhere in the image, not only near the image center or directly beneath the sensor (nadir). If it is not uniformly orthorectified, measured crossing distances could carry a position-dependent geometric bias that has gone undetected because no study has compared it against a documented survey-grade product.
+3. **Leaf-off visibility.** Tree canopy overhanging an intersection or crosswalk is a plausible, unrecoverable source of measurement error (the pavement edge simply isn't visible), independent of segmentation model quality. Whatever season/canopy-condition Google's tiles happen to represent for a given location is not controlled for or documented.
+
+Cook County's own orthoimagery program (`CookOrtho2025`, Cook County GIS) offers a documented alternative on all three counts: a single countywide flight year, imagery in both 3-band (RGB) and 4-band (RGB + near-infrared) products, at 6-inch native pixel resolution (finer than the ~30 cm/pixel Google tiles the reference methodology uses), referenced to NAD83(2011) Illinois State Plane East (feet) — the same CRS family (`EPSG:3435`) already used throughout this project's pipeline — and, consistent with standard practice for county/regional orthophoto programs, flown leaf-off. It is served via an Esri ArcGIS ImageServer (`https://gis.cookcountyil.gov/imagery/rest/services/CookOrtho2025/ImageServer`) rather than a Google-style `{z}/{x}/{y}` slippy-map tile server; its `exportImage` REST operation returns an arbitrary bounding-box clip at a chosen pixel size and band selection directly, which is a good fit for pulling a fixed-radius clip around each intersection coordinate.
+
+None of this guarantees the county imagery is *better* for this specific task, though — a higher-resolution, leaf-off, single-vintage source is still a domain shift for a segmentation model fine-tuned on Google tiles' particular resolution, color balance, and mosaicking artifacts (see `phase00.qmd`'s H5/H6/H7). That's what this comparison tests.
+
+## The Three Approaches
+
+### Approach A — 3-Band RGB, Cook County Orthoimagery
+
+**Model work required: none.** This is a data-source swap, not a model change — the existing fine-tuned SAM 2.1 checkpoint already expects a 3-channel RGB input, and a 3-band clip from the county imagery is architecturally identical to a 3-band Google tile as far as the model is concerned.
+
+Steps:
+
+1. For each sampled intersection (candidate list drawn from `dataprep.qmd`'s `all_intersections_sf`), buffer to the same fixed radius the reference methodology uses around each candidate crossing location.
+2. Request the RGB clip via the ImageServer's `exportImage` operation: bounding box from step 1, `bandIds=0,1,2` (R, G, B; drop the NIR band), output format GeoTIFF, pixel size at native 6-inch resolution or resampled to match the model's expected input dimensions — resolve this choice empirically (native resolution preserves the county imagery's real advantage; resampling to the reference methodology's fixed pixel dimensions keeps the model's effective receptive field/input size consistent with what it was fine-tuned on). Reconcile the returned raster's exact CRS against this project's working CRS (`EPSG:3435`) before use — Cook County's NAD83(2011) realization and the NAD83 (1986) realization already used elsewhere in this pipeline are very close but not identical; be deliberate about which is authoritative for distance measurement rather than assuming they're interchangeable.
+3. Feed the clip directly into the existing fine-tuned SAM 2.1 checkpoint — no architecture or weight changes.
+4. Run the same grow-cut post-processing and crossing-distance measurement logic already implemented for the Google-imagery pipeline, unchanged.
+
+Open question this approach tests: does the different radiometric/visual style of a raw-ish orthophoto product (versus Google's color-corrected, mosaicked basemap) degrade the existing model's accuracy, even holding the RGB-only channel count fixed? (H5/H6)
+
+### Approach B — 4-Band RGB + Near-Infrared, Cook County Orthoimagery
+
+**Model work required: yes** — this is the approach that needs the channel-extension fine-tuning discussed for this project.
+
+Steps:
+
+1. Same clip retrieval as Approach A, but request all 4 bands (`bandIds=0,1,2,3`).
+2. **Extend the segmentation model's input layer.** SAM's image encoder is a Vision Transformer; the only place the channel count is architecturally fixed is the patch-embedding layer (a `Conv2d` with `in_channels=3`). Build a new `Conv2d` with `in_channels=4`, copy the pretrained R/G/B weights into the first 3 input channels unchanged, and zero-initialize the 4th (NIR) channel's weights — this makes the modified model mathematically identical to the original on day one, so fine-tuning starts from a safe, known-good point rather than a randomly initialized layer.
+3. **Fine-tune.** Freeze most of the backbone; unfreeze (at minimum) the new patch-embedding layer and the mask decoder. Train on labeled crosswalk/pavement masks over the 4-band tiles. If the original fine-tuning's ground-truth masks are stored as georeferenced polygons (real-world coordinates) rather than pixel masks tied to the specific Google tiles, they can likely be rasterized directly onto the new county tiles' pixel grid without manual re-annotation — confirm this before assuming fresh annotation is needed.
+4. **Compute.** A single mid-tier GPU (e.g., Modal `gpu="A10G"` or `"L4"`) for the fine-tuning run — this is a small job relative to full pretraining, closer to "fine-tune a small head" than "retrain a ViT." Prototype the channel-inflation code and initial training loop somewhere cheap and interactive (e.g., Colab) before moving the finalized script to Modal, since Modal's per-container debug cycle is slower to iterate against.
+5. Run the fine-tuned model, then the same grow-cut post-processing as Approaches A/C.
+
+Open question this approach tests: does the NIR band measurably reduce error beyond what leaf-off RGB alone (Approach A) already achieves, specifically at canopy-adjacent locations, given NIR's stronger spectral contrast between vegetation and pavement? (H7)
+
+### Approach C — Google Maps Imagery (Reference Baseline)
+
+**Model work required: none** — this is the existing, already-implemented methodology, run unchanged as the comparison's baseline: the same tile-fetch approach, the existing fine-tuned SAM 2.1 checkpoint, and the existing grow-cut post-processing. Its role here is to establish empirically whether switching away from it is actually justified, rather than assuming it from the imagery specs alone.
+
+## Comparison Design
+
+### Sample selection
+
+Draw a stratified sample of intersections from `dataprep.qmd`'s countywide `all_intersections_sf` layer. Proposed stratification dimensions, chosen to target each hypothesis directly rather than sample uniformly at random:
+
+- **Geography type**: Chicago community area vs. suburban municipality (parallels H1's built-form comparison).
+- **Tree canopy cover**: high vs. low at each candidate location (from a canopy/land-cover layer, or a quick NDVI-based screen using the county imagery's own NIR band) — targets H5 and H7 directly.
+- **Position within the Google tile grid**: near tile-center vs. near tile-edge, using Google's known, fixed tile-grid arithmetic to estimate each candidate's offset — targets H6 (geometric integrity) directly.
+- **Urban vs. suburban street-network form** (arterial, cul-de-sac subdivision, dense grid) — consistent with the suburban-built-form validation already planned for the countywide run.
+
+A starting target of roughly 75–150 intersections is proposed — well above the "minimum 30 locations" floor already used elsewhere in this project's statistical work (e.g., `sociome`'s ADI calculation), and enough to support the stratified/interaction breakdowns above; refine this with an explicit power calculation once the ground-truth measurement protocol (below) is finalized and its per-intersection cost is known.
+
+### Ground truth
+
+Manually measure crossing distance at each sampled intersection, following the same measurement protocol as the reference methodology's own validation, so results are comparable to its published 93% accuracy / ~2 ft 3 in median-error benchmark.
+
+### Metrics
+
+- **Absolute/median error** against ground truth, per approach.
+- **Inter-method agreement** between the three approaches at the same intersections (a paired design, since every sampled intersection is measured three ways) — e.g., Bland-Altman-style agreement plots, or intraclass correlation.
+- **Measurement failure rate**: the share of sampled intersections where an approach cannot confidently identify the pavement edge (most likely canopy occlusion for Approach C, least likely hypothesized for Approaches A/B).
+- All of the above, broken out by the sampling strata (canopy cover, tile-position, geography type) to test H5/H6/H7 specifically, not just compare overall averages.
+
+### Statistical approach
+
+Because the same intersections are measured by all three approaches, treat this as a repeated-measures design: a mixed-effects model with intersection as a random effect, imagery/model approach as a fixed effect, and canopy cover / tile-position as interaction terms is the target analysis; paired t-tests or Wilcoxon signed-rank tests per approach-pair are a reasonable first pass before that model is built.
+
+### Decision criteria for Aim 1b
+
+Select the approach with the lowest error against ground truth and the lowest occlusion-driven failure rate. If Approach B (4-band) does not measurably outperform Approach A (3-band) once fine-tuned, default to Approach A for Aim 1b — the added model-training complexity is only worth carrying forward if it earns its keep empirically.
+
+## Task Table
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Define comparison sample | Stratified sample of intersections (geography type × canopy cover × Google tile-position × street-network form), drawn from `dataprep.qmd`'s `all_intersections_sf` | Sample intersection list | Not started |
+| Establish ground truth | Manually measure crossing distance at each sampled intersection, per the reference methodology's protocol | Ground-truth measurement table | Not started |
+| Approach A: 3-band Cook County RGB pipeline | Retrieve RGB clips via the ImageServer's `exportImage` operation; run the existing fine-tuned SAM 2.1 + grow-cut, unchanged | Approach A crossing-distance measurements | Not started |
+| Approach B: 4-band Cook County RGB+NIR pipeline | Retrieve 4-band clips; channel-extend and fine-tune the segmentation model's embedding layer + decoder; run + grow-cut | Approach B crossing-distance measurements | Not started |
+| Approach C: Google Maps pipeline (baseline) | Existing methodology, unchanged | Approach C crossing-distance measurements | Not started |
+| Compare approaches | Paired statistical comparison against ground truth and against each other, stratified by canopy cover and tile-position | Comparison results; selected approach for Aim 1b | Not started |
+| Countywide production run (Aim 1b) | Apply the selected approach at full scale across all study-area intersections | Countywide crossing-distance dataset | Not started (gated on the comparison above) |
+
+## Open Questions
+
+- **Sample size**: the 75–150 proposed above is a starting point, not a power calculation — refine once the ground-truth measurement protocol's per-intersection time cost is known.
+- **Canopy-cover data source**: confirm whether an existing tree-canopy/land-cover layer is available for Cook County, or whether the county imagery's own NIR band (NDVI-style) should be used to screen candidate locations instead.
+- **Reusability of existing ground-truth annotations**: confirm with the reference methodology's materials whether its crosswalk ground-truth is stored as georeferenced polygons (reusable across imagery sources by rasterizing onto new tiles) or as pixel masks tied specifically to the Google tiles (would need fresh annotation for Approaches A/B).
+- **GPU budget/timeline for Approach B**: this is the one piece of this comparison that is a genuine ML engineering sub-project (see `phase00.qmd`'s discussion of "model work") rather than a data-pipeline change — scope its Modal compute budget and timeline separately from Approaches A/C, which need none.
+- **Native resolution vs. resampling** (Approach A/B, step 2): whether to keep the county imagery's native 6-inch resolution (larger input, preserves the resolution advantage) or resample to the fixed pixel dimensions the existing fine-tuned model was validated on (keeps the model's effective receptive field unchanged) is an open implementation choice, not yet resolved here.

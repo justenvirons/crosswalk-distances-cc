@@ -30,7 +30,9 @@ This project extends a validated satellite-imagery-based crosswalk-geometry meas
 
 **Research aims:**
 
-1. Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities (~200 areal units).
+1. Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities (~200 areal units), via two sub-aims:
+   - **1a** — Compare three imagery/model approaches (3-band and 4-band Cook County orthoimagery, and Google Maps imagery — the original reference methodology's source) against manually measured ground truth on a sample of intersections, to determine which the countywide run should use. See [`phase01_crosswalk_models.qmd`](phase01_crosswalk_models.qmd).
+   - **1b** — Produce the full countywide dataset using the approach Aim 1a supports.
 2. Compare crossing distance across municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.
 3. Relate crossing distance to point-level pedestrian fatalities (NHTSA FARS).
 4. Model the areal rate of pedestrian crashes (IDOT crash records) as a function of median crossing distance, population density, median age, ADI, and other covariates identified in the literature.
@@ -63,9 +65,12 @@ This plan is organized into five phases, mirroring the structure of an academic 
 | Street network and speed limits | OpenStreetMap via Geofabrik/`osmextract` | 3, 4 | Complete |
 | Pedestrian fatalities | NHTSA FARS | 3 | Complete |
 | Crash records | Illinois Department of Transportation (IDOT) | 4 | In progress |
-| Area Deprivation Index (ADI) | Neighborhood Atlas (Univ. of Wisconsin) | 2 | Not started |
+| Area Deprivation Index (ADI) | Neighborhood Atlas (Univ. of Wisconsin) / ACS via `sociome`+`tidycensus` | 2 | In progress |
 | Population, housing, employment | U.S. Census ACS 5-year / LEHD LODES | 2 | Not started |
-| Crossing-distance imagery/segmentation | Satellite imagery + segmentation pipeline | 1 | Not started |
+| Crossing-distance imagery (candidate A) | Google Maps satellite tiles (reference methodology's original source) | 1a, 1b | Not started |
+| Crossing-distance imagery (candidate B) | Cook County 3-band RGB orthoimagery (leaf-off, single-vintage) | 1a, 1b | Not started |
+| Crossing-distance imagery (candidate C) | Cook County 4-band RGB+NIR orthoimagery (leaf-off, single-vintage) | 1a, 1b | Not started |
+| Crossing-distance segmentation pipeline | Fine-tuned SAM 2.1 + grow-cut (existing); channel-extended/re-fine-tuned variant for the 4-band candidate | 1a, 1b | Not started |
 
 See [`phase01.qmd`](phase01.qmd) for the detailed, task-level status of each data layer.
 
@@ -77,15 +82,18 @@ See [`phase01.qmd`](phase01.qmd) for the detailed, task-level status of each dat
 | Municipal/community-area aggregation of block-group data (ADI, demographics) is sensitive to boundary choice (modifiable areal unit problem) | Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels |
 | Ambiguity in matching FARS fatality points to a specific measured crossing | Predefine a buffer/network-distance matching rule; run a sensitivity analysis on buffer size |
 | EMS injury data access/timeline is uncertain, given the need for a data-use agreement | IDOT crash data (already in development, see `phase01.qmd`) is the working primary source for Aim 4; EMS data is incorporated only if/when access is secured |
+| The 4-band imagery/model comparison arm (Aim 1a) requires ML engineering work (modifying and fine-tuning the segmentation model's input layer) beyond running the existing fine-tuned model, plus GPU compute for that fine-tuning run — a different kind of effort than this project's other data-assembly tasks | Prototype and validate the channel-extension/fine-tuning approach at small scale (e.g., in a notebook environment) before committing a full training run; if it doesn't clearly outperform the 3-band approach, proceed with 3-band Cook County imagery (or Google imagery, per Aim 1a's results) for Aim 1b without the added model complexity |
+| Aim 1a's ground-truth sample is specific to Cook County, which limits how far its imagery/model comparison findings generalize if pursued as a standalone methods paper | Document the sample's stratification (built form, tree canopy, position within source imagery) explicitly, so the paper's claims are scoped appropriately rather than overgeneralized |
 
 ## Anticipated Outputs
 
 1. Public/shareable Cook County crosswalk-distance dataset spanning Chicago community areas and suburban municipalities.
-2. Manuscript: municipal/community-area crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).
-3. Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).
-4. Manuscript or technical report: crossing distance and crash-reported pedestrian injury rates across Cook County (Aim 4).
-5. Updated open-source codebase reflecting the countywide pipeline.
-6. Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).
+2. Manuscript: imagery source and segmentation model comparison for crossing-distance measurement — 3-band and 4-band Cook County orthoimagery vs. Google Maps imagery, validated against ground truth (Aim 1a). Designed to stand alone as a methods contribution, independent of Aims 2–4.
+3. Manuscript: municipal/community-area crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).
+4. Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).
+5. Manuscript or technical report: crossing distance and crash-reported pedestrian injury rates across Cook County (Aim 4).
+6. Updated open-source codebase reflecting the countywide pipeline, including the channel-extended segmentation model if Aim 1a supports the 4-band approach.
+7. Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).
 
 ## Open Decisions Requiring Early Input
 
