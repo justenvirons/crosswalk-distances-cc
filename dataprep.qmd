@@ -398,8 +398,20 @@ st_write(ped_fatalities, "output/ped_fatalities.shp", delete_dsn = TRUE)
 
 Supports `phase01.qmd`'s *Crash Records (IDOT)* table (Aim 4). Stacks yearly IDOT crash-report CSV exports, cleans coordinates and dates, and identifies pedestrian/bicycle crashes and KSI (killed-or-seriously-injured) severity. Adapted from [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd), pointed at this project's `data/boundaries/CRASHES_*.csv` files rather than a parameterized directory.
 
+Confirmed against the actual exported column headers (`CRASHES_2022/2023/2024.csv`; PascalCase, no underscores except `City_Township_Flag`/`Crash_Hour`) — after `rename_with(tolower)`, every column this code reads (`x`, `y`, `tscrashlongitude`, `tscrashlatitude`, `crashyr`, `crashmonth`, `crashday`, `crashhour`, `typeoffirstcrash`, `totalfatals`, `ainjuries`, `crashseverity`, `crash_hour`) is present as-is; no renaming was needed. `crash_hour` (a near-duplicate of `crashhour`) is dropped rather than used.
+
 ```{r}
 #| label: idot-crashes
+
+# Required lowercased column names this function depends on -- checked
+# explicitly below so a schema change in a future IDOT export (a renamed
+# or dropped column) fails with a clear message naming the column, rather
+# than a cryptic downstream "object not found" error from dplyr.
+required_idot_cols <- c(
+  "x", "y", "tscrashlongitude", "tscrashlatitude",
+  "crashyr", "crashmonth", "crashday", "crashhour",
+  "typeoffirstcrash", "totalfatals", "ainjuries"
+)
 
 read_crash_year <- function(year, dir) {
   file <- list.files(dir, pattern = paste0(year, ".*\\.csv$"),
@@ -425,10 +437,30 @@ process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
     bind_rows() %>%
     type_convert(col_types = cols())
 
+  missing_cols <- setdiff(required_idot_cols, names(crash_raw))
+  if (length(missing_cols) > 0) {
+    stop(
+      "IDOT crash CSV is missing expected column(s): ",
+      paste(missing_cols, collapse = ", "),
+      ". Check the raw column headers (rename_with(tolower) is applied) ",
+      "and update required_idot_cols/process_crashes() to match."
+    )
+  }
+
   in_il <- function(lon, lat) {
     !is.na(lon) & !is.na(lat) &
       between(lon, -91.6, -87.0) & between(lat, 36.9, 42.6)
   }
+
+  # x/y are the ArcGIS-exported coordinate pair, distinct from
+  # tscrashcoordinatex/y (a separate, likely projected pair not used here)
+  # and from tscrashlongitude/tscrashlatitude (the fallback). Report how
+  # often x/y actually resolves as in-Illinois lon/lat vs. falls back, as a
+  # sanity check that x/y really is geographic and not itself projected.
+  n_xy_valid <- sum(in_il(crash_raw$x, crash_raw$y), na.rm = TRUE)
+  cli::cli_alert_info(
+    "IDOT crashes: {n_xy_valid} of {nrow(crash_raw)} rows used x/y directly (rest fell back to TSCrashLongitude/TSCrashLatitude)."
+  )
 
   crash_df <- crash_raw %>%
     mutate(
