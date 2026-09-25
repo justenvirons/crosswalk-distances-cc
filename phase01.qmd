@@ -13,6 +13,7 @@ author:
 date: today
 format:
   html:
+    code-fold: true
     toc: true
     toc-depth: 2
     number-sections: false
@@ -38,6 +39,9 @@ Supports **Aims 1–4** (defines the unit of geography used to organize and aggr
 |---|---|---|---|
 | Combine Chicago community areas and suburban municipalities | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
 | Reconcile boundary source and projection | Source boundaries from Cook County/Chicago health-atlas geographies; standardize to a common projected CRS for area and distance calculations | Projected study-area boundary file | Complete |
+
+
+
 
 ## Street Intersections
 

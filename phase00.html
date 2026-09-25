@@ -10,7 +10,7 @@
 <meta name="author" content="Zane Sufi">
 <meta name="dcterms.date" content="2026-09-24">
 
-<title>Work Plan for Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</title>
+<title>Phase 0 — Background, Literature Review, and Study Purpose</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -22,7 +22,27 @@ ul.task-list li input[type="checkbox"] {
 width: 0.8em;
 margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
 }
-</style>
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}</style>
 
 
 <script>/*!
@@ -2175,21 +2195,23 @@ vertical-align: -.125em;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul class="collapse">
-  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
-  <li><a href="#project-structure" id="toc-project-structure" class="nav-link" data-scroll-target="#project-structure">Project Structure</a></li>
-  <li><a href="#project-team-roles" id="toc-project-team-roles" class="nav-link" data-scroll-target="#project-team-roles">Project Team &amp; Roles</a></li>
-  <li><a href="#data-sources-summary" id="toc-data-sources-summary" class="nav-link" data-scroll-target="#data-sources-summary">Data Sources Summary</a></li>
-  <li><a href="#risks-and-mitigations" id="toc-risks-and-mitigations" class="nav-link" data-scroll-target="#risks-and-mitigations">Risks and Mitigations</a></li>
-  <li><a href="#anticipated-outputs" id="toc-anticipated-outputs" class="nav-link" data-scroll-target="#anticipated-outputs">Anticipated Outputs</a></li>
-  <li><a href="#open-decisions-requiring-early-input" id="toc-open-decisions-requiring-early-input" class="nav-link" data-scroll-target="#open-decisions-requiring-early-input">Open Decisions Requiring Early Input</a></li>
+  <li><a href="#background" id="toc-background" class="nav-link active" data-scroll-target="#background">Background</a></li>
+  <li><a href="#gaps-in-past-research" id="toc-gaps-in-past-research" class="nav-link" data-scroll-target="#gaps-in-past-research">Gaps in Past Research</a></li>
+  <li><a href="#purpose-of-the-current-study" id="toc-purpose-of-the-current-study" class="nav-link" data-scroll-target="#purpose-of-the-current-study">Purpose of the Current Study</a></li>
+  <li><a href="#units-of-analysis-and-variables" id="toc-units-of-analysis-and-variables" class="nav-link" data-scroll-target="#units-of-analysis-and-variables">Units of Analysis and Variables</a></li>
+  <li><a href="#aims" id="toc-aims" class="nav-link" data-scroll-target="#aims">Aims</a></li>
+  <li><a href="#working-hypotheses" id="toc-working-hypotheses" class="nav-link" data-scroll-target="#working-hypotheses">Working Hypotheses</a></li>
+  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
-<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="plan.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="phase00.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Work Plan for <i>Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</i></h1>
+<h1 class="title">Phase 0 — Background, Literature Review, and Study Purpose</h1>
+<p class="subtitle lead">Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</p>
 </div>
 
 
@@ -2236,213 +2258,126 @@ vertical-align: -.125em;
 </header>
 
 
-<section id="overview" class="level2">
-<h2 class="anchored" data-anchor-id="overview">Overview</h2>
-<p>This project extends a validated satellite-imagery-based crosswalk-geometry measurement methodology countywide across Cook County, Illinois, and links the resulting crossing-distance dataset to socioeconomic deprivation, pedestrian fatality, and crash-injury data to answer applied pedestrian-safety questions. Full background, literature review, and the study’s research aims and working hypotheses are documented in <a href="phase00.qmd"><code>phase00.qmd</code></a>.</p>
-<p><strong>Research aims:</strong></p>
-<ol type="1">
-<li>Produce a countywide crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities (~200 areal units).</li>
-<li>Compare crossing distance across municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.</li>
-<li>Relate crossing distance to point-level pedestrian fatalities (NHTSA FARS).</li>
-<li>Model the areal rate of pedestrian crashes (IDOT crash records) as a function of median crossing distance, population density, median age, ADI, and other covariates identified in the literature.</li>
-</ol>
-</section>
-<section id="project-structure" class="level2">
-<h2 class="anchored" data-anchor-id="project-structure">Project Structure</h2>
-<p>This plan is organized into five phases, mirroring the structure of an academic paper. Each phase has (or will have) its own detailed working document.</p>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Phase</th>
-<th>Focus</th>
-<th>Document</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>0</td>
-<td>Background, literature review, gaps in past research, study purpose, aims and hypotheses</td>
-<td><a href="phase00.qmd"><code>phase00.qmd</code></a></td>
-<td>Complete</td>
-</tr>
-<tr class="even">
-<td>1</td>
-<td>Dataset development: study area boundaries, intersections, streets, crashes, fatalities, ADI, census, and other contextual data</td>
-<td><a href="phase01.qmd"><code>phase01.qmd</code></a></td>
-<td>In progress</td>
-</tr>
-<tr class="odd">
-<td>2</td>
-<td>Data presentation and analysis: descriptive statistics and statistical model specification/execution</td>
-<td><code>phase02.qmd</code></td>
-<td>Not started</td>
-</tr>
-<tr class="even">
-<td>3</td>
-<td>Results, interpretation, and discussion of statistical tests</td>
-<td><code>phase03.qmd</code></td>
-<td>Not started</td>
-</tr>
-<tr class="odd">
-<td>4</td>
-<td>Study limitations, implications, conclusion, and next steps</td>
-<td><code>phase04.qmd</code></td>
-<td>Not started</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="project-team-roles" class="level2">
-<h2 class="anchored" data-anchor-id="project-team-roles">Project Team &amp; Roles</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Role</th>
-<th>Responsibility</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>PI / GIS, ML &amp; Data Governance Lead (Smith)</td>
-<td>Overall direction and methodology oversight; geospatial data pipeline development and QA; data governance and compliance (data-use agreements, IRB/data-sharing review if needed); dissemination</td>
-</tr>
-<tr class="even">
-<td>Data Analyst / Statistician &amp; Quant Lead (Sufi)</td>
-<td>Spatial and statistical modeling (Aims 2–4); ADI/demographic data assembly; crash and fatality data cleaning and merging; manual QA/validation sampling; municipal boundary reconciliation; literature review; general research assistance</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="data-sources-summary" class="level2">
-<h2 class="anchored" data-anchor-id="data-sources-summary">Data Sources Summary</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Data</th>
-<th>Source</th>
-<th>Aim(s)</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Study area geography (community areas + municipalities)</td>
-<td>Chicago/Cook County health atlases</td>
-<td>1–4</td>
-<td>Complete</td>
-</tr>
-<tr class="even">
-<td>Street intersections</td>
-<td>OpenStreetMap via OSMnx</td>
-<td>1, 3, 4</td>
-<td>Complete</td>
-</tr>
-<tr class="odd">
-<td>Street network and speed limits</td>
-<td>OpenStreetMap via Geofabrik/<code>osmextract</code></td>
-<td>3, 4</td>
-<td>Complete</td>
-</tr>
-<tr class="even">
-<td>Pedestrian fatalities</td>
-<td>NHTSA FARS</td>
-<td>3</td>
-<td>Complete</td>
-</tr>
-<tr class="odd">
-<td>Crash records</td>
-<td>Illinois Department of Transportation (IDOT)</td>
-<td>4</td>
-<td>In progress</td>
-</tr>
-<tr class="even">
-<td>Area Deprivation Index (ADI)</td>
-<td>Neighborhood Atlas (Univ. of Wisconsin)</td>
-<td>2</td>
-<td>Not started</td>
-</tr>
-<tr class="odd">
-<td>Population, housing, employment</td>
-<td>U.S. Census ACS 5-year / LEHD LODES</td>
-<td>2</td>
-<td>Not started</td>
-</tr>
-<tr class="even">
-<td>Crossing-distance imagery/segmentation</td>
-<td>Satellite imagery + segmentation pipeline</td>
-<td>1</td>
-<td>Not started</td>
-</tr>
-</tbody>
-</table>
-<p>See <a href="phase01.qmd"><code>phase01.qmd</code></a> for the detailed, task-level status of each data layer.</p>
-</section>
-<section id="risks-and-mitigations" class="level2">
-<h2 class="anchored" data-anchor-id="risks-and-mitigations">Risks and Mitigations</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Risk</th>
-<th>Mitigation</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>OSM crossing-edge data is sparser and less consistent in lower-density suburbs than in Chicago’s dense urban core</td>
-<td>Document coverage completeness by municipality/community area; flag low-coverage units for interpretive caution in Aim 2</td>
-</tr>
-<tr class="even">
-<td>Municipal/community-area aggregation of block-group data (ADI, demographics) is sensitive to boundary choice (modifiable areal unit problem)</td>
-<td>Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels</td>
-</tr>
-<tr class="odd">
-<td>Ambiguity in matching FARS fatality points to a specific measured crossing</td>
-<td>Predefine a buffer/network-distance matching rule; run a sensitivity analysis on buffer size</td>
-</tr>
-<tr class="even">
-<td>EMS injury data access/timeline is uncertain, given the need for a data-use agreement</td>
-<td>IDOT crash data (already in development, see <code>phase01.qmd</code>) is the working primary source for Aim 4; EMS data is incorporated only if/when access is secured</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="anticipated-outputs" class="level2">
-<h2 class="anchored" data-anchor-id="anticipated-outputs">Anticipated Outputs</h2>
-<ol type="1">
-<li>Public/shareable Cook County crosswalk-distance dataset spanning Chicago community areas and suburban municipalities.</li>
-<li>Manuscript: municipal/community-area crossing distance, ADI, and socioeconomic patterns across Cook County (Aim 2).</li>
-<li>Manuscript: crossing distance and point-level pedestrian fatality risk using FARS (Aim 3).</li>
-<li>Manuscript or technical report: crossing distance and crash-reported pedestrian injury rates across Cook County (Aim 4).</li>
-<li>Updated open-source codebase reflecting the countywide pipeline.</li>
-<li>Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).</li>
-</ol>
-</section>
-<section id="open-decisions-requiring-early-input" class="level2">
-<h2 class="anchored" data-anchor-id="open-decisions-requiring-early-input">Open Decisions Requiring Early Input</h2>
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>Crosswalk geometry — how far a pedestrian must travel to cross a street at a marked or unmarked crossing — is a measurable, modifiable element of street design with a direct link to pedestrian exposure. Longer crossing distances increase the time a pedestrian spends in conflict with vehicle traffic and are associated with wider, faster roadways generally built to accommodate vehicle throughput rather than pedestrian safety. As a determinant of pedestrian injury and fatality risk, crossing distance sits at the intersection of transportation engineering and public health, and is one of the few street-design variables that can be measured consistently and at scale from remotely sensed imagery rather than requiring field survey.</p>
+<p>Recent work has demonstrated that crossing distance can be extracted automatically and accurately from satellite imagery. <span class="citation" data-cites="moran2024multiscale">Moran and Laefer (<a href="#ref-moran2024multiscale" role="doc-biblioref">2024</a>)</span> developed and validated a pipeline that combines OpenStreetMap (OSM) intersection and crossing-edge data, high-resolution satellite tiles, a fine-tuned Segment Anything Model (SAM 2.1), and a grow-cut algorithm to measure crossing distance at marked and unmarked crosswalks, achieving approximately 93% accuracy against manually measured ground truth (median absolute error ≈ 2 ft 3 in). That same study overlaid the resulting crossing-distance measurements with recent pedestrian–vehicle collisions and found that longer crossing distance correlated with increased collision likelihood, framed around traffic-calming interventions — this is the study that most directly motivates the present project. <span class="citation" data-cites="moran2026scaling">Moran et al. (<a href="#ref-moran2026scaling" role="doc-biblioref">2026</a>)</span> scaled the underlying segmentation methodology to roughly 100 cities nationally — including the City of Chicago, where the pipeline processed approximately 80,000 satellite tiles — establishing that the approach generalizes across a range of urban street-network forms.</p>
+<p>A separate body of work has linked intersection- and street-network-level design characteristics to pedestrian collision and injury outcomes using structural equation modeling and related statistical frameworks (e.g., <span class="citation" data-cites="ihssian2026understanding">Ihssian (<a href="#ref-ihssian2026understanding" role="doc-biblioref">2026</a>)</span>), reinforcing that intersection geometry is a plausible causal factor in pedestrian safety outcomes, distinct from — and interacting with — traffic volume, land use, and socioeconomic context.</p>
+<section id="statistical-methods-and-prior-findings" class="level3">
+<h3 class="anchored" data-anchor-id="statistical-methods-and-prior-findings">Statistical Methods and Prior Findings</h3>
+<p><span class="citation" data-cites="moran2024multiscale">Moran and Laefer (<a href="#ref-moran2024multiscale" role="doc-biblioref">2024</a>)</span>’s crossing-distance/collision association is, by its own design, bivariate: it does not control for confounders such as road width, traffic volume, density, or socioeconomic context. Building a multivariate, spatially explicit model that does control for these factors is the central statistical objective of this project. The following concepts and modeling approaches, drawn from the broader pedestrian-safety literature, inform that design:</p>
+<p><strong>Spatial dependence and heterogeneity.</strong> Pedestrian crash counts are spatial data, and standard (non-spatial) regression risks two distinct problems:</p>
 <ul>
-<li>Should unincorporated Cook County areas be included, or only incorporated municipalities and Chicago community areas?</li>
-<li>Which EMS data source, if any, is feasible as a supplement to IDOT crash data for Aim 4?</li>
-<li>What buffer/matching rule will be used to associate FARS point fatalities with specific measured crossings?</li>
-<li>Target FARS and IDOT crash year range (most recent years only, vs. multi-year pooled for statistical power)?</li>
+<li><em>Spatial autocorrelation</em> (Tobler’s First Law): nearby observations tend to be more similar than distant ones, which violates the independence assumption of ordinary regression, deflates standard errors, and inflates apparent significance because the effective sample size is smaller than the nominal count of areas. This is tested globally with <strong>Moran’s I</strong> and localized with <strong>LISA</strong> (Local Indicators of Spatial Association; <span class="citation" data-cites="anselin1995local">Anselin (<a href="#ref-anselin1995local" role="doc-biblioref">1995</a>)</span>).</li>
+<li><em>Spatial heterogeneity</em>: the relationship between a predictor (e.g., crossing distance) and the outcome can vary across space — for example, a stronger association in Chicago’s dense urban core than in lower-density suburbs.</li>
+</ul>
+<p><strong>Modeling approaches used in the literature</strong> for pedestrian-crash outcomes, several of which are candidates for this project’s Aim 2/Aim 4 models:</p>
+<ul>
+<li><strong>Geographically weighted regression (GWR)</strong> lets effect coefficients vary across space and can be mapped, directly addressing spatial heterogeneity; it has been applied to built-environment/crash relationships generally <span class="citation" data-cites="huang2018examining">(<a href="#ref-huang2018examining" role="doc-biblioref">Huang, Wang, and Patton 2018</a>)</span> and to child pedestrian collisions specifically <span class="citation" data-cites="soroori2023spatial">(<a href="#ref-soroori2023spatial" role="doc-biblioref">Soroori et al. 2023</a>)</span>.</li>
+<li><strong>Poisson and negative binomial regression</strong> are the standard choice for crash-count and crash-rate outcomes, with the negative binomial form used when counts are overdispersed relative to the Poisson assumption <span class="citation" data-cites="soroori2023spatial zhu2022exploring">(<a href="#ref-soroori2023spatial" role="doc-biblioref">Soroori et al. 2023</a>; <a href="#ref-zhu2022exploring" role="doc-biblioref">Zhu et al. 2022</a>)</span>.</li>
+<li><strong>Bayesian spatial models</strong> account for spatial dependence directly and are often compared across alternative exposure specifications <span class="citation" data-cites="zhu2022exploring">(<a href="#ref-zhu2022exploring" role="doc-biblioref">Zhu et al. 2022</a>)</span>.</li>
+<li><strong>Network-based kernel density</strong> estimates crash risk at the road-segment (rather than areal) level <span class="citation" data-cites="zhu2022exploring">(<a href="#ref-zhu2022exploring" role="doc-biblioref">Zhu et al. 2022</a>)</span>.</li>
+<li>More recent extensions, such as a geographically weighted convolutional neural network regression (GWCNNR), have been reported to outperform standard GWR, though these are not the starting point for this project.</li>
+</ul>
+<p><strong>Exposure measurement.</strong> Getting the exposure variable right matters as much as the design variable, since crashes depend on how many people cross, not only on road geometry. The FHWA’s synthesis of pedestrian/bicyclist exposure methods <span class="citation" data-cites="fhwa2018synthesis">(<a href="#ref-fhwa2018synthesis" role="doc-biblioref">Federal Highway Administration 2018</a>)</span> catalogs exposure at four scales — regional, network (tract/block group), road segment, and point (intersection/mid-block) — and a recurring finding across this literature is a <strong>safety-in-numbers</strong> effect: higher pedestrian exposure raises total crash frequency but reduces the <em>share</em> of crashes that are serious or fatal <span class="citation" data-cites="hu2024linklevel">(<a href="#ref-hu2024linklevel" role="doc-biblioref">Hu, Chen, and Zhao 2024</a>)</span>. Because this project models crash rate (Aim 2/4) and point-level fatality (Aim 3) separately, this distinction is kept in view when interpreting results across the two aims.</p>
+<p><strong>Prior evidence on socioeconomic disparities.</strong> In the Chicago metropolitan area specifically, pedestrian crashes have been found to be roughly twice as frequent in low-income/high-minority (“environmental justice”) areas as elsewhere, a disparity that persists after controlling for exposure, land use, transit access, school quality, and crime <span class="citation" data-cites="cottrill2010evaluating">(<a href="#ref-cottrill2010evaluating" role="doc-biblioref">Cottrill and Thakuriah 2010</a>)</span>. A broader systematic review <span class="citation" data-cites="moradi2016spatial">(<a href="#ref-moradi2016spatial" role="doc-biblioref">Moradi et al. 2016</a>)</span> likewise reports consistent associations between pedestrian-crash frequency and population density, traffic volume, roadway/intersection density, socioeconomic status, and pedestrian volume across 15 qualifying studies. These findings motivate this project’s choice of covariates (below) and its expectation, per Aim 2, that socioeconomic deprivation is independently associated with the built-environment measures under study.</p>
+</section>
+</section>
+<section id="gaps-in-past-research" class="level2">
+<h2 class="anchored" data-anchor-id="gaps-in-past-research">Gaps in Past Research</h2>
+<p>Three gaps in the existing literature motivate this study:</p>
+<ol type="1">
+<li><strong>Limited geographic scope and urban/suburban comparison.</strong> The validated crossing-distance methodology has been applied to dense urban cores (Chicago, Paris, San Francisco) and a small number of additional case-study cities, but has not been applied consistently across a single metropolitan county that spans both a dense urban core and a large number of lower-density suburban jurisdictions with materially different street-network design eras and built forms. It is therefore unknown whether crossing-distance patterns — and their relationship to safety outcomes — observed in dense urban contexts hold in suburban arterial and cul-de-sac-subdivision contexts.</li>
+<li><strong>No direct linkage to socioeconomic deprivation.</strong> Prior crossing-distance studies have not tested whether measured crossing geometry co-varies with area-level socioeconomic deprivation, despite a well-established literature linking deprivation to disparities in built-environment safety investment <span class="citation" data-cites="cottrill2010evaluating">(<a href="#ref-cottrill2010evaluating" role="doc-biblioref">Cottrill and Thakuriah 2010</a>)</span>.</li>
+<li><strong>Bivariate design and limited linkage to observed outcomes at scale.</strong> The motivating crossing-distance/collision association <span class="citation" data-cites="moran2024multiscale">(<a href="#ref-moran2024multiscale" role="doc-biblioref">Moran and Laefer 2024</a>)</span> is bivariate and does not control for road width, traffic volume, density, or socioeconomic context; more generally, few studies have joined segmentation-derived crossing-distance measurements to point-level fatality records (e.g., FARS) or aggregate crash-rate records at a scale larger than a handful of case-study cities, and few apply the spatial-regression toolkit summarized above (GWR, spatial Poisson/negative binomial, Bayesian spatial models) to a crossing-distance exposure variable specifically.</li>
+</ol>
+</section>
+<section id="purpose-of-the-current-study" class="level2">
+<h2 class="anchored" data-anchor-id="purpose-of-the-current-study">Purpose of the Current Study</h2>
+<p>This study extends the validated crossing-distance segmentation methodology across a countywide study area covering all of Cook County, Illinois — combining the City of Chicago’s 77 community areas with suburban Cook County’s incorporated municipalities (limited to those ≥4 square miles) into a single, internally consistent geography of roughly 200 areal units. It links the resulting crossing-distance dataset to municipal/community-area socioeconomic deprivation (Area Deprivation Index) and demographic covariates, point-level pedestrian fatality records (NHTSA FARS), and crash records (Illinois Department of Transportation, IDOT) to test — using a multivariate, spatially explicit modeling approach rather than the bivariate design of the motivating study — whether crossing geometry is systematically associated with socioeconomic context and with pedestrian crash and fatality risk, at a scale (one large, geographically diverse county) not previously studied.</p>
+<p>Dataset development for this study is documented in <a href="phase01.qmd"><code>phase01.qmd</code></a>; it is currently in progress, with study-area geography, street-intersection extraction, street network/speed-limit data, and FARS fatality data assembled, and IDOT crash-record processing and socioeconomic/contextual data (ADI, Census) actively underway.</p>
+</section>
+<section id="units-of-analysis-and-variables" class="level2">
+<h2 class="anchored" data-anchor-id="units-of-analysis-and-variables">Units of Analysis and Variables</h2>
+<ul>
+<li><strong>Unit of analysis:</strong> the combined Cook County geography of Chicago community areas and suburban municipalities (N ≈ 200; see <code>phase01.qmd</code>).</li>
+<li><strong>Dependent variable (Aims 2 and 4):</strong> the <em>rate</em> of pedestrian–motor vehicle crashes per areal unit (from IDOT crash records; not raw counts), modeled with count/rate-appropriate methods (Poisson or negative binomial regression, optionally with a spatial or Bayesian specification; see <em>Statistical Methods</em>, above). Aim 3’s point-level FARS fatality analysis is modeled separately, at the individual-fatality level, and is not folded into this areal rate.</li>
+<li><strong>Primary explanatory/exposure variable:</strong> median crossing distance per areal unit, from the segmentation pipeline (Aim 1).</li>
+<li><strong>Core covariates</strong> (per the working hypotheses and the literature reviewed above):
+<ul>
+<li>Population density</li>
+<li>Median age</li>
+<li>Area Deprivation Index (ADI)</li>
+<li>Median household income</li>
+<li>Roadway characteristics: road width, posted speed limit, traffic volume/functional class</li>
+<li>Land use / socioeconomic context (e.g., percent low-income, percent minority population), following <span class="citation" data-cites="cottrill2010evaluating">Cottrill and Thakuriah (<a href="#ref-cottrill2010evaluating" role="doc-biblioref">2010</a>)</span></li>
+<li>Pedestrian exposure and intersection/roadway density, following the FHWA exposure framework <span class="citation" data-cites="fhwa2018synthesis">(<a href="#ref-fhwa2018synthesis" role="doc-biblioref">Federal Highway Administration 2018</a>)</span> and <span class="citation" data-cites="moradi2016spatial">Moradi et al. (<a href="#ref-moradi2016spatial" role="doc-biblioref">2016</a>)</span></li>
+</ul></li>
+</ul>
+<p>The exact covariate set will be finalized once ADI and Census/LODES assembly (<code>phase01.qmd</code>) is complete and will be refined based on data availability and collinearity diagnostics in <code>phase02.qmd</code>.</p>
+</section>
+<section id="aims" class="level2">
+<h2 class="anchored" data-anchor-id="aims">Aims</h2>
+<ol type="1">
+<li><strong>Aim 1 — Countywide crossing-distance dataset.</strong> Produce a geographically consistent crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities.</li>
+<li><strong>Aim 2 — Municipal/community-area cross-sectional analysis.</strong> Compare crossing distance across all ~200 Cook County municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.</li>
+<li><strong>Aim 3 — Point-level fatality analysis.</strong> Relate measured crossing distance to individual pedestrian fatalities using FARS data.</li>
+<li><strong>Aim 4 — Crash-rate analysis.</strong> Model the areal <em>rate</em> of pedestrian crashes (IDOT crash records) as a function of median crossing distance, population density, median age, ADI, and other covariates identified in the literature, across the ~200-unit Cook County geography.</li>
+</ol>
+</section>
+<section id="working-hypotheses" class="level2">
+<h2 class="anchored" data-anchor-id="working-hypotheses">Working Hypotheses</h2>
+<ul>
+<li><strong>H1 (built-form variation):</strong> Measured crossing distance varies systematically with municipal/community-area built-environment characteristics, producing longer average crossings in lower-density suburban arterial contexts than in Chicago’s dense urban core.</li>
+<li><strong>H2 (deprivation association):</strong> Longer municipal/community-area median crossing distance is associated with higher socioeconomic deprivation (higher ADI) and lower median income, consistent with disparities in pedestrian-infrastructure investment.</li>
+<li><strong>H3 (fatality association):</strong> Locations with longer measured crossing distance are associated with a higher likelihood of a nearby pedestrian fatality, controlling for roadway functional class and speed limit.</li>
+<li><strong>H4 (crash-rate association):</strong> Areal pedestrian crash rate increases with median crossing distance, independent of population density, median age, and ADI, consistent in direction with the fatality-based association tested in H3.</li>
 </ul>
 </section>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
+<p>Subsequent phases of this project (documented in <code>phase02.qmd</code> through <code>phase04.qmd</code>, to be added as work progresses) will cover descriptive and statistical analysis of the assembled dataset — including the spatial-autocorrelation diagnostics and regression approaches summarized above — presentation and interpretation of results, and discussion of study limitations, implications, and conclusions.</p>
+</section>
+<section id="references" class="level2 unnumbered">
 
-</main>
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-anselin1995local" class="csl-entry" role="listitem">
+Anselin, Luc. 1995. <span>“Local Indicators of Spatial Association—<span>LISA</span>.”</span> <em>Geographical Analysis</em> 27 (2): 93–115. <a href="https://doi.org/10.1111/j.1538-4632.1995.tb00338.x">https://doi.org/10.1111/j.1538-4632.1995.tb00338.x</a>.
+</div>
+<div id="ref-cottrill2010evaluating" class="csl-entry" role="listitem">
+Cottrill, Caitlin D., and Piyushimita Vonu Thakuriah. 2010. <span>“Evaluating Pedestrian Crashes in Areas with High Low-Income or Minority Populations.”</span> <em>Accident Analysis &amp; Prevention</em> 42 (6): 1718–28. <a href="https://doi.org/10.1016/j.aap.2010.04.012">https://doi.org/10.1016/j.aap.2010.04.012</a>.
+</div>
+<div id="ref-fhwa2018synthesis" class="csl-entry" role="listitem">
+Federal Highway Administration. 2018. <span>“Synthesis of Methods for Estimating Pedestrian and Bicyclist Exposure to Risk.”</span> U.S. Department of Transportation, Federal Highway Administration. <a href="https://highways.dot.gov/safety/pedestrian-bicyclist/safety-tools/chapter-3-exposure-analysis-areawide-levels-synthesis">https://highways.dot.gov/safety/pedestrian-bicyclist/safety-tools/chapter-3-exposure-analysis-areawide-levels-synthesis</a>.
+</div>
+<div id="ref-hu2024linklevel" class="csl-entry" role="listitem">
+Hu, Yiyuan, Long Chen, and Zhen Zhao. 2024. <span>“How Does Street Environment Affect Pedestrian Crash Risks? A Link-Level Analysis Using Street View Image-Based Pedestrian Exposure Measurement.”</span> <em>Accident Analysis &amp; Prevention</em> 205: 107682. <a href="https://www.sciencedirect.com/science/article/abs/pii/S0001457524002276">https://www.sciencedirect.com/science/article/abs/pii/S0001457524002276</a>.
+</div>
+<div id="ref-huang2018examining" class="csl-entry" role="listitem">
+Huang, Yefu, Xin Wang, and Donald Patton. 2018. <span>“Examining Spatial Relationships Between Crashes and the Built Environment: A Geographically Weighted Regression Approach.”</span> <em>Journal of Transport Geography</em> 69: 221–33. <a href="https://www.sciencedirect.com/science/article/abs/pii/S0966692317306373">https://www.sciencedirect.com/science/article/abs/pii/S0966692317306373</a>.
+</div>
+<div id="ref-ihssian2026understanding" class="csl-entry" role="listitem">
+Ihssian, Ali. 2026. <span>“Understanding Pedestrian Collisions at Intersections and Traffic Analysis Zones Using Structural Equation Modelling Applications.”</span> {PhD} dissertation, Ottawa, Ontario, Canada: Carleton University.
+</div>
+<div id="ref-moradi2016spatial" class="csl-entry" role="listitem">
+Moradi, A., H. Soori, A. Kavousi, F. Eshghabadi, and E. Jamshidi. 2016. <span>“Spatial Factors Affecting the Frequency of Pedestrian Traffic Crashes: A Systematic Review.”</span> <em>Archives of Trauma Research</em> 5 (4): e62276. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5251886/">https://pmc.ncbi.nlm.nih.gov/articles/PMC5251886/</a>.
+</div>
+<div id="ref-moran2026scaling" class="csl-entry" role="listitem">
+Moran, Marcel E., Anish Gupta, Jun Qian, and Debra F. Laefer. 2026. <span>“Scaling Pedestrian Crossing Analysis to 100 <span>U.S.</span> Cities via <span>AI</span>-Based Segmentation of Satellite Imagery.”</span> <em>Journal of Transport and Land Use</em> 19 (1): 21–40. <a href="https://doi.org/10.5198/jtlu.2026.2771">https://doi.org/10.5198/jtlu.2026.2771</a>.
+</div>
+<div id="ref-moran2024multiscale" class="csl-entry" role="listitem">
+Moran, Marcel E., and Debra F. Laefer. 2024. <span>“Multiscale Analysis of Pedestrian Crossing Distance.”</span> <em>Journal of the American Planning Association</em>. <a href="https://doi.org/10.1080/01944363.2024.2394610">https://doi.org/10.1080/01944363.2024.2394610</a>.
+</div>
+<div id="ref-soroori2023spatial" class="csl-entry" role="listitem">
+Soroori, E., B. Kiani, S. Ghasemi, A. Mohammadi, H. Shabanikiya, and R. Bergquist. 2023. <span>“Spatial Association Between Urban Neighbourhood Characteristics and Child Pedestrian–Motor Vehicle Collisions.”</span> <em>Applied Spatial Analysis and Policy</em> 16 (4): 1443–62. <a href="https://doi.org/10.1007/s12061-023-09519-w">https://doi.org/10.1007/s12061-023-09519-w</a>.
+</div>
+<div id="ref-zhu2022exploring" class="csl-entry" role="listitem">
+Zhu, Manman, Haojie Li, N. N. Sze, and Gang Ren. 2022. <span>“Exploring the Impacts of Street Layout on the Frequency of Pedestrian Crashes: A Micro-Level Study.”</span> <em>Journal of Safety Research</em> 81: 91–100. <a href="https://doi.org/10.1016/j.jsr.2022.01.009">https://doi.org/10.1016/j.jsr.2022.01.009</a>.
+</div>
+</div></section></div></main>
 <!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
