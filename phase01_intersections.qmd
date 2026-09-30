@@ -50,15 +50,32 @@ cc_boundary_geo <- st_read("data/boundaries/cc_boundary.shp") |> st_transform(43
 st_write(cc_boundary_geo, "data/boundaries/cc_boundary.geojson", delete_dsn = TRUE)
 ```
 
-```bash
-osmium extract --polygon data/boundaries/cc_boundary.geojson \
-  illinois-latest.osm.pbf \
-  -o data/osm/cook_extract.osm.pbf --overwrite
+`osmium-tool` is a system package (C++), not an R or Python package — but since it's available on conda-forge, it can be installed into the existing `osmnx-env` conda environment and run from R through `reticulate`, without ever leaving RStudio for a separate terminal:
+
+```r
+reticulate::conda_install("osmnx-env", packages = "osmium-tool", channel = "conda-forge")
+
+# confirm it's actually reachable in that environment before relying on it
+reticulate::conda_run2(cmd = "osmium", args = "--version", envname = "osmnx-env")
 ```
 
-### One-time setup
+With that done, `reticulate::conda_run2()` runs any `osmium` subcommand inside `osmnx-env` the same way — `cmd` is the executable, `args` is a plain character vector of the command-line arguments (**not** `cmd_args` — that argument name doesn't exist and raises `unused argument`), and `envname` picks the conda environment:
 
-`osmium-tool` is a system package (C++), not installable via `install.packages()` or `conda install` from within R/Python — install it once with the platform's package manager (e.g., `apt install osmium-tool`, `brew install osmium-tool`, or the `osmium-tool` conda-forge package if a system package manager isn't available).
+```r
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "extract", "--polygon", "data/boundaries/cc_boundary.geojson",
+    "illinois-latest.osm.pbf",
+    "-o", "data/osm/cook_extract.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+file.exists("data/osm/cook_extract.osm.pbf")
+```
+
+One caveat worth knowing before chaining several of these calls (Step 2 does exactly that): `conda_run2()` joins `args` with a plain space, without quoting each element individually. That's harmless for every argument used in this document (none contain spaces), but an argument that did contain one would need its own quoting added manually.
 
 ## Step 2 — Filter to the Drive Network (`osmium tags-filter`)
 
@@ -72,36 +89,70 @@ osmium extract --polygon data/boundaries/cc_boundary.geojson \
 
 as five sequential `osmium tags-filter` passes (verified live end-to-end on a synthetic file: a `service=driveway` way present after the keep-pass was correctly dropped by the following invert-match pass, while an unrelated way was left untouched):
 
-```bash
+Each pass is a separate `reticulate::conda_run2()` call, feeding the previous pass's output into the next:
+
+```r
 # 1. Keep only the drive-network highway subtypes (same list as dataprep.qmd's highway_subtypes)
-osmium tags-filter data/osm/cook_extract.osm.pbf \
-  'w/highway=primary,primary_link,unclassified,residential,secondary,secondary_link,service,tertiary,tertiary_link,trunk,trunk_link,busway,construction,corridor' \
-  -o data/osm/cook_01_highway.osm.pbf --overwrite
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "data/osm/cook_extract.osm.pbf",
+    "w/highway=primary,primary_link,unclassified,residential,secondary,secondary_link,service,tertiary,tertiary_link,trunk,trunk_link,busway,construction,corridor",
+    "-o", "data/osm/cook_01_highway.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
 
 # 2. Drop the service-road exclusions (parking aisles, driveways)
-osmium tags-filter -i data/osm/cook_01_highway.osm.pbf \
-  'w/service=parking_aisle,driveway' \
-  -o data/osm/cook_02_service.osm.pbf --overwrite
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "-i", "data/osm/cook_01_highway.osm.pbf",
+    "w/service=parking_aisle,driveway",
+    "-o", "data/osm/cook_02_service.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
 
 # 3. Drop private-access ways
-osmium tags-filter -i data/osm/cook_02_service.osm.pbf \
-  'w/access=private' \
-  -o data/osm/cook_03_access.osm.pbf --overwrite
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "-i", "data/osm/cook_02_service.osm.pbf",
+    "w/access=private",
+    "-o", "data/osm/cook_03_access.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
 
 # 4. Drop anything tagged as an aeroway (any value)
-osmium tags-filter -i data/osm/cook_03_access.osm.pbf \
-  'w/aeroway' \
-  -o data/osm/cook_04_aeroway.osm.pbf --overwrite
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "-i", "data/osm/cook_03_access.osm.pbf",
+    "w/aeroway",
+    "-o", "data/osm/cook_04_aeroway.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
 
 # 5. Drop indoor=yes, and output straight to OSM XML (osmium's -f/--output-format
 #    works on any command, so this folds the pbf-to-XML conversion into the last
 #    filtering pass rather than needing a separate `osmium cat` step)
-osmium tags-filter -i data/osm/cook_04_aeroway.osm.pbf \
-  'w/indoor=yes' \
-  -o data/osm/cook_drive_network.osm -f osm --overwrite
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "-i", "data/osm/cook_04_aeroway.osm.pbf",
+    "w/indoor=yes",
+    "-o", "data/osm/cook_drive_network.osm", "-f", "osm", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+file.exists("data/osm/cook_drive_network.osm")
 ```
 
-The intermediate `.osm.pbf` files (steps 1–4) keep the pipeline fast; only the final output needs to be XML, since that's the only file `graph_from_xml()` reads.
+The intermediate `.osm.pbf` files (passes 1–4) keep the pipeline fast; only the final output needs to be XML, since that's the only file `graph_from_xml()` reads.
 
 ## Step 3 — Build the Graph Once, Reuse Existing Logic Unchanged
 
