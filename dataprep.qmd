@@ -45,21 +45,6 @@ library(lubridate)
 library(stringr)
 ```
 
-```{r}
-#| label: osmnx-setup
-
-reticulate::use_condaenv("osmnx-env", required = TRUE)
-
-# convert = FALSE: keep everything returned by these modules as live Python
-# object references rather than letting reticulate auto-convert them to R
-# the instant a call returns (see get_area_intersections() below for why).
-ox <- reticulate::import("osmnx", convert = FALSE)
-shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
-
-ox$settings$use_cache <- TRUE
-ox$settings$log_console <- TRUE
-```
-
 ## Study Area Geography
 
 Supports `phase01.qmd`'s *Study Area Geography* table. Combines the City of Chicago's 77 community areas with suburban Cook County's incorporated municipalities (≥4 sq mi) into a single, internally consistent geography (`study_area`, N ≈ 200), identified by `geoid` and `name`, with a `type` field distinguishing the two.
@@ -133,6 +118,52 @@ An earlier version of this pipeline built the run list from `cc_municipalities.s
 :::
 
 ## Street Intersections
+```{r}
+#| label: osmnx-setup
+
+reticulate::conda_install("osmnx-env", packages = "osmium-tool", channel = "conda-forge")
+
+# confirm it exists
+file.exists(file.path(
+  dirname(reticulate::conda_binary()), "..", "envs", "osmnx-env",
+  "Library", "bin", "osmium.exe"
+))
+
+reticulate::use_condaenv("osmnx-env", required = TRUE)
+
+# convert = FALSE: keep everything returned by these modules as live Python
+# object references rather than letting reticulate auto-convert them to R
+# the instant a call returns (see get_area_intersections() below for why).
+ox <- reticulate::import("osmnx", convert = FALSE)
+shapely_wkt <- reticulate::import("shapely.wkt", convert = FALSE)
+
+ox$settings$use_cache <- TRUE
+ox$settings$log_console <- TRUE
+```
+
+```{r}
+library(sf)
+cc_boundary_geo <- st_read("data/boundaries/cc_boundary.shp") |> st_transform(4326)
+st_write(cc_boundary_geo, "data/boundaries/cc_boundary.geojson", delete_dsn = TRUE)
+
+# if you don't already have the Illinois PBF downloaded somewhere, grab it:
+download.file(
+  "https://download.geofabrik.de/north-america/us/geofabrik_illinois-latest.osm.pbf",
+  "illinois-latest.osm.pbf", mode = "wb", method = "libcurl"
+)
+
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "extract", "--polygon", "data/boundaries/cc_boundary.geojson",
+    "data/osm/illinois-latest.osm.pbf",
+    "-o", "data/osm/cook_extract.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+```
+
 
 Supports `phase01.qmd`'s *Street Intersections* table (candidate crossing locations for Aim 1; spatial units for Aims 3–4).
 
@@ -155,6 +186,38 @@ drive_filter <- glue(
   '["access"!~"private"]["aeroway"!~".*"]["indoor"!~"yes"]'
 )
 ```
+
+
+```{r}
+# 1. Keep only the drive-network highway subtypes (same list as dataprep.qmd's highway_subtypes)
+osmium tags-filter data/osm/cook_extract.osm.pbf \
+  'w/highway=primary,primary_link,unclassified,residential,secondary,secondary_link,service,tertiary,tertiary_link,trunk,trunk_link,busway,construction,corridor' \
+  -o data/osm/cook_01_highway.osm.pbf --overwrite
+
+# 2. Drop the service-road exclusions (parking aisles, driveways)
+osmium tags-filter -i data/osm/cook_01_highway.osm.pbf \
+  'w/service=parking_aisle,driveway' \
+  -o data/osm/cook_02_service.osm.pbf --overwrite
+
+# 3. Drop private-access ways
+osmium tags-filter -i data/osm/cook_02_service.osm.pbf \
+  'w/access=private' \
+  -o data/osm/cook_03_access.osm.pbf --overwrite
+
+# 4. Drop anything tagged as an aeroway (any value)
+osmium tags-filter -i data/osm/cook_03_access.osm.pbf \
+  'w/aeroway' \
+  -o data/osm/cook_04_aeroway.osm.pbf --overwrite
+
+# 5. Drop indoor=yes, and output straight to OSM XML (osmium's -f/--output-format
+#    works on any command, so this folds the pbf-to-XML conversion into the last
+#    filtering pass rather than needing a separate `osmium cat` step)
+osmium tags-filter -i data/osm/cook_04_aeroway.osm.pbf \
+  'w/indoor=yes' \
+  -o data/osm/cook_drive_network.osm -f osm --overwrite
+```
+
+
 
 Build the per-area run list — one row per `study_area` unit, with a WKT polygon and a `wave` number for batched, resumable processing:
 
@@ -220,6 +283,16 @@ get_area_intersections <- function(geoid, name, wkt,
 ```
 
 Run across all study-area units, wave by wave. This queries the shared public Overpass API underneath `osmnx` — process sequentially within each wave, with a short pause between units, and skip units already written so a failed run can resume without redoing completed ones. See `Phase0.qmd`'s Step 6 for a list of alternate Overpass mirrors if the default endpoint is timing out.
+
+If the default `overpass-api.de` endpoint is timing out (a real risk — it's a shared, free, sometimes-overloaded community server), swap in one of these public mirrors by setting `ox$settings$overpass_url` before Step 6, as in the chunk below:
+
+-   `https://overpass.kumi.systems/api/interpreter` — Kumi Systems, generally reliable, commonly recommended as a fallback
+-   `https://overpass.openstreetmap.fr/api/interpreter` — French OSM chapter mirror
+-   `https://overpass.openstreetmap.ru/api/interpreter` — Russian mirror
+-   `https://overpass.private.coffee/api/interpreter`
+-   `https://overpass.nchc.org.tw/api/interpreter` — Taiwan (NCHC) mirror
+
+Check whether a mirror is up before switching to it by visiting `<mirror-base-url>/api/status` in a browser (e.g. `https://overpass.kumi.systems/api/status`).
 
 ```{r}
 #| label: run-waves
@@ -318,6 +391,8 @@ il_streets <- oe_read(
   query = "SELECT * FROM lines WHERE highway IS NOT NULL",
   quiet = TRUE
 )
+
+osmextract::oe_find("illinois", download_directory = osmextract::oe_download_directory())
 
 cc_streets <- il_streets %>%
   filter(highway %in% highway_subtypes) %>%
