@@ -23,7 +23,42 @@ format:
     toc: true
     number-sections: true
 editor: source
+editor_options: 
+  chunk_output_type: console
 ---
+
+## Step 1 — Activate R Packages, Connect R to the OSMnx Python environment
+
+```{r}
+#| label: r-packages
+#| eval: true
+#| code-fold: true
+
+library(sf)
+library(reticulate)
+library(dplyr)
+library(purrr)
+library(readr)
+library(glue)
+library(janitor)
+library(cli)
+library(tigris)
+library(units)
+library(leaflet)
+library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+library(osmextract)
+library(readr)
+library(dplyr)
+library(sf)
+library(lubridate)
+library(purrr)
+library(stringr)
+
+# API key for leaflet maps
+CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
+
+
+```
 
 ## Overview
 
@@ -40,7 +75,77 @@ Supports **Aims 1–4** (defines the unit of geography used to organize and aggr
 | Combine Chicago community areas and suburban municipalities | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
 | Reconcile boundary source and projection | Source boundaries from Cook County/Chicago health-atlas geographies; standardize to a common projected CRS for area and distance calculations | Projected study-area boundary file | Complete |
 
+```{r}
+#| label: create-boundaries
+#| code-fold: true
 
+# download latest counties data from US Census TIGER/Line data
+# Cook County Boundary
+counties_il <- counties(state="17", cb=TRUE)
+
+# reformat data, standardize column names
+cc_boundary <- counties_il %>%
+  filter(GEOID == "17031") %>%
+  st_transform(3435) %>%
+  st_as_sf() %>%
+  select(geoid_county = GEOID,
+         name_county = NAME,
+         area_land = ALAND,
+         area_water = AWATER) %>%
+    mutate(
+      area_land = set_units(area_land, m^2),
+      area_water = set_units(area_water, m^2),
+      area_land_sqmi = set_units(area_land, mi^2),
+      area_water_sqmi = set_units(area_water, mi^2),
+      area_sqmi = area_land_sqmi + area_water_sqmi
+    ) %>%
+    select(-c(area_land, area_water))
+
+# write cook county boundary to data/boundaries folder
+st_write(obj = cc_boundary, dsn = "data/boundaries/cc_boundary.shp")
+
+# Community areas
+community_areas <- st_read("https://metopio.blob.core.windows.net/lalage/atlas/3/shapes/communityareas.topo.json", quiet=TRUE) %>% 
+  st_as_sf() %>% 
+  st_set_crs(4326) %>% 
+  st_transform(3435) %>% 
+  rename(geoid = id) %>% 
+  mutate(geoid= str_replace(geoid,"1714000-",""),
+         location = "Chicago, IL",
+         type = "community area")
+
+# Places
+places_cook_county <- st_read("https://metopio.blob.core.windows.net/lalage/atlas/6/shapes/SCC-place.topo.json", quiet=TRUE) %>% 
+  st_as_sf() %>% 
+  st_set_crs(4326) %>% 
+  st_transform(3435) %>% 
+  rename(geoid = id) %>% 
+  mutate(sqmi = as.numeric(st_area(geometry)) * 0.0000003861,
+         location = "suburban Cook County",
+         type = "municipality") %>% 
+  filter(sqmi >= 4) %>% 
+  select(-sqmi)
+
+# create a novel geography in Cook County which combines both municipalities in suburban Cook County and communities areas in Chicago
+study_area <- places_cook_county %>% 
+  bind_rows(community_areas) %>% 
+  st_as_sf() %>% 
+  st_make_valid()
+
+# write cook county municipalities to data/boundaries folder
+st_write(obj = study_area, dsn = "data/boundaries/study_area.shp")
+
+# read cook county boundary
+cc_boundary <- st_read("data/boundaries/cc_boundary.shp") %>%
+  st_make_valid() %>%
+  st_transform(4326)  # osmnx expects unprojected lat/lon polygons
+
+# read study area layer
+study_area <- st_read("data/boundaries/study_area.shp") %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+```
 
 
 ## Street Intersections
