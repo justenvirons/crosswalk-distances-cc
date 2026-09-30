@@ -158,6 +158,8 @@ Supports **Aim 1** (defines candidate crossing locations for the segmentation pi
 | Consolidate intersections | Merge closely spaced OSM nodes into single intersection points, consistent with the reference methodology's approach | Countywide consolidated-intersection point layer (~170,000 points) | Complete |
 | Cache/skip already-downloaded units | Avoid re-downloading intersections for study-area units already processed in an earlier run | Resumable run list | Complete |
 
+The above runs one live Overpass query per study-area unit (~200), which is what the resumable run list exists to survive. [`phase01_intersections.qmd`](phase01_intersections.qmd) plans and verifies an offline alternative — clip and filter the Illinois OSM extract locally with `osmium`, then build the countywide graph once with `ox$graph_from_xml()` — that would replace this section's Overpass dependency entirely once validated.
+
 ## Crossing Distance (Segmentation Models)
 
 Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.

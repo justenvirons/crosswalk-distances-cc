@@ -1,0 +1,143 @@
+---
+title: "Phase 1 — Street Intersections: Offline Extraction via osmium + graph_from_xml"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+---
+
+## Purpose
+
+`dataprep.qmd`'s current *Street Intersections* section calls `ox$graph_from_polygon()` once per study-area unit (~200 units, processed in waves) against the live Overpass API — the same shared, rate-limited, sometimes-overloaded endpoint that has already caused repeated trouble in this project (timeouts, mirror-switching). This document operationalizes an offline alternative: clip and filter the Illinois OSM extract locally with `osmium`, build the drive-network graph **once** for the whole county with `ox$graph_from_xml()`, and run the exact same `project_graph()` → `consolidate_intersections()` logic `dataprep.qmd` already has, unchanged. No Overpass request, no per-unit run list, no resume logic — one call instead of ~200.
+
+This is a planning/validation document, not a live pipeline change: it lays out and verifies the approach in detail so it can be adopted into `dataprep.qmd`'s *Street Intersections* section once validated (see *Relationship to `dataprep.qmd`*, below).
+
+## Why This Works — Verified, Not Assumed
+
+`graph_from_xml()` parses a static local OSM XML file into the same kind of graph `graph_from_polygon()` builds from a live Overpass response, so the downstream code (`project_graph()`, `consolidate_intersections()`, coordinate extraction) is reusable unchanged. But two things about it needed checking before relying on it, so this was verified directly against the installed `osmnx` package (2.1.1) source and a live `osmium` (1.16.0) install, rather than assumed:
+
+- **`graph_from_xml()` takes no `custom_filter`/`network_type` argument, and applies no tag-based filtering at all.** Its signature is `graph_from_xml(filepath, *, bidirectional=False, simplify=True, retain_all=False, encoding="utf-8")` — nothing like `custom_filter`. Tracing its parse path (`_osm_xml._overpass_json_from_xml()` → the SAX `_OSMContentHandler` → `graph._parse_nodes_paths()` → `graph._create_graph()`) confirms every `<way>` element in the file becomes a graph edge, unconditionally — there is no highway-tag check anywhere in that chain. This means the `highway_subtypes`/`service_exclusion`/`access`/`aeroway`/`indoor` filtering `dataprep.qmd`'s `drive_filter` currently applies *via the Overpass query string* must instead happen **upstream, in the file itself**, before `graph_from_xml()` ever reads it — that's what Step 2 below does with `osmium tags-filter`.
+- **`.pbf` is not accepted.** `graph_from_xml()` hard-parses the file as XML (`etree_parse`/SAX). Feeding it a binary `.pbf` file would fail outright. The `.pbf` → `.osm` XML conversion in Step 2 is required, not optional — this settles the "worth a quick test rather than assuming" question from the original three-step sketch.
+- **Orphaned nodes from the filtering passes are handled automatically, not left over as junk.** Removing ways in Step 2 doesn't remove the nodes those ways referenced — but `graph_from_xml()`'s default `retain_all=False` (matching every existing per-unit call in `dataprep.qmd`) discards every graph component except the largest one, which drops those now-isolated single-node leftovers with no extra cleanup step needed.
+
+## Step 1 — Clip Illinois to Cook County (`osmium extract`)
+
+Reuse the Illinois `.osm.pbf` `dataprep.qmd` already downloads via `osmextract::oe_read()` for the *Streets and Speed Limits* section (`https://download.geofabrik.de/north-america/us/illinois-latest.osm.pbf`) — no second download needed.
+
+`osmium extract --polygon` requires a GeoJSON **Feature** (verified live: a bare `Polygon` geometry is rejected with `Expected 'type' value to be 'Feature'`) in geographic (lon/lat) coordinates. `sf::st_write()`'s GeoJSON driver produces a `Feature`/`FeatureCollection` by default, so exporting the already-built `cc_boundary` (from `dataprep.qmd`'s *Study Area Geography* section) just needs the right CRS:
+
+```r
+library(sf)
+cc_boundary_geo <- st_read("data/boundaries/cc_boundary.shp") |> st_transform(4326)
+st_write(cc_boundary_geo, "data/boundaries/cc_boundary.geojson", delete_dsn = TRUE)
+```
+
+```bash
+osmium extract --polygon data/boundaries/cc_boundary.geojson \
+  illinois-latest.osm.pbf \
+  -o data/osm/cook_extract.osm.pbf --overwrite
+```
+
+### One-time setup
+
+`osmium-tool` is a system package (C++), not installable via `install.packages()` or `conda install` from within R/Python — install it once with the platform's package manager (e.g., `apt install osmium-tool`, `brew install osmium-tool`, or the `osmium-tool` conda-forge package if a system package manager isn't available).
+
+## Step 2 — Filter to the Drive Network (`osmium tags-filter`)
+
+`osmium tags-filter` matches a `w/key=value1,value2,...` expression syntax (verified live: comma-separated values within one expression are matched as alternatives), and `-i`/`--invert-match` flips a pass from "keep matches" to "drop matches." Chaining a keep-pass with several invert-match exclude-passes reproduces `drive_filter`'s exact logic:
+
+```
+'["highway"~"{highway_subtypes}"]'
+'["service"!~"{service_exclusion}"]'
+'["access"!~"private"]["aeroway"!~".*"]["indoor"!~"yes"]'
+```
+
+as five sequential `osmium tags-filter` passes (verified live end-to-end on a synthetic file: a `service=driveway` way present after the keep-pass was correctly dropped by the following invert-match pass, while an unrelated way was left untouched):
+
+```bash
+# 1. Keep only the drive-network highway subtypes (same list as dataprep.qmd's highway_subtypes)
+osmium tags-filter data/osm/cook_extract.osm.pbf \
+  'w/highway=primary,primary_link,unclassified,residential,secondary,secondary_link,service,tertiary,tertiary_link,trunk,trunk_link,busway,construction,corridor' \
+  -o data/osm/cook_01_highway.osm.pbf --overwrite
+
+# 2. Drop the service-road exclusions (parking aisles, driveways)
+osmium tags-filter -i data/osm/cook_01_highway.osm.pbf \
+  'w/service=parking_aisle,driveway' \
+  -o data/osm/cook_02_service.osm.pbf --overwrite
+
+# 3. Drop private-access ways
+osmium tags-filter -i data/osm/cook_02_service.osm.pbf \
+  'w/access=private' \
+  -o data/osm/cook_03_access.osm.pbf --overwrite
+
+# 4. Drop anything tagged as an aeroway (any value)
+osmium tags-filter -i data/osm/cook_03_access.osm.pbf \
+  'w/aeroway' \
+  -o data/osm/cook_04_aeroway.osm.pbf --overwrite
+
+# 5. Drop indoor=yes, and output straight to OSM XML (osmium's -f/--output-format
+#    works on any command, so this folds the pbf-to-XML conversion into the last
+#    filtering pass rather than needing a separate `osmium cat` step)
+osmium tags-filter -i data/osm/cook_04_aeroway.osm.pbf \
+  'w/indoor=yes' \
+  -o data/osm/cook_drive_network.osm -f osm --overwrite
+```
+
+The intermediate `.osm.pbf` files (steps 1–4) keep the pipeline fast; only the final output needs to be XML, since that's the only file `graph_from_xml()` reads.
+
+## Step 3 — Build the Graph Once, Reuse Existing Logic Unchanged
+
+```r
+G_drive <- ox$graph_from_xml("data/osm/cook_drive_network.osm", retain_all = FALSE)
+G_drive <- ox$project_graph(G_drive)
+
+intersections <- ox$consolidate_intersections(G_drive, rebuild_graph = FALSE, dead_ends = FALSE)
+
+coords_df <- intersections$to_crs("EPSG:4326")$get_coordinates()
+lon <- as.numeric(reticulate::py_to_r(coords_df$x$to_numpy()))
+lat <- as.numeric(reticulate::py_to_r(coords_df$y$to_numpy()))
+
+cook_intersections <- tibble::tibble(lon = lon, lat = lat)
+```
+
+`retain_all = FALSE` and the `consolidate_intersections()` call are identical to `dataprep.qmd`'s `get_area_intersections()`; the coordinate-extraction pattern (numpy array, not a converted pandas object) is the same one already used there for the same reticulate-conversion-safety reason. This single call replaces the entire run-list/wave/`pwalk()`/Overpass-mirror machinery in `dataprep.qmd`'s current *Street Intersections* section.
+
+## Practical Notes
+
+- **Study-area attribution is lost and must be restored.** Each per-unit Overpass call in the current approach got its `geoid`/`name`/`type` attribution "for free," since the call itself was scoped to one unit's polygon. A single countywide `graph_from_xml()` call has no such scoping — the result is one flat table of intersection points with no unit attribution. Restore it with an explicit spatial join against `study_area` after Step 3: `st_join(st_as_sf(cook_intersections, coords = c("lon","lat"), crs = 4326), study_area)`.
+- **No resume/checkpoint logic is needed**, unlike the current run-list/wave system — that machinery exists specifically to survive mid-run Overpass failures, a failure mode this approach doesn't have (there's no live query to fail). Re-running for an updated OSM snapshot is just re-running Steps 1–3 against a freshly downloaded Illinois `.osm.pbf`.
+- **This changes only how the input graph is sourced, not the consolidation algorithm** — `consolidate_intersections()`'s tolerance, `rebuild_graph`, and `dead_ends` arguments are unchanged from `dataprep.qmd`.
+- **Validate before trusting it as a full replacement.** Before retiring the Overpass-based approach, compare this method's output on a handful of already-processed municipalities against the corresponding per-unit results already on disk — a materially different intersection count for the same unit would indicate the filter chain in Step 2 doesn't fully match `drive_filter`'s intent and needs a closer look.
+
+## Task Table
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Clip Illinois to Cook County | `osmium extract --polygon` against `cc_boundary`, reusing the Illinois PBF `dataprep.qmd` already downloads | `cook_extract.osm.pbf` | Not started |
+| Filter to the drive network | Five-pass `osmium tags-filter` chain (one keep-pass, four invert-match exclude-passes), final pass outputs OSM XML directly | `cook_drive_network.osm` | Not started |
+| Build the countywide graph | `ox$graph_from_xml()` once, then the existing `project_graph()`/`consolidate_intersections()` calls, unchanged | Countywide intersection point table (replaces the per-unit run) | Not started |
+| Restore study-area attribution | Spatial join of the consolidated intersections against `study_area` | `all_intersections_sf` with `geoid`/`name`/`type` attribution | Not started |
+| Validate against existing output | Spot-check intersection counts for a sample of municipalities against the current per-unit results | Validation comparison | Not started |
+| Retire the Overpass-based run list | Once validated, replace `dataprep.qmd`'s wave/resume machinery in *Street Intersections* with this approach | Simplified `dataprep.qmd` (future edit, out of scope for this document) | Not started |
+
+## Relationship to `dataprep.qmd`
+
+This document plans and verifies the approach; it does not itself change `dataprep.qmd`. Once validated per the task table above, `dataprep.qmd`'s *Street Intersections* section would be rewritten to use Steps 1–3 here in place of its current run-list/wave/Overpass loop — the rest of that section's downstream consumers (the combine step, `output/all_intersections.shp`, the `phase01.qmd` interactive map) are unaffected, since they only depend on the final `all_intersections_sf` schema (`geoid`, `name`, `type`, `geometry`), not on how it was produced.
