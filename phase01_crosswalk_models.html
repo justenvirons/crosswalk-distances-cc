@@ -10,7 +10,7 @@
 <meta name="author" content="Zane Sufi">
 <meta name="dcterms.date" content="2026-09-30">
 
-<title>Phase 1 — Street Intersections: Offline Extraction via osmium + graph_from_xml</title>
+<title>Phase 1 — Crosswalk Distance: Imagery Source and Segmentation Model Comparison</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -23,41 +23,26 @@ width: 0.8em;
 margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
 }
 
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+margin-bottom: 0em;
 }
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+.hanging-indent div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
 }
-pre.numberSource code
-{ counter-reset: source-line 0; }
-pre.numberSource code > span
-{ position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-{ content: counter(source-line);
-position: relative; left: -1em; text-align: right; vertical-align: baseline;
-border: none; display: inline-block;
--webkit-touch-callout: none; -webkit-user-select: none;
--khtml-user-select: none; -moz-user-select: none;
--ms-user-select: none; user-select: none;
-padding: 0 4px; width: 4em;
+div.csl-left-margin {
+min-width:2em;
+float:left;
 }
-pre.numberSource { margin-left: 3em; padding-left: 4px; }
-div.sourceCode
-{ }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
 }
-</style>
+div.csl-indent {
+margin-left: 2em;
+}</style>
 
 
 <script>/*!
@@ -2211,21 +2196,31 @@ vertical-align: -.125em;
    
   <ul>
   <li><a href="#purpose" id="toc-purpose" class="nav-link active" data-scroll-target="#purpose">Purpose</a></li>
-  <li><a href="#why-this-works-verified-not-assumed" id="toc-why-this-works-verified-not-assumed" class="nav-link" data-scroll-target="#why-this-works-verified-not-assumed">Why This Works — Verified, Not Assumed</a></li>
-  <li><a href="#step-1-clip-illinois-to-cook-county-osmium-extract" id="toc-step-1-clip-illinois-to-cook-county-osmium-extract" class="nav-link" data-scroll-target="#step-1-clip-illinois-to-cook-county-osmium-extract">Step 1 — Clip Illinois to Cook County (<code>osmium extract</code>)</a></li>
-  <li><a href="#step-2-filter-to-the-drive-network-osmium-tags-filter" id="toc-step-2-filter-to-the-drive-network-osmium-tags-filter" class="nav-link" data-scroll-target="#step-2-filter-to-the-drive-network-osmium-tags-filter">Step 2 — Filter to the Drive Network (<code>osmium tags-filter</code>)</a></li>
-  <li><a href="#step-3-build-the-graph-once-reuse-existing-logic-unchanged" id="toc-step-3-build-the-graph-once-reuse-existing-logic-unchanged" class="nav-link" data-scroll-target="#step-3-build-the-graph-once-reuse-existing-logic-unchanged">Step 3 — Build the Graph Once, Reuse Existing Logic Unchanged</a></li>
-  <li><a href="#practical-notes" id="toc-practical-notes" class="nav-link" data-scroll-target="#practical-notes">Practical Notes</a></li>
+  <li><a href="#background-why-compare-imagery-sources-at-all" id="toc-background-why-compare-imagery-sources-at-all" class="nav-link" data-scroll-target="#background-why-compare-imagery-sources-at-all">Background: Why Compare Imagery Sources at All</a></li>
+  <li><a href="#the-three-approaches" id="toc-the-three-approaches" class="nav-link" data-scroll-target="#the-three-approaches">The Three Approaches</a>
+  <ul class="collapse">
+  <li><a href="#approach-a-3-band-rgb-cook-county-orthoimagery" id="toc-approach-a-3-band-rgb-cook-county-orthoimagery" class="nav-link" data-scroll-target="#approach-a-3-band-rgb-cook-county-orthoimagery">Approach A — 3-Band RGB, Cook County Orthoimagery</a></li>
+  <li><a href="#approach-b-4-band-rgb-near-infrared-cook-county-orthoimagery" id="toc-approach-b-4-band-rgb-near-infrared-cook-county-orthoimagery" class="nav-link" data-scroll-target="#approach-b-4-band-rgb-near-infrared-cook-county-orthoimagery">Approach B — 4-Band RGB + Near-Infrared, Cook County Orthoimagery</a></li>
+  <li><a href="#approach-c-google-maps-imagery-reference-baseline" id="toc-approach-c-google-maps-imagery-reference-baseline" class="nav-link" data-scroll-target="#approach-c-google-maps-imagery-reference-baseline">Approach C — Google Maps Imagery (Reference Baseline)</a></li>
+  </ul></li>
+  <li><a href="#comparison-design" id="toc-comparison-design" class="nav-link" data-scroll-target="#comparison-design">Comparison Design</a>
+  <ul class="collapse">
+  <li><a href="#sample-selection" id="toc-sample-selection" class="nav-link" data-scroll-target="#sample-selection">Sample selection</a></li>
+  <li><a href="#ground-truth" id="toc-ground-truth" class="nav-link" data-scroll-target="#ground-truth">Ground truth</a></li>
+  <li><a href="#metrics" id="toc-metrics" class="nav-link" data-scroll-target="#metrics">Metrics</a></li>
+  <li><a href="#statistical-approach" id="toc-statistical-approach" class="nav-link" data-scroll-target="#statistical-approach">Statistical approach</a></li>
+  <li><a href="#decision-criteria-for-aim-1b" id="toc-decision-criteria-for-aim-1b" class="nav-link" data-scroll-target="#decision-criteria-for-aim-1b">Decision criteria for Aim 1b</a></li>
+  </ul></li>
   <li><a href="#task-table" id="toc-task-table" class="nav-link" data-scroll-target="#task-table">Task Table</a></li>
-  <li><a href="#relationship-to-dataprep.qmd" id="toc-relationship-to-dataprep.qmd" class="nav-link" data-scroll-target="#relationship-to-dataprep.qmd">Relationship to <code>dataprep.qmd</code></a></li>
+  <li><a href="#open-questions" id="toc-open-questions" class="nav-link" data-scroll-target="#open-questions">Open Questions</a></li>
   </ul>
-<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="phase01_intersections.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="phase01_crosswalk_models.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Phase 1 — Street Intersections: Offline Extraction via osmium + graph_from_xml</h1>
+<h1 class="title">Phase 1 — Crosswalk Distance: Imagery Source and Segmentation Model Comparison</h1>
 <p class="subtitle lead">Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</p>
 </div>
 
@@ -2275,134 +2270,86 @@ vertical-align: -.125em;
 
 <section id="purpose" class="level2">
 <h2 class="anchored" data-anchor-id="purpose">Purpose</h2>
-<p><code>dataprep.qmd</code>’s current <em>Street Intersections</em> section calls <code>ox$graph_from_polygon()</code> once per study-area unit (~200 units, processed in waves) against the live Overpass API — the same shared, rate-limited, sometimes-overloaded endpoint that has already caused repeated trouble in this project (timeouts, mirror-switching). This document operationalizes an offline alternative: clip and filter the Illinois OSM extract locally with <code>osmium</code>, build the drive-network graph <strong>once</strong> for the whole county with <code>ox$graph_from_xml()</code>, and run the exact same <code>project_graph()</code> → <code>consolidate_intersections()</code> logic <code>dataprep.qmd</code> already has, unchanged. No Overpass request, no per-unit run list, no resume logic — one call instead of ~200.</p>
-<p>This is a planning/validation document, not a live pipeline change: it lays out and verifies the approach in detail so it can be adopted into <code>dataprep.qmd</code>’s <em>Street Intersections</em> section once validated (see <em>Relationship to <code>dataprep.qmd</code></em>, below).</p>
+<p>This document operationalizes Aim 1a (<code>phase00.qmd</code>): before producing the countywide crossing-distance dataset (Aim 1b), compare three imagery/segmentation-model approaches against manually measured ground truth on a sample of intersections across the study area, and use that comparison’s results to decide which approach Aim 1b should run at full scale. It is a planning document — it lays out the comparison design and the steps to operationalize each approach in enough detail to implement, not runnable pipeline code (that will live alongside <code>dataprep.qmd</code> once an approach is selected and implemented).</p>
+<p>This comparison is also designed to stand on its own as a methods contribution: a rigorous, ground-truth-validated test of whether a documented, single-vintage, leaf-off county orthoimagery product outperforms the commercial satellite basemap imagery the reference methodology <span class="citation" data-cites="moran2024multiscale moran2026scaling">(<a href="#ref-moran2024multiscale" role="doc-biblioref">Moran and Laefer 2024</a>; <a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span> was built on — independent of this project’s applied safety analyses in Aims 2–4.</p>
 </section>
-<section id="why-this-works-verified-not-assumed" class="level2">
-<h2 class="anchored" data-anchor-id="why-this-works-verified-not-assumed">Why This Works — Verified, Not Assumed</h2>
-<p><code>graph_from_xml()</code> parses a static local OSM XML file into the same kind of graph <code>graph_from_polygon()</code> builds from a live Overpass response, so the downstream code (<code>project_graph()</code>, <code>consolidate_intersections()</code>, coordinate extraction) is reusable unchanged. But two things about it needed checking before relying on it, so this was verified directly against the installed <code>osmnx</code> package (2.1.1) source and a live <code>osmium</code> (1.16.0) install, rather than assumed:</p>
+<section id="background-why-compare-imagery-sources-at-all" class="level2">
+<h2 class="anchored" data-anchor-id="background-why-compare-imagery-sources-at-all">Background: Why Compare Imagery Sources at All</h2>
+<p>The reference methodology measures crossing distance from Google Maps satellite/aerial basemap tiles. Three open questions about that choice motivate this comparison (Gap 4, <code>phase00.qmd</code>), and this document treats all three as testable, not assumed:</p>
+<ol type="1">
+<li><strong>Vintage/temporal consistency.</strong> Google’s basemap for a metro area is a mosaic assembled from multiple providers and capture dates that are not uniformly disclosed per-tile; adjacent tiles can represent different years. It is not established what year(s) of imagery any given Google-derived crossing-distance measurement actually represents.</li>
+<li><strong>Geometric integrity.</strong> It is not established in this literature whether Google’s basemap imagery is processed to survey-grade orthorectification — i.e., corrected for terrain- and building-lean-induced displacement so that a measured pixel distance equals the true ground distance everywhere in the image, not only near the image center or directly beneath the sensor (nadir). If it is not uniformly orthorectified, measured crossing distances could carry a position-dependent geometric bias that has gone undetected because no study has compared it against a documented survey-grade product.</li>
+<li><strong>Leaf-off visibility.</strong> Tree canopy overhanging an intersection or crosswalk is a plausible, unrecoverable source of measurement error (the pavement edge simply isn’t visible), independent of segmentation model quality. Whatever season/canopy-condition Google’s tiles happen to represent for a given location is not controlled for or documented.</li>
+</ol>
+<p>Cook County’s own orthoimagery program (<code>CookOrtho2025</code>, Cook County GIS) offers a documented alternative on all three counts: a single countywide flight year, imagery in both 3-band (RGB) and 4-band (RGB + near-infrared) products, at 6-inch native pixel resolution (finer than the ~30 cm/pixel Google tiles the reference methodology uses), referenced to NAD83(2011) Illinois State Plane East (feet) — the same CRS family (<code>EPSG:3435</code>) already used throughout this project’s pipeline — and, consistent with standard practice for county/regional orthophoto programs, flown leaf-off. It is served via an Esri ArcGIS ImageServer (<code>https://gis.cookcountyil.gov/imagery/rest/services/CookOrtho2025/ImageServer</code>) rather than a Google-style <code>{z}/{x}/{y}</code> slippy-map tile server; its <code>exportImage</code> REST operation returns an arbitrary bounding-box clip at a chosen pixel size and band selection directly, which is a good fit for pulling a fixed-radius clip around each intersection coordinate.</p>
+<p>None of this guarantees the county imagery is <em>better</em> for this specific task, though — a higher-resolution, leaf-off, single-vintage source is still a domain shift for a segmentation model fine-tuned on Google tiles’ particular resolution, color balance, and mosaicking artifacts (see <code>phase00.qmd</code>’s H5/H6/H7). That’s what this comparison tests.</p>
+</section>
+<section id="the-three-approaches" class="level2">
+<h2 class="anchored" data-anchor-id="the-three-approaches">The Three Approaches</h2>
+<section id="approach-a-3-band-rgb-cook-county-orthoimagery" class="level3">
+<h3 class="anchored" data-anchor-id="approach-a-3-band-rgb-cook-county-orthoimagery">Approach A — 3-Band RGB, Cook County Orthoimagery</h3>
+<p><strong>Model work required: none.</strong> This is a data-source swap, not a model change — the existing fine-tuned SAM 2.1 checkpoint already expects a 3-channel RGB input, and a 3-band clip from the county imagery is architecturally identical to a 3-band Google tile as far as the model is concerned.</p>
+<p>Steps:</p>
+<ol type="1">
+<li>For each sampled intersection (candidate list drawn from <code>dataprep.qmd</code>’s <code>all_intersections_sf</code>), buffer to the same fixed radius the reference methodology uses around each candidate crossing location.</li>
+<li>Request the RGB clip via the ImageServer’s <code>exportImage</code> operation: bounding box from step 1, <code>bandIds=0,1,2</code> (R, G, B; drop the NIR band), output format GeoTIFF, pixel size at native 6-inch resolution or resampled to match the model’s expected input dimensions — resolve this choice empirically (native resolution preserves the county imagery’s real advantage; resampling to the reference methodology’s fixed pixel dimensions keeps the model’s effective receptive field/input size consistent with what it was fine-tuned on). Reconcile the returned raster’s exact CRS against this project’s working CRS (<code>EPSG:3435</code>) before use — Cook County’s NAD83(2011) realization and the NAD83 (1986) realization already used elsewhere in this pipeline are very close but not identical; be deliberate about which is authoritative for distance measurement rather than assuming they’re interchangeable.</li>
+<li>Feed the clip directly into the existing fine-tuned SAM 2.1 checkpoint — no architecture or weight changes.</li>
+<li>Run the same grow-cut post-processing and crossing-distance measurement logic already implemented for the Google-imagery pipeline, unchanged.</li>
+</ol>
+<p>Open question this approach tests: does the different radiometric/visual style of a raw-ish orthophoto product (versus Google’s color-corrected, mosaicked basemap) degrade the existing model’s accuracy, even holding the RGB-only channel count fixed? (H5/H6)</p>
+</section>
+<section id="approach-b-4-band-rgb-near-infrared-cook-county-orthoimagery" class="level3">
+<h3 class="anchored" data-anchor-id="approach-b-4-band-rgb-near-infrared-cook-county-orthoimagery">Approach B — 4-Band RGB + Near-Infrared, Cook County Orthoimagery</h3>
+<p><strong>Model work required: yes</strong> — this is the approach that needs the channel-extension fine-tuning discussed for this project.</p>
+<p>Steps:</p>
+<ol type="1">
+<li>Same clip retrieval as Approach A, but request all 4 bands (<code>bandIds=0,1,2,3</code>).</li>
+<li><strong>Extend the segmentation model’s input layer.</strong> SAM’s image encoder is a Vision Transformer; the only place the channel count is architecturally fixed is the patch-embedding layer (a <code>Conv2d</code> with <code>in_channels=3</code>). Build a new <code>Conv2d</code> with <code>in_channels=4</code>, copy the pretrained R/G/B weights into the first 3 input channels unchanged, and zero-initialize the 4th (NIR) channel’s weights — this makes the modified model mathematically identical to the original on day one, so fine-tuning starts from a safe, known-good point rather than a randomly initialized layer.</li>
+<li><strong>Fine-tune.</strong> Freeze most of the backbone; unfreeze (at minimum) the new patch-embedding layer and the mask decoder. Train on labeled crosswalk/pavement masks over the 4-band tiles. If the original fine-tuning’s ground-truth masks are stored as georeferenced polygons (real-world coordinates) rather than pixel masks tied to the specific Google tiles, they can likely be rasterized directly onto the new county tiles’ pixel grid without manual re-annotation — confirm this before assuming fresh annotation is needed.</li>
+<li><strong>Compute.</strong> A single mid-tier GPU (e.g., Modal <code>gpu=&quot;A10G&quot;</code> or <code>&quot;L4&quot;</code>) for the fine-tuning run — this is a small job relative to full pretraining, closer to “fine-tune a small head” than “retrain a ViT.” Prototype the channel-inflation code and initial training loop somewhere cheap and interactive (e.g., Colab) before moving the finalized script to Modal, since Modal’s per-container debug cycle is slower to iterate against.</li>
+<li>Run the fine-tuned model, then the same grow-cut post-processing as Approaches A/C.</li>
+</ol>
+<p>Open question this approach tests: does the NIR band measurably reduce error beyond what leaf-off RGB alone (Approach A) already achieves, specifically at canopy-adjacent locations, given NIR’s stronger spectral contrast between vegetation and pavement? (H7)</p>
+</section>
+<section id="approach-c-google-maps-imagery-reference-baseline" class="level3">
+<h3 class="anchored" data-anchor-id="approach-c-google-maps-imagery-reference-baseline">Approach C — Google Maps Imagery (Reference Baseline)</h3>
+<p><strong>Model work required: none</strong> — this is the existing, already-implemented methodology, run unchanged as the comparison’s baseline: the same tile-fetch approach, the existing fine-tuned SAM 2.1 checkpoint, and the existing grow-cut post-processing. Its role here is to establish empirically whether switching away from it is actually justified, rather than assuming it from the imagery specs alone.</p>
+</section>
+</section>
+<section id="comparison-design" class="level2">
+<h2 class="anchored" data-anchor-id="comparison-design">Comparison Design</h2>
+<section id="sample-selection" class="level3">
+<h3 class="anchored" data-anchor-id="sample-selection">Sample selection</h3>
+<p>Draw a stratified sample of intersections from <code>dataprep.qmd</code>’s countywide <code>all_intersections_sf</code> layer. Proposed stratification dimensions, chosen to target each hypothesis directly rather than sample uniformly at random:</p>
 <ul>
-<li><strong><code>graph_from_xml()</code> takes no <code>custom_filter</code>/<code>network_type</code> argument, and applies no tag-based filtering at all.</strong> Its signature is <code>graph_from_xml(filepath, *, bidirectional=False, simplify=True, retain_all=False, encoding=&quot;utf-8&quot;)</code> — nothing like <code>custom_filter</code>. Tracing its parse path (<code>_osm_xml._overpass_json_from_xml()</code> → the SAX <code>_OSMContentHandler</code> → <code>graph._parse_nodes_paths()</code> → <code>graph._create_graph()</code>) confirms every <code>&lt;way&gt;</code> element in the file becomes a graph edge, unconditionally — there is no highway-tag check anywhere in that chain. This means the <code>highway_subtypes</code>/<code>service_exclusion</code>/<code>access</code>/<code>aeroway</code>/<code>indoor</code> filtering <code>dataprep.qmd</code>’s <code>drive_filter</code> currently applies <em>via the Overpass query string</em> must instead happen <strong>upstream, in the file itself</strong>, before <code>graph_from_xml()</code> ever reads it — that’s what Step 2 below does with <code>osmium tags-filter</code>.</li>
-<li><strong><code>.pbf</code> is not accepted.</strong> <code>graph_from_xml()</code> hard-parses the file as XML (<code>etree_parse</code>/SAX). Feeding it a binary <code>.pbf</code> file would fail outright. The <code>.pbf</code> → <code>.osm</code> XML conversion in Step 2 is required, not optional — this settles the “worth a quick test rather than assuming” question from the original three-step sketch.</li>
-<li><strong>Orphaned nodes from the filtering passes are handled automatically, not left over as junk.</strong> Removing ways in Step 2 doesn’t remove the nodes those ways referenced — but <code>graph_from_xml()</code>’s default <code>retain_all=False</code> (matching every existing per-unit call in <code>dataprep.qmd</code>) discards every graph component except the largest one, which drops those now-isolated single-node leftovers with no extra cleanup step needed.</li>
+<li><strong>Geography type</strong>: Chicago community area vs. suburban municipality (parallels H1’s built-form comparison).</li>
+<li><strong>Tree canopy cover</strong>: high vs. low at each candidate location (from a canopy/land-cover layer, or a quick NDVI-based screen using the county imagery’s own NIR band) — targets H5 and H7 directly.</li>
+<li><strong>Position within the Google tile grid</strong>: near tile-center vs. near tile-edge, using Google’s known, fixed tile-grid arithmetic to estimate each candidate’s offset — targets H6 (geometric integrity) directly.</li>
+<li><strong>Urban vs. suburban street-network form</strong> (arterial, cul-de-sac subdivision, dense grid) — consistent with the suburban-built-form validation already planned for the countywide run.</li>
+</ul>
+<p>A starting target of roughly 75–150 intersections is proposed — well above the “minimum 30 locations” floor already used elsewhere in this project’s statistical work (e.g., <code>sociome</code>’s ADI calculation), and enough to support the stratified/interaction breakdowns above; refine this with an explicit power calculation once the ground-truth measurement protocol (below) is finalized and its per-intersection cost is known.</p>
+</section>
+<section id="ground-truth" class="level3">
+<h3 class="anchored" data-anchor-id="ground-truth">Ground truth</h3>
+<p>Manually measure crossing distance at each sampled intersection, following the same measurement protocol as the reference methodology’s own validation, so results are comparable to its published 93% accuracy / ~2 ft 3 in median-error benchmark.</p>
+</section>
+<section id="metrics" class="level3">
+<h3 class="anchored" data-anchor-id="metrics">Metrics</h3>
+<ul>
+<li><strong>Absolute/median error</strong> against ground truth, per approach.</li>
+<li><strong>Inter-method agreement</strong> between the three approaches at the same intersections (a paired design, since every sampled intersection is measured three ways) — e.g., Bland-Altman-style agreement plots, or intraclass correlation.</li>
+<li><strong>Measurement failure rate</strong>: the share of sampled intersections where an approach cannot confidently identify the pavement edge (most likely canopy occlusion for Approach C, least likely hypothesized for Approaches A/B).</li>
+<li>All of the above, broken out by the sampling strata (canopy cover, tile-position, geography type) to test H5/H6/H7 specifically, not just compare overall averages.</li>
 </ul>
 </section>
-<section id="step-1-clip-illinois-to-cook-county-osmium-extract" class="level2">
-<h2 class="anchored" data-anchor-id="step-1-clip-illinois-to-cook-county-osmium-extract">Step 1 — Clip Illinois to Cook County (<code>osmium extract</code>)</h2>
-<p>Reuse the Illinois <code>.osm.pbf</code> <code>dataprep.qmd</code> already downloads via <code>osmextract::oe_read()</code> for the <em>Streets and Speed Limits</em> section (<code>https://download.geofabrik.de/north-america/us/illinois-latest.osm.pbf</code>) — no second download needed.</p>
-<p><code>osmium extract --polygon</code> requires a GeoJSON <strong>Feature</strong> (verified live: a bare <code>Polygon</code> geometry is rejected with <code>Expected &#39;type&#39; value to be &#39;Feature&#39;</code>) in geographic (lon/lat) coordinates. <code>sf::st_write()</code>’s GeoJSON driver produces a <code>Feature</code>/<code>FeatureCollection</code> by default, so exporting the already-built <code>cc_boundary</code> (from <code>dataprep.qmd</code>’s <em>Study Area Geography</em> section) just needs the right CRS:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>cc_boundary_geo <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">&quot;data/boundaries/cc_boundary.shp&quot;</span>) <span class="sc">|&gt;</span> <span class="fu">st_transform</span>(<span class="dv">4326</span>)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">st_write</span>(cc_boundary_geo, <span class="st">&quot;data/boundaries/cc_boundary.geojson&quot;</span>, <span class="at">delete_dsn =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>osmium-tool</code> is a system package (C++), not an R or Python package — but since it’s available on conda-forge, it can be installed into the existing <code>osmnx-env</code> conda environment and run from R through <code>reticulate</code>, without ever leaving RStudio for a separate terminal:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_install</span>(<span class="st">&quot;osmnx-env&quot;</span>, <span class="at">packages =</span> <span class="st">&quot;osmium-tool&quot;</span>, <span class="at">channel =</span> <span class="st">&quot;conda-forge&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># confirm it&#39;s actually reachable in that environment before relying on it</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(<span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>, <span class="at">args =</span> <span class="st">&quot;--version&quot;</span>, <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>With that done, <code>reticulate::conda_run2()</code> runs any <code>osmium</code> subcommand inside <code>osmnx-env</code> the same way — <code>cmd</code> is the executable, <code>args</code> is a plain character vector of the command-line arguments (<strong>not</strong> <code>cmd_args</code> — that argument name doesn’t exist and raises <code>unused argument</code>), and <code>envname</code> picks the conda environment:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;extract&quot;</span>, <span class="st">&quot;--polygon&quot;</span>, <span class="st">&quot;data/boundaries/cc_boundary.geojson&quot;</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;illinois-latest.osm.pbf&quot;</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_extract.osm.pbf&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="fu">file.exists</span>(<span class="st">&quot;data/osm/cook_extract.osm.pbf&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>One caveat worth knowing before chaining several of these calls (Step 2 does exactly that): <code>conda_run2()</code> joins <code>args</code> with a plain space, without quoting each element individually. That’s harmless for every argument used in this document (none contain spaces), but an argument that did contain one would need its own quoting added manually.</p>
+<section id="statistical-approach" class="level3">
+<h3 class="anchored" data-anchor-id="statistical-approach">Statistical approach</h3>
+<p>Because the same intersections are measured by all three approaches, treat this as a repeated-measures design: a mixed-effects model with intersection as a random effect, imagery/model approach as a fixed effect, and canopy cover / tile-position as interaction terms is the target analysis; paired t-tests or Wilcoxon signed-rank tests per approach-pair are a reasonable first pass before that model is built.</p>
 </section>
-<section id="step-2-filter-to-the-drive-network-osmium-tags-filter" class="level2">
-<h2 class="anchored" data-anchor-id="step-2-filter-to-the-drive-network-osmium-tags-filter">Step 2 — Filter to the Drive Network (<code>osmium tags-filter</code>)</h2>
-<p><code>osmium tags-filter</code> matches a <code>w/key=value1,value2,...</code> expression syntax (verified live: comma-separated values within one expression are matched as alternatives), and <code>-i</code>/<code>--invert-match</code> flips a pass from “keep matches” to “drop matches.” Chaining a keep-pass with several invert-match exclude-passes reproduces <code>drive_filter</code>’s exact logic:</p>
-<pre><code>&#39;[&quot;highway&quot;~&quot;{highway_subtypes}&quot;]&#39;
-&#39;[&quot;service&quot;!~&quot;{service_exclusion}&quot;]&#39;
-&#39;[&quot;access&quot;!~&quot;private&quot;][&quot;aeroway&quot;!~&quot;.*&quot;][&quot;indoor&quot;!~&quot;yes&quot;]&#39;</code></pre>
-<p>as five sequential <code>osmium tags-filter</code> passes (verified live end-to-end on a synthetic file: a <code>service=driveway</code> way present after the keep-pass was correctly dropped by the following invert-match pass, while an unrelated way was left untouched):</p>
-<p>Each pass is a separate <code>reticulate::conda_run2()</code> call, feeding the previous pass’s output into the next:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Keep only the drive-network highway subtypes (same list as dataprep.qmd&#39;s highway_subtypes)</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;tags-filter&quot;</span>, <span class="st">&quot;data/osm/cook_extract.osm.pbf&quot;</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;w/highway=primary,primary_link,unclassified,residential,secondary,secondary_link,service,tertiary,tertiary_link,trunk,trunk_link,busway,construction,corridor&quot;</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_01_highway.osm.pbf&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Drop the service-road exclusions (parking aisles, driveways)</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;tags-filter&quot;</span>, <span class="st">&quot;-i&quot;</span>, <span class="st">&quot;data/osm/cook_01_highway.osm.pbf&quot;</span>,</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;w/service=parking_aisle,driveway&quot;</span>,</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_02_service.osm.pbf&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Drop private-access ways</span></span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;tags-filter&quot;</span>, <span class="st">&quot;-i&quot;</span>, <span class="st">&quot;data/osm/cook_02_service.osm.pbf&quot;</span>,</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;w/access=private&quot;</span>,</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_03_access.osm.pbf&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Drop anything tagged as an aeroway (any value)</span></span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;tags-filter&quot;</span>, <span class="st">&quot;-i&quot;</span>, <span class="st">&quot;data/osm/cook_03_access.osm.pbf&quot;</span>,</span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;w/aeroway&quot;</span>,</span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_04_aeroway.osm.pbf&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. Drop indoor=yes, and output straight to OSM XML (osmium&#39;s -f/--output-format</span></span>
-<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="co">#    works on any command, so this folds the pbf-to-XML conversion into the last</span></span>
-<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a><span class="co">#    filtering pass rather than needing a separate `osmium cat` step)</span></span>
-<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">conda_run2</span>(</span>
-<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  <span class="at">cmd =</span> <span class="st">&quot;osmium&quot;</span>,</span>
-<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>  <span class="at">args =</span> <span class="fu">c</span>(</span>
-<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;tags-filter&quot;</span>, <span class="st">&quot;-i&quot;</span>, <span class="st">&quot;data/osm/cook_04_aeroway.osm.pbf&quot;</span>,</span>
-<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;w/indoor=yes&quot;</span>,</span>
-<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;-o&quot;</span>, <span class="st">&quot;data/osm/cook_drive_network.osm&quot;</span>, <span class="st">&quot;-f&quot;</span>, <span class="st">&quot;osm&quot;</span>, <span class="st">&quot;--overwrite&quot;</span></span>
-<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>  <span class="at">envname =</span> <span class="st">&quot;osmnx-env&quot;</span></span>
-<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a><span class="fu">file.exists</span>(<span class="st">&quot;data/osm/cook_drive_network.osm&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The intermediate <code>.osm.pbf</code> files (passes 1–4) keep the pipeline fast; only the final output needs to be XML, since that’s the only file <code>graph_from_xml()</code> reads.</p>
+<section id="decision-criteria-for-aim-1b" class="level3">
+<h3 class="anchored" data-anchor-id="decision-criteria-for-aim-1b">Decision criteria for Aim 1b</h3>
+<p>Select the approach with the lowest error against ground truth and the lowest occlusion-driven failure rate. If Approach B (4-band) does not measurably outperform Approach A (3-band) once fine-tuned, default to Approach A for Aim 1b — the added model-training complexity is only worth carrying forward if it earns its keep empirically.</p>
 </section>
-<section id="step-3-build-the-graph-once-reuse-existing-logic-unchanged" class="level2">
-<h2 class="anchored" data-anchor-id="step-3-build-the-graph-once-reuse-existing-logic-unchanged">Step 3 — Build the Graph Once, Reuse Existing Logic Unchanged</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>G_drive <span class="ot">&lt;-</span> ox<span class="sc">$</span><span class="fu">graph_from_xml</span>(<span class="st">&quot;data/osm/cook_drive_network.osm&quot;</span>, <span class="at">retain_all =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>G_drive <span class="ot">&lt;-</span> ox<span class="sc">$</span><span class="fu">project_graph</span>(G_drive)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>intersections <span class="ot">&lt;-</span> ox<span class="sc">$</span><span class="fu">consolidate_intersections</span>(G_drive, <span class="at">rebuild_graph =</span> <span class="cn">FALSE</span>, <span class="at">dead_ends =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>coords_df <span class="ot">&lt;-</span> intersections<span class="sc">$</span><span class="fu">to_crs</span>(<span class="st">&quot;EPSG:4326&quot;</span>)<span class="sc">$</span><span class="fu">get_coordinates</span>()</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>lon <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(coords_df<span class="sc">$</span>x<span class="sc">$</span><span class="fu">to_numpy</span>()))</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>lat <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(reticulate<span class="sc">::</span><span class="fu">py_to_r</span>(coords_df<span class="sc">$</span>y<span class="sc">$</span><span class="fu">to_numpy</span>()))</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>cook_intersections <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">lon =</span> lon, <span class="at">lat =</span> lat)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>retain_all = FALSE</code> and the <code>consolidate_intersections()</code> call are identical to <code>dataprep.qmd</code>’s <code>get_area_intersections()</code>; the coordinate-extraction pattern (numpy array, not a converted pandas object) is the same one already used there for the same reticulate-conversion-safety reason. This single call replaces the entire run-list/wave/<code>pwalk()</code>/Overpass-mirror machinery in <code>dataprep.qmd</code>’s current <em>Street Intersections</em> section.</p>
-</section>
-<section id="practical-notes" class="level2">
-<h2 class="anchored" data-anchor-id="practical-notes">Practical Notes</h2>
-<ul>
-<li><strong>Study-area attribution is lost and must be restored.</strong> Each per-unit Overpass call in the current approach got its <code>geoid</code>/<code>name</code>/<code>type</code> attribution “for free,” since the call itself was scoped to one unit’s polygon. A single countywide <code>graph_from_xml()</code> call has no such scoping — the result is one flat table of intersection points with no unit attribution. Restore it with an explicit spatial join against <code>study_area</code> after Step 3: <code>st_join(st_as_sf(cook_intersections, coords = c(&quot;lon&quot;,&quot;lat&quot;), crs = 4326), study_area)</code>.</li>
-<li><strong>No resume/checkpoint logic is needed</strong>, unlike the current run-list/wave system — that machinery exists specifically to survive mid-run Overpass failures, a failure mode this approach doesn’t have (there’s no live query to fail). Re-running for an updated OSM snapshot is just re-running Steps 1–3 against a freshly downloaded Illinois <code>.osm.pbf</code>.</li>
-<li><strong>This changes only how the input graph is sourced, not the consolidation algorithm</strong> — <code>consolidate_intersections()</code>’s tolerance, <code>rebuild_graph</code>, and <code>dead_ends</code> arguments are unchanged from <code>dataprep.qmd</code>.</li>
-<li><strong>Validate before trusting it as a full replacement.</strong> Before retiring the Overpass-based approach, compare this method’s output on a handful of already-processed municipalities against the corresponding per-unit results already on disk — a materially different intersection count for the same unit would indicate the filter chain in Step 2 doesn’t fully match <code>drive_filter</code>’s intent and needs a closer look.</li>
-</ul>
 </section>
 <section id="task-table" class="level2">
 <h2 class="anchored" data-anchor-id="task-table">Task Table</h2>
@@ -2423,50 +2370,70 @@ vertical-align: -.125em;
 </thead>
 <tbody>
 <tr class="odd">
-<td>Clip Illinois to Cook County</td>
-<td><code>osmium extract --polygon</code> against <code>cc_boundary</code>, reusing the Illinois PBF <code>dataprep.qmd</code> already downloads</td>
-<td><code>cook_extract.osm.pbf</code></td>
+<td>Define comparison sample</td>
+<td>Stratified sample of intersections (geography type × canopy cover × Google tile-position × street-network form), drawn from <code>dataprep.qmd</code>’s <code>all_intersections_sf</code></td>
+<td>Sample intersection list</td>
 <td>Not started</td>
 </tr>
 <tr class="even">
-<td>Filter to the drive network</td>
-<td>Five-pass <code>osmium tags-filter</code> chain (one keep-pass, four invert-match exclude-passes), final pass outputs OSM XML directly</td>
-<td><code>cook_drive_network.osm</code></td>
+<td>Establish ground truth</td>
+<td>Manually measure crossing distance at each sampled intersection, per the reference methodology’s protocol</td>
+<td>Ground-truth measurement table</td>
 <td>Not started</td>
 </tr>
 <tr class="odd">
-<td>Build the countywide graph</td>
-<td><code>ox$graph_from_xml()</code> once, then the existing <code>project_graph()</code>/<code>consolidate_intersections()</code> calls, unchanged</td>
-<td>Countywide intersection point table (replaces the per-unit run)</td>
+<td>Approach A: 3-band Cook County RGB pipeline</td>
+<td>Retrieve RGB clips via the ImageServer’s <code>exportImage</code> operation; run the existing fine-tuned SAM 2.1 + grow-cut, unchanged</td>
+<td>Approach A crossing-distance measurements</td>
 <td>Not started</td>
 </tr>
 <tr class="even">
-<td>Restore study-area attribution</td>
-<td>Spatial join of the consolidated intersections against <code>study_area</code></td>
-<td><code>all_intersections_sf</code> with <code>geoid</code>/<code>name</code>/<code>type</code> attribution</td>
+<td>Approach B: 4-band Cook County RGB+NIR pipeline</td>
+<td>Retrieve 4-band clips; channel-extend and fine-tune the segmentation model’s embedding layer + decoder; run + grow-cut</td>
+<td>Approach B crossing-distance measurements</td>
 <td>Not started</td>
 </tr>
 <tr class="odd">
-<td>Validate against existing output</td>
-<td>Spot-check intersection counts for a sample of municipalities against the current per-unit results</td>
-<td>Validation comparison</td>
+<td>Approach C: Google Maps pipeline (baseline)</td>
+<td>Existing methodology, unchanged</td>
+<td>Approach C crossing-distance measurements</td>
 <td>Not started</td>
 </tr>
 <tr class="even">
-<td>Retire the Overpass-based run list</td>
-<td>Once validated, replace <code>dataprep.qmd</code>’s wave/resume machinery in <em>Street Intersections</em> with this approach</td>
-<td>Simplified <code>dataprep.qmd</code> (future edit, out of scope for this document)</td>
+<td>Compare approaches</td>
+<td>Paired statistical comparison against ground truth and against each other, stratified by canopy cover and tile-position</td>
+<td>Comparison results; selected approach for Aim 1b</td>
 <td>Not started</td>
+</tr>
+<tr class="odd">
+<td>Countywide production run (Aim 1b)</td>
+<td>Apply the selected approach at full scale across all study-area intersections</td>
+<td>Countywide crossing-distance dataset</td>
+<td>Not started (gated on the comparison above)</td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="relationship-to-dataprep.qmd" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-dataprep.qmd">Relationship to <code>dataprep.qmd</code></h2>
-<p>This document plans and verifies the approach; it does not itself change <code>dataprep.qmd</code>. Once validated per the task table above, <code>dataprep.qmd</code>’s <em>Street Intersections</em> section would be rewritten to use Steps 1–3 here in place of its current run-list/wave/Overpass loop — the rest of that section’s downstream consumers (the combine step, <code>output/all_intersections.shp</code>, the <code>phase01.qmd</code> interactive map) are unaffected, since they only depend on the final <code>all_intersections_sf</code> schema (<code>geoid</code>, <code>name</code>, <code>type</code>, <code>geometry</code>), not on how it was produced.</p>
+<section id="open-questions" class="level2">
+<h2 class="anchored" data-anchor-id="open-questions">Open Questions</h2>
+<ul>
+<li><strong>Sample size</strong>: the 75–150 proposed above is a starting point, not a power calculation — refine once the ground-truth measurement protocol’s per-intersection time cost is known.</li>
+<li><strong>Canopy-cover data source</strong>: confirm whether an existing tree-canopy/land-cover layer is available for Cook County, or whether the county imagery’s own NIR band (NDVI-style) should be used to screen candidate locations instead.</li>
+<li><strong>Reusability of existing ground-truth annotations</strong>: confirm with the reference methodology’s materials whether its crosswalk ground-truth is stored as georeferenced polygons (reusable across imagery sources by rasterizing onto new tiles) or as pixel masks tied specifically to the Google tiles (would need fresh annotation for Approaches A/B).</li>
+<li><strong>GPU budget/timeline for Approach B</strong>: this is the one piece of this comparison that is a genuine ML engineering sub-project (see <code>phase00.qmd</code>’s discussion of “model work”) rather than a data-pipeline change — scope its Modal compute budget and timeline separately from Approaches A/C, which need none.</li>
+<li><strong>Native resolution vs. resampling</strong> (Approach A/B, step 2): whether to keep the county imagery’s native 6-inch resolution (larger input, preserves the resolution advantage) or resample to the fixed pixel dimensions the existing fine-tuned model was validated on (keeps the model’s effective receptive field unchanged) is an open implementation choice, not yet resolved here.</li>
+</ul>
+
 </section>
 
-</main>
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-moran2026scaling" class="csl-entry" role="listitem">
+Moran, Marcel E., Anish Gupta, Jun Qian, and Debra F. Laefer. 2026. <span>“Scaling Pedestrian Crossing Analysis to 100 <span>U.S.</span> Cities via <span>AI</span>-Based Segmentation of Satellite Imagery.”</span> <em>Journal of Transport and Land Use</em> 19 (1): 21–40. <a href="https://doi.org/10.5198/jtlu.2026.2771">https://doi.org/10.5198/jtlu.2026.2771</a>.
+</div>
+<div id="ref-moran2024multiscale" class="csl-entry" role="listitem">
+Moran, Marcel E., and Debra F. Laefer. 2024. <span>“Multiscale Analysis of Pedestrian Crossing Distance.”</span> <em>Journal of the American Planning Association</em>. <a href="https://doi.org/10.1080/01944363.2024.2394610">https://doi.org/10.1080/01944363.2024.2394610</a>.
+</div>
+</div></section></div></main>
 <!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {

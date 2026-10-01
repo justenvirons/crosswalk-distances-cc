@@ -1,5 +1,5 @@
 # Folders, file types
-data/intersections/raw/*.csv
+data/intersections/*
 data/infrastructure/*
 data/census/*
 data/crashes/*
@@ -7,6 +7,7 @@ data/boundaries/*
 output/all_streets*.*
 output/ped_fatalities*.*
 output/all_ped_fatalities*.*
+data/osm/*
 *.pbf
 
 # History files
