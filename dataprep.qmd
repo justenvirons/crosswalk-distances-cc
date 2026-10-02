@@ -41,6 +41,9 @@ library(units)
 library(osmextract)
 library(lubridate)
 library(stringr)
+library(tidycensus)
+library(sociome)
+library(tidyr)
 ```
 
 ## Study Area Geography
@@ -559,8 +562,8 @@ cc_ped_bike_crashes <- il_ped_bike_crashes %>%
   st_as_sf() 
 
 # write to folder
-st_write(cc_crashes, "data/crashes/cc_crashes_2022_2024.shp", append= FALSE)
-st_write(cc_ped_bike_crashes, "data/crashes/cc_ped_bike_crashes_2022_2024.shp", append = FALSE)
+st_write(obj = cc_crashes, dsn = "data/crashes/cc_crashes_2022_2024.gpkg", append = FALSE)
+st_write(cc_ped_bike_crashes, "data/crashes/cc_ped_bike_crashes_2022_2024.gpkg", append = FALSE)
 ```
 
 ## Area Deprivation Index (ADI)
@@ -571,12 +574,9 @@ Supports `phase01.qmd`'s *Socioeconomic and Contextual Data* table (Aim 2). Adap
 
 ```{r}
 #| label: adi-setup
-
-library(tidycensus)
-library(sociome)
-library(tidyr)
-
 # Set once per machine: tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"), install = TRUE)
+CENSUS_API_KEY <- Sys.getenv("CENSUS_API_KEY", unset = "8f6a0a83c8a2466e3e018a966846c86412d0bb6e")
+
 if (Sys.getenv("CENSUS_API_KEY") != "") {
   tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"))
 }
