@@ -577,9 +577,7 @@ Supports `phase01.qmd`'s *Socioeconomic and Contextual Data* table (Aim 2). Adap
 # Set once per machine: tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"), install = TRUE)
 CENSUS_API_KEY <- Sys.getenv("CENSUS_API_KEY", unset = "8f6a0a83c8a2466e3e018a966846c86412d0bb6e")
 
-if (Sys.getenv("CENSUS_API_KEY") != "") {
-  tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"))
-}
+tidycensus::census_api_key(CENSUS_API_KEY, install = TRUE)
 
 adi_year   <- 2024
 adi_survey <- "acs5"
