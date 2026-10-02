@@ -50,6 +50,7 @@ library(tidyr)
 
 Combines the City of Chicago's 77 community areas with suburban Cook County's incorporated municipalities (≥4 sq mi) into a single, internally consistent geography (`study_area`, N ≈ 200), identified by `geoid` and `name`, with a `type` field distinguishing the two as either `community area` or `municipality`.
 
+### Cook County boundary
 ```{r}
 #| label: study-area
 
@@ -69,7 +70,10 @@ cc_boundary <- counties_il %>%
   select(-area_land, -area_water)
 
 st_write(cc_boundary, "data/boundaries/cc_boundary.shp", delete_dsn = TRUE)
+```
 
+### Councils of mayors boundaries
+```{r}
 # import, process councils of Mayors boundaries for Cook County
 cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>% 
   rename_with(tolower) %>% 
@@ -78,7 +82,10 @@ cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>%
   st_transform(crs = 3435) 
 
 st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.shp", delete_dsn = TRUE)
+```
 
+### Study areas boundaries (community area and municipalities)
+```{r}
 # download community areas from Chicago Health Atlas
 community_areas <- st_read(
   "https://metopio.blob.core.windows.net/lalage/atlas/3/shapes/communityareas.topo.json",
@@ -576,8 +583,7 @@ Supports `phase01.qmd`'s *Socioeconomic and Contextual Data* table (Aim 2). Adap
 #| label: adi-setup
 # Set once per machine: tidycensus::census_api_key(Sys.getenv("CENSUS_API_KEY"), install = TRUE)
 CENSUS_API_KEY <- Sys.getenv("CENSUS_API_KEY", unset = "8f6a0a83c8a2466e3e018a966846c86412d0bb6e")
-
-tidycensus::census_api_key(CENSUS_API_KEY, install = TRUE)
+tidycensus::census_api_key(CENSUS_API_KEY, install = TRUE, overwrite = TRUE)
 
 adi_year   <- 2024
 adi_survey <- "acs5"
@@ -649,7 +655,7 @@ tract_geoid_col <- intersect(
 )[1]
 
 tract_ca_lookup <- tract_boundaries %>%
-  mutate(GEOID = as.character(.data[[tract_geoid_col]])) %>%
+  mutate(GEOID = tract_full) %>%
   st_point_on_surface() %>%
   st_join(community_areas %>% select(commarea_geoid = geoid, commarea_name = name)) %>%
   st_drop_geometry() %>%
