@@ -484,8 +484,8 @@ process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
       # crash date/time built from crashyr/crashmonth/crashday/crashhour
       # rather than the raw crashdate field, which is UTC-shifted and can
       # move late-evening crashes to the next calendar day.
-      crash_date = make_date(crashyr, crashmonth, crashday),
-      crash_dt   = crash_date + hours(crashhour),
+      crash_date = make_date(crashyr + 2000, crashmonth, crashday),
+      crash_dth   = crash_date + hours(crashhour),
       ped_bike = case_when(
         typeoffirstcrash == "Pedestrian"   ~ "Pedestrian",
         typeoffirstcrash == "Pedalcyclist" ~ "Bicycle",
@@ -507,13 +507,60 @@ process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
 idot_years <- 2022:2024
 idot_dir   <- "data/crashes"
 
-crash <- process_crashes(idot_years, dir = idot_dir)
-ped_bike <- process_crashes(idot_years, dir = idot_dir, ped_bike_only = TRUE)
+il_crashes <- process_crashes(idot_years, dir = idot_dir)
+il_ped_bike_crashes <- process_crashes(idot_years, dir = idot_dir, ped_bike_only = TRUE)
 
-study_area_crashes <- st_read(file = "output/idot_ped_bike_crashes_2022_2024.shp")
+# join crashes with study area
+cc_crashes <- il_crashes %>%
+  select(
+    x = lon,
+    y = lat,
+    year = crashyr,
+    month = crashmonth,
+    day = crashday,
+    datetime = crash_dth,
+    crash_type = collisiontypecode,
+    fatals = totalfatals,
+    injurs = totalinjured,
+    ainjurs = ainjuries,
+    binjurs = binjuries,
+    cinjurs = cinjuries,
+    ksi,
+    severity = crashseverity,
+  ) %>%
+  st_transform(crs = 3435) %>%
+  st_join(study_area) %>%
+  drop_na(geoid) %>%
+  st_make_valid() %>%
+  st_as_sf() 
 
-st_write(crash, "output/idot_crashes_2022_2024.shp", delete_dsn = TRUE)
-st_write(ped_bike, "output/idot_ped_bike_crashes_2022_2024.shp", delete_dsn = TRUE)
+# join ped and bike crashes with study area
+cc_ped_bike_crashes <- il_ped_bike_crashes %>%
+  select(
+    x = lon,
+    y = lat,
+    year = crashyr,
+    month = crashmonth,
+    day = crashday,
+    datetime = crash_dth,
+    crash_type = collisiontypecode,
+    fatals = totalfatals,
+    injurs = totalinjured,
+    ainjurs = ainjuries,
+    binjurs = binjuries,
+    cinjurs = cinjuries,
+    ksi,
+    severity = crashseverity,
+  ) %>% 
+  st_transform(crs = 3435) %>% 
+  st_join(study_area) %>% 
+  drop_na(geoid) %>% 
+  st_make_valid() %>% 
+  st_as_sf() 
+
+# write to folder
+st_write(cc_crashes, "data/crashes/cc_crashes_2022_2024.shp", append= FALSE)
+st_write(cc_ped_bike_crashes, "data/crashes/cc_ped_bike_crashes_2022_2024.shp", append = FALSE)
 ```
 
 ## Area Deprivation Index (ADI)
@@ -669,7 +716,13 @@ write_csv(adi_places, "output/adi_suburban_places.csv")
 ADI is a relative measure -- its value for a given area depends on which other areas were included in the same `calculate_adi()` call (its "reference area"). The two calculations above use separate reference areas (77 community areas; suburban municipalities), so `adi_community_areas$ADI` and `adi_places$ADI` are not on a directly comparable scale, even though both used the same ACS variables/year. Combining them into one reference area (one `calculate_adi()` call over all ~200 units) would make them comparable, at the cost of mixing a tract-aggregated construct with a directly-measured one -- worth resolving explicitly in `phase02.qmd` before Aim 2 analysis, rather than assumed away here.
 :::
 
-## Save
+## Read, Format and Save
+
+### Read
+```{r}
+study_area <- st_read(dsn = "data/boundaries/study_area.shp")
+```
+
 
 Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles/CSVs under `output/`).
 
