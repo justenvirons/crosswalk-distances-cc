@@ -443,10 +443,15 @@ fatality_time <- if (!is.null(hourname)) {
 }
 
 ped_fatalities_formatted <- ped_fatalities %>%
+  # Attach fatality_date/fatality_time as real columns before the join below,
+  # rather than leaving them as loose chunk-local vectors -- otherwise
+  # they never make it into the saved .gpkg (and, since drop_na(geoid) below
+  # removes rows, couldn't safely be attached after the join anyway).
+  mutate(fatality_date = fatality_date, fatality_time = fatality_time) %>%
   st_join(study_area) %>%
   drop_na(geoid) %>%
   st_make_valid() %>%
-  st_as_sf() 
+  st_as_sf()
 
 st_write(ped_fatalities_formatted, "data/crashes/ped_fatalities.gpkg", delete_dsn = TRUE)
 ```
@@ -584,6 +589,7 @@ cc_ped_bike_crashes <- il_ped_bike_crashes %>%
     day = crashday,
     datetime = crash_dth,
     crash_type = collisiontypecode,
+    ped_bike,
     fatals = totalfatals,
     injurs = totalinjured,
     ainjurs = ainjuries,
@@ -769,8 +775,8 @@ county_boundary <- st_read(dsn = "data/boundaries/cc_boundary.gpkg")
 cog_boundaries <- st_read(dsn = "data/boundaries/cogs_boundaries.gpkg")
 study_area <- st_read(dsn = "data/boundaries/study_area.gpkg")
 intersections <- st_read("data/intersections/study_area_intersections.gpkg")
-streets <- ("data/infrastructure/study_area_streets.gpkg")
-walkability <- ("data/infrastructure/walkability.gpkg")
+streets <- st_read("data/infrastructure/study_area_streets.gpkg")
+walkability <- st_read("data/infrastructure/walkability.gpkg")
 ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>%  st_transform(crs = 3435)
 ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg")
 adi <- read.csv("data/census/adi_study_area.csv")
@@ -784,8 +790,9 @@ Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd`
 #| label: save-dataprep
 
 save(
-  study_area, 
-  county_boundary, 
+  study_area,
+  county_boundary,
+  cog_boundaries,
   streets,
   intersections,
   walkability,
