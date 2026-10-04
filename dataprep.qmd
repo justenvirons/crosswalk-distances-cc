@@ -69,7 +69,7 @@ cc_boundary <- counties_il %>%
   ) %>%
   select(-area_land, -area_water)
 
-st_write(cc_boundary, "data/boundaries/cc_boundary.shp", delete_dsn = TRUE)
+st_write(cc_boundary, "data/boundaries/cc_boundary.gpkg", delete_dsn = TRUE)
 ```
 
 ### Councils of mayors boundaries
@@ -81,7 +81,7 @@ cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>%
          name = fullname) %>% 
   st_transform(crs = 3435) 
 
-st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.shp", delete_dsn = TRUE)
+st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.gpkg", delete_dsn = TRUE)
 ```
 
 ### Study areas boundaries (Chicago community area and Suburban municipalities)
@@ -123,7 +123,7 @@ study_area <- places_cook_county %>%
   st_as_sf() %>%
   st_make_valid()
 
-st_write(study_area, "data/boundaries/study_area.shp", delete_dsn = TRUE)
+st_write(study_area, "data/boundaries/study_area.gpkg", delete_dsn = TRUE)
 
 ```
 
@@ -282,7 +282,7 @@ study_area_intersections <- cook_intersections_geo %>%
   st_make_valid() %>% 
   st_as_sf() 
 
-st_write(study_area_intersections, "data/intersections/study_area_intersections.shp", delete_dsn = TRUE)
+st_write(study_area_intersections, "data/intersections/study_area_intersections.gpkg", delete_dsn = TRUE)
 
 ```
 
@@ -363,18 +363,26 @@ il_streets <- oe_read(
   quiet = TRUE
 )
 
-osmextract::oe_find("illinois", download_directory = osmextract::oe_download_directory())
-
-cc_streets <- il_streets %>%
+study_area_streets <- il_streets %>%
   filter(highway %in% highway_subtypes) %>%
-  st_transform(4326) %>%
+  st_transform(3435) %>%
   st_make_valid() %>%
   st_intersection(st_geometry(cc_boundary)) %>%
   st_collection_extract("LINESTRING") %>%
   select(street_name = name, highway, maxspeed_raw = maxspeed, oneway) %>%
   mutate(resolve_speed_limit(highway, maxspeed_raw))
 
-st_write(cc_streets, "output/all_streets.shp", delete_dsn = TRUE)
+st_write(study_area_streets, "data/infrastructure/study_area_streets.gpkg", delete_dsn = TRUE)
+```
+
+## Walkability 
+```{r}
+walkability <- st_read("data/infrastructure/Walkability.shp") %>% 
+  st_transform(crs=3435) %>%
+  st_intersection(st_geometry(cc_boundary)) %>%
+  st_make_valid()
+
+st_write(walkability, "data/infrastructure/walkability.gpkg", delete_dsn = TRUE)
 ```
 
 ## Pedestrian Fatalities (FARS)
@@ -434,10 +442,13 @@ fatality_time <- if (!is.null(hourname)) {
   NA_character_
 }
 
-ped_fatalities <- ped_fatalities %>%
-  mutate(fatality_date = fatality_date, fatality_time = fatality_time)
+ped_fatalities_formatted <- ped_fatalities %>%
+  st_join(study_area) %>%
+  drop_na(geoid) %>%
+  st_make_valid() %>%
+  st_as_sf() 
 
-st_write(ped_fatalities, "output/ped_fatalities.shp", delete_dsn = TRUE)
+st_write(ped_fatalities_formatted, "data/crashes/ped_fatalities.gpkg", delete_dsn = TRUE)
 ```
 
 ## Crash Records (IDOT)
@@ -753,7 +764,17 @@ ADI is a relative measure -- its value for a given area depends on which other a
 
 ### Read
 ```{r}
-study_area <- st_read(dsn = "data/boundaries/study_area.shp")
+
+county_boundary <- st_read(dsn = "data/boundaries/cc_boundary.gpkg")
+cog_boundaries <- st_read(dsn = "data/boundaries/cogs_boundaries.gpkg")
+study_area <- st_read(dsn = "data/boundaries/study_area.gpkg")
+intersections <- st_read("data/intersections/study_area_intersections.gpkg")
+streets <- ("data/infrastructure/study_area_streets.gpkg")
+walkability <- ("data/infrastructure/walkability.gpkg")
+ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>%  st_transform(crs = 3435)
+ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg")
+adi <- read.csv("data/census/adi_study_area.csv")
+
 ```
 
 
@@ -763,23 +784,14 @@ Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd`
 #| label: save-dataprep
 
 save(
-  study_area, cc_boundary, cc_streets,
-  all_intersections_sf, ped_fatalities,
-  crash, ped_bike,
-  adi_community_areas, adi_places,
-  file = "data/phase1_dataprep.RData"
+  study_area, 
+  county_boundary, 
+  streets,
+  intersections,
+  walkability,
+  ped_fatalities,
+  ped_bike_crashes,
+  adi,
+  file = "data/phase01_dataprep.RData"
 )
 ```
-
-## Outputs
-
-- `data/boundaries/study_area.shp` — countywide study-area geography (Chicago community areas + suburban municipalities).
-- `config/cc_run_list.csv` — per-study-area-unit run manifest (geoid, name, type, WKT polygon, wave).
-- `data/intersections/raw/{geoid}.csv` — one file per study-area unit, raw consolidated intersection coordinates.
-- `output/all_intersections.shp` — countywide consolidated-intersection layer.
-- `output/all_streets.shp` — countywide street layer with `highway`, `maxspeed_raw`, `street_name`, `oneway`, and resolved `maxspeed_mph`/`maxspeed_source`.
-- `output/ped_fatalities.shp` — Cook County pedestrian fatalities from FARS, 2010–2024.
-- `output/idot_crashes_2022_2024.shp` / `output/idot_ped_bike_crashes_2022_2024.shp` — IDOT crash records, all crashes and the pedestrian/bicycle subset.
-- `output/adi_community_areas.csv` — ADI and ADI-3 (Financial Strength, Economic Hardship and Inequality, Educational Attainment) by Chicago community area.
-- `output/adi_suburban_places.csv` — ADI and ADI-3 by suburban Cook County municipality (Census place).
-- `data/phase1_dataprep.RData` — `study_area`, `cc_boundary`, `cc_streets`, `all_intersections_sf`, `ped_fatalities`, `crash`, `ped_bike`, `adi_community_areas`, `adi_places`, loaded by `phase01.qmd`'s interactive map.
