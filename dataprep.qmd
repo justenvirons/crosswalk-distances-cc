@@ -286,6 +286,25 @@ st_write(study_area_intersections, "data/intersections/study_area_intersections.
 
 ```
 
+### Sample of intersections
+```{r}
+library(dplyr)
+
+all_intersections <- st_read("output/all_intersections.shp")
+
+set.seed(42)
+
+# add row number
+all_intersections_id <- all_intersections %>% mutate(.id = row_number())
+
+all_intersections_sample <- all_intersections_id %>%
+  # group_by(region) %>%   # strata nested within geography
+  slice_sample(n = 50)
+
+test <- df %>% anti_join(train, by = ".id")
+
+```
+
 ## Streets and Speed Limits
 
 Street segments come from the Illinois OpenStreetMap extract, keeping only road features and clipping them to the county boundary. Each segment is assigned a speed limit from its posted value in OpenStreetMap where one is recorded. Where it isn't, a default is applied based on road type, such as 25 mph for residential streets, which matches the limit many Cook County suburbs post below the state's 30 mph urban default. A source field marks whether each segment's speed limit was posted or estimated, since the defaults are approximations rather than measured data.
