@@ -84,7 +84,7 @@ cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>%
 st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.shp", delete_dsn = TRUE)
 ```
 
-### Study areas boundaries (community area and municipalities)
+### Study areas boundaries (Chicago community area and Suburban municipalities)
 ```{r}
 # download community areas from Chicago Health Atlas
 community_areas <- st_read(
@@ -575,9 +575,11 @@ st_write(cc_ped_bike_crashes, "data/crashes/cc_ped_bike_crashes_2022_2024.gpkg",
 
 ## Area Deprivation Index (ADI)
 
-Supports `phase01.qmd`'s *Socioeconomic and Contextual Data* table (Aim 2). Adapted from [`scripts/QMD/adi_calculations.qmd`](scripts/QMD/adi_calculations.qmd), using the `sociome` package to download 2024 ACS 5-year variables and compute ADI -- by Chicago community area (aggregated up from 2020 census tracts) and by suburban Cook County municipality (Census place).
+This section produces the neighborhood disadvantage measures used in the Socioeconomic and Contextual Data table for Aim 2. It calculates the Area Deprivation Index (ADI), a composite score of neighborhood socioeconomic disadvantage based on income, education, employment, and housing, for two sets of areas: Chicago's community areas, built up from 2020 census tracts, and the municipalities of suburban Cook County. The underlying data come from the 2024 American Community Survey 5-year estimates, and the approach is adapted from an earlier analysis in adi_calculations.qmd.
 
-`sociome::get_adi()` only supports `geography = "state"`, `"county"`, `"tract"`, `"block group"`, or `"zcta"` -- **not `"place"`**, and it has no built-in way to aggregate to a custom geography like a community area. So rather than calling `get_adi()` directly, this section calls `sociome::calculate_adi()` directly on ACS variables pulled with `tidycensus::get_acs()` -- the "bring your own tidycensus data" pathway `calculate_adi()`'s own documentation describes (`get_adi(raw_data_only = TRUE)` is exactly this pathway, just restricted to `get_adi()`'s five supported geographies). `adi_acs_vars` below reproduces `sociome`'s internal "set1" variable list -- the exact ACS5 variables `get_adi()` itself requests for 2011+ ACS5/ACS1/ACS3 data (confirmed against `sociome`'s own `data-raw/acs_vars.R` and `get_tidycensus.R` source, since neither is exported) -- so both ADI calculations below stay methodologically identical to what `get_adi()` would produce at tract/county level.
+The sociome R package usually handles ADI calculations automatically, but its standard function only works with built-in geographies such as states, counties, and census tracts. It can't produce scores for municipalities or for custom areas like Chicago community areas. To work around this, the code downloads the census data separately and passes it to the package's core ADI calculation step, a route the package's documentation supports. It requests the same census variables the package would use on its own, so the results follow the same method as standard ADI scores.
+
+Unlike the national 1–100 percentiles published by the Neighborhood Atlas, these scores are relative to the areas included in the calculation. Higher values indicate greater disadvantage.
 
 ```{r}
 #| label: adi-setup
@@ -630,9 +632,9 @@ get_acs_tidy_wide <- function(..., variables) {
 }
 ```
 
-### By Chicago Community Area
+### Chicago community area
 
-Pulls 2024 ACS estimates for every Cook County census tract (2020 tract boundaries, per `adi_year`), assigns each tract to a community area, aggregates, and calculates ADI. The tract-to-community-area assignment uses a spatial join (each tract's point-on-surface against the `community_areas` polygons from *Study Area Geography*, above) against the [Chicago Data Portal's 2020 Census Tract boundaries](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Census-Tracts-2020/7qjk-677h/about_data) -- `data.cityofchicago.org` wasn't reachable to confirm this file's exact column names from this environment, so `tract_geoid_col` below guesses among the common TIGER-style spellings; check `names(tract_boundaries)` on a real run and adjust if needed. If this portal file turns out to already carry its own community-area attribute, joining on that directly would be simpler and more precise than the spatial join used here.
+This step calculates ADI for each of Chicago's 77 community areas. Census data aren't published by community area, so the code starts with 2024 American Community Survey estimates for every census tract in Cook County, using 2020 tract boundaries. It assigns each tract to the community area it falls within, using the tract boundary file from the City of Chicago Data Portal and the community area boundaries defined earlier in the Study Area Geography section. It then combines the tract data within each community area and calculates one ADI score per area.
 
 ```{r}
 #| label: adi-community-areas
@@ -678,12 +680,12 @@ adi_ca_agg <- tracts_with_ca %>%
 
 adi_community_areas <- calculate_adi(adi_ca_agg, keep_indicators = TRUE)
 
-write_csv(adi_community_areas, "output/adi_community_areas.csv")
+write_csv(adi_community_areas, "data/census/adi_community_areas.csv")
 ```
 
-### By Suburban Municipality (Census Place)
+### Suburban municipality
 
-`get_acs(geography = "place")` returns all Illinois places (place doesn't nest under `county`), so this restricts to `places_cook_county`'s GEOIDs (*Study Area Geography*, above) before calculating ADI -- keeping the reference area suburban Cook County's municipalities, not all ~1,300 Illinois places.
+This step calculates ADI for each municipality in suburban Cook County. The Census Bureau publishes data for cities, villages, and towns as "places," but it can only provide them for an entire state at once, not by county. The code therefore downloads 2024 American Community Survey data for all of Illinois's roughly 1,300 places and keeps only the Cook County municipalities identified in the Study Area Geography section. Filtering before the calculation matters because ADI scores are relative to the set of areas they are computed from. Each suburb is therefore scored against other suburban Cook County municipalities, not against communities statewide.
 
 ```{r}
 #| label: adi-places
@@ -712,7 +714,15 @@ if (nrow(places_cc_raw) < length(suburban_place_geoids) * 0.9) {
 
 adi_places <- calculate_adi(places_cc_raw, keep_indicators = TRUE)
 
-write_csv(adi_places, "output/adi_suburban_places.csv")
+write_csv(adi_places, "data/census/adi_suburban_places.csv")
+```
+
+### Study Area ADI
+```{r}
+adi_study_area <- adi_community_areas %>% 
+  bind_rows(adi_places)
+
+write_csv(adi_study_area, "data/census/adi_study_area.csv")
 ```
 
 ::: {.callout-note collapse="true"}
