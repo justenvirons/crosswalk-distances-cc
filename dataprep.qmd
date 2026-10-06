@@ -403,25 +403,21 @@ lui_layer <- get_layer(lui_fs, id = 0)
 
 # arc_select() pages through the service's max record count automatically
 lui_raw <- arc_select(
-  lui_layer,
-  filter_geom = st_as_sfc(st_bbox(cc_boundary))
-)
+  lui_layer)
 
-land_use <- lui_raw %>%
+study_area_land_use <- lui_raw %>%
   st_transform(3435) %>%
   st_make_valid() %>%
   st_intersection(st_geometry(cc_boundary)) %>%
   st_collection_extract("POLYGON") %>%
   st_as_sf()
 
-st_write(land_use, "data/infrastructure/land_use_2020.gpkg", delete_dsn = TRUE)
+st_write(study_area_land_use, "data/boundaries/land_use_2020.gpkg", delete_dsn = TRUE)
 ```
 
 ## Annual Average Daily Traffic (AADT)
 
-**Source:** Illinois Department of Transportation (IDOT), [Annual Average Daily Traffic (AADT)](https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt), IDOT GIS Open Data portal. The file is downloaded manually as GeoJSON to `data/infrastructure/aadt.geojson`. IDOT also posts a separate layer for each year, such as "Average Annual Daily Traffic - 2023". Record the version or download date used.
-
-**Content.** AADT is the estimated number of vehicles that travel a road segment on an average day of the year, counting both directions. The estimates come from IDOT's Traffic Count Program. A small number of permanent stations count traffic continuously. Thousands of other locations get a short count, usually 24 hours, on a rotating multi-year schedule. IDOT adjusts these short counts for season and day of week to estimate a year-round average. The layer covers the state highway system and many local roads statewide. Each feature is a road segment (a line), with total traffic and heavy commercial vehicle (truck) volumes. The chunk below keeps only the segments inside Cook County. This project uses AADT as a measure of how much traffic a pedestrian is exposed to at each intersection and crosswalk.
+Illinois Department of Transportation (IDOT), [Annual Average Daily Traffic (AADT)](https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt), IDOT GIS Open Data portal. The file is downloaded manually as GeoJSON to `data/infrastructure/aadt.geojson`. AADT is the estimated number of vehicles that travel a road segment on an average day of the year, counting both directions. The estimates come from IDOT's Traffic Count Program. A small number of permanent stations count traffic continuously. Thousands of other locations get a short count, usually 24 hours, on a rotating multi-year schedule. IDOT adjusts these short counts for season and day of week to estimate a year-round average. The layer covers the state highway system and many local roads statewide. Each feature is a road segment (a line), with total traffic and heavy commercial vehicle (truck) volumes. The chunk below keeps only the segments inside Cook County. This project uses AADT as a measure of how much traffic a pedestrian is exposed to at each intersection and crosswalk.
 
 **Things to know before using it:**
 
@@ -431,7 +427,7 @@ st_write(land_use, "data/infrastructure/land_use_2020.gpkg", delete_dsn = TRUE)
 - **`Shape_Length` is not updated after clipping.** It keeps the length of the original, unclipped segment. Recompute length with `st_length()` after `st_intersection()` if you need it.
 - **Some column names are shortened** (`MARKED_NAM`, `COUNTY_NAM`) because of the 10-character limit in shapefile exports.
 
-**Informal data dictionary.** These are the columns in the IDOT AADT layer. Most of the definitions are my reading of IDOT's descriptions and FHWA vehicle-class conventions. Confirm them against the layer's metadata on the portal before relying on them, and run `names(aadt)` to check what this download actually contains.
+These are the columns in the IDOT AADT layer. Most of the definitions are my reading of IDOT's descriptions and FHWA vehicle-class conventions. Confirm them against the layer's metadata on the portal before relying on them, and run `names(aadt)` to check what this download actually contains.
 
 | Column | Type | Description |
 |---|---|---|
@@ -456,7 +452,9 @@ aadt <- st_read("data/infrastructure/aadt.geojson") %>%
   st_transform(3435) %>%
   st_make_valid() %>%
   st_intersection(st_geometry(cc_boundary)) %>% 
-  st_as_sf()
+  st_as_sf() %>% 
+  mutate(length = st_length(geomtry))
+  
 
 ```
 
