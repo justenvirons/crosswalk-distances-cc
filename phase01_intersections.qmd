@@ -1,39 +1,15 @@
----
-title: "Phase 1 — Street Intersections: Methods"
-subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
-author:
-  - name: "C. Scott Smith, PhD AICP"
-    affiliations:
-      - name: "DePaul University"
-      - name: "Cook County Department of Public Health (CCDPH)"
-    email: c.scott.smith@depaul.edu
-  - name: "Zane Sufi"
-    affiliations:
-      - name: "Oak Park River Forest High School"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    number-sections: false
-    theme: cosmo
-    embed-resources: true
-  pdf:
-    toc: true
-    number-sections: true
-editor: source
----
+# Street Intersections: Methods {#sec-intersections}
 
 ## Overview
 
-This document describes how the street intersection dataset for Cook County was created. Intersections were derived from OpenStreetMap (OSM) road data in four steps:
+This chapter describes how the street intersection dataset for Cook County was created. Intersections were derived from OpenStreetMap (OSM) road data in four steps:
 
 1. Clip a statewide OSM extract to Cook County.
 2. Filter the roads to the drivable street network.
 3. Build a street network graph and merge nearby nodes into single intersection points.
 4. Assign each intersection to a study-area unit (Chicago community area or suburban municipality).
 
-All processing is done locally on a downloaded OSM file, so no online map service (Overpass API) is queried. The implementation code is in [`dataprep.html`](dataprep.html) (*Street Intersections*); the code below summarizes it.
+All processing is done locally on a downloaded OSM file, so no online map service (Overpass API) is queried. The implementation code is in [Data Preparation Code](dataprep.html) (*Street Intersections*); the code below summarizes it.
 
 ## Software
 
@@ -176,7 +152,7 @@ st_write(study_area_intersections, "data/intersections/study_area_intersections.
 
 ## Output
 
-`data/intersections/study_area_intersections.gpkg` is a point layer with one record per street intersection in the study area (about 170,000 points), in Illinois State Plane East (EPSG:3435), with the study-area attributes `geoid`, `name` and `type`. It is the source of the intersection sample used to compare crosswalk measurement methods ([`phase01_crosswalk_models.html`](phase01_crosswalk_models.html)).
+`data/intersections/study_area_intersections.gpkg` is a point layer with one record per street intersection in the study area (about 170,000 points), in Illinois State Plane East (EPSG:3435), with the study-area attributes `geoid`, `name` and `type`. It is the source of the intersection sample used to compare crosswalk measurement methods ([Crossing Distance Model Comparison](phase01_crosswalk_models.html)).
 
 ## Limitations
 

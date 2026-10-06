@@ -1,0 +1,66 @@
+project:
+  type: book
+  output-dir: _book
+  # only the book's chapters are rendered (skips archive/ and scripts/ .qmd files)
+  render:
+    - index.qmd
+    - phase00.qmd
+    - phase01.qmd
+    - phase01_intersections.qmd
+    - phase01_crosswalk_models.qmd
+    - dataprep.qmd
+    - phase02.qmd
+    - phase03.qmd
+    - phase04.qmd
+    - references.qmd
+  resources:
+    - archive/Phase0.html
+
+book:
+  title: "Street Design as a Public Health Determinant"
+  subtitle: "Crosswalk Geometry and Pedestrian Injury Risk Across Cook County — Project Workbook"
+  author:
+    - name: "C. Scott Smith, PhD AICP"
+      affiliations:
+        - name: "DePaul University"
+        - name: "Cook County Department of Public Health (CCDPH)"
+      email: c.scott.smith@depaul.edu
+    - name: "Zane Sufi"
+      affiliations:
+        - name: "Oak Park River Forest High School"
+  date: today
+  repo-url: https://github.com/justenvirons/crosswalk-distances-cc
+  chapters:
+    - index.qmd
+    - part: "Phase 0 — Background and Aims"
+      chapters:
+        - phase00.qmd
+    - part: "Phase 1 — Dataset Development"
+      chapters:
+        - phase01.qmd
+        - phase01_intersections.qmd
+        - phase01_crosswalk_models.qmd
+        - dataprep.qmd
+    - part: "Phase 2 — Data Presentation and Analysis"
+      chapters:
+        - phase02.qmd
+    - part: "Phase 3 — Results and Discussion"
+      chapters:
+        - phase03.qmd
+    - part: "Phase 4 — Limitations and Conclusions"
+      chapters:
+        - phase04.qmd
+    - references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    number-depth: 1
+    code-fold: true
+
+editor: source

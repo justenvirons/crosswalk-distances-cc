@@ -1,0 +1,11 @@
+# Limitations and Conclusions {#sec-phase04}
+
+## Purpose
+
+This phase covers study limitations, implications for policy and practice, conclusions and next steps. Work has not started.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Limitations | Data coverage, measurement error, aggregation (MAUP) and causal-inference limits | Limitations text | Not started |
+| Implications | Implications for street design, public health and transportation investment | Implications text | Not started |
+| Conclusions and next steps | Summary of findings and future work | Conclusion text | Not started |

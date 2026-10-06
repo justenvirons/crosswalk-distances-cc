@@ -1,26 +1,16 @@
 ---
-title: "Data Preparation for Phase 1 — Dataset Development"
-subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 2
-    code-fold: true
-    number-sections: false
-    theme: cosmo
-    embed-resources: true
-    warning: false
-editor: source
 execute:
   eval: false
+  warning: false
 editor_options:
   chunk_output_type: console
 ---
 
+# Data Preparation Code {#sec-dataprep}
+
 ## Purpose
 
-This document builds the `sf` data tables that support [`phase01.html`](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
+This chapter contains the code that builds the `sf` data tables that support [Dataset Development](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which [Dataset Development](phase01.html) loads (a subset of) to build an interactive map for data exploration.
 
 ## Activate R Libraries
 
@@ -846,7 +836,7 @@ land_use <- st_read("data/boundaries/land_use_simplified_2020.gpkg") %>% st_tran
 
 ```
 
-Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles/CSVs under `output/`).
+Save the assembled `sf`/`tibble` tables to a single `.RData` file. [Dataset Development](phase01.html) loads this file to build an interactive data-exploration map; downstream analysis in [Data Presentation and Analysis](phase02.html) will read from these same tables (or their saved shapefiles/CSVs under `output/`).
 
 ```{r}
 #| label: save-dataprep

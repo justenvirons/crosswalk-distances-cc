@@ -1,0 +1,11 @@
+# Results and Discussion {#sec-phase03}
+
+## Purpose
+
+This phase reports and interprets the results of the statistical tests run in [Data Presentation and Analysis](phase02.html), evaluated against the working hypotheses in [Background and Aims](phase00.html). Work has not started.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Report results by aim | Results for Aims 1a, 1b, 2, 3 and 4 | Results tables and figures | Not started |
+| Evaluate hypotheses | Assess support for H1–H8 | Hypothesis summary | Not started |
+| Discussion | Interpret findings relative to prior literature | Discussion text | Not started |

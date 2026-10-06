@@ -1,29 +1,4 @@
----
-title: "Phase 0 — Background, Literature Review, and Study Purpose"
-subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
-author:
-  - name: "C. Scott Smith, PhD AICP"
-    affiliations:
-      - name: "DePaul University"
-      - name: "Cook County Department of Public Health (CCDPH)"
-    email: c.scott.smith@depaul.edu
-  - name: "Zane Sufi"
-    affiliations:
-      - name: "Oak Park River Forest High School"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 2
-    number-sections: false
-    theme: cosmo
-    embed-resources: true
-  pdf:
-    toc: true
-    number-sections: true
-editor: source
-bibliography: references.bib
----
+# Background, Literature Review, and Study Purpose {#sec-phase00}
 
 ## Background
 
@@ -71,11 +46,11 @@ This study extends the validated crossing-distance segmentation methodology acro
 
 Before that countywide measurement is produced, this study first addresses Gap 4 directly: Cook County's own orthoimagery program offers a documented alternative to Google Maps imagery — single-vintage (flown in one year, countywide), leaf-off (flown before spring canopy emergence, reducing tree-cover occlusion of pavement), and available in both a 3-band (RGB) and 4-band (RGB + near-infrared) product at finer native resolution than the Google tiles the reference methodology uses. Aim 1 is accordingly split into a validation stage (1a) and a production stage (1b): a sample of intersections across the study area is measured using all three imagery/model combinations and compared against manually measured ground truth, and the full countywide dataset (1b) is produced using whichever approach that comparison supports — rather than assuming, untested, that the original Google-imagery-based methodology is the best available option for this county. This comparison is designed to also stand on its own as a methods contribution (candidate for separate publication), independent of the applied safety analyses in Aims 2–4.
 
-Dataset development for this study is documented in [`phase01.html`](phase01.html); it is currently in progress, with study-area geography, street-intersection extraction, street network/speed-limit data, and FARS fatality data assembled, and IDOT crash-record processing and socioeconomic/contextual data (ADI, Census) actively underway. Aim 1a/1b's crossing-distance measurement — the imagery source and segmentation model comparison, and the countywide production run it gates — is planned in detail in [`phase01_crosswalk_models.html`](phase01_crosswalk_models.html).
+Dataset development for this study is documented in [Dataset Development](phase01.html); it is currently in progress, with study-area geography, street-intersection extraction, street network/speed-limit data, and FARS fatality data assembled, and IDOT crash-record processing and socioeconomic/contextual data (ADI, Census) actively underway. Aim 1a/1b's crossing-distance measurement — the imagery source and segmentation model comparison, and the countywide production run it gates — is planned in detail in [Crossing Distance Model Comparison](phase01_crosswalk_models.html).
 
 ## Units of Analysis and Variables
 
-- **Unit of analysis:** the combined Cook County geography of Chicago community areas and suburban municipalities (N ≈ 200; see `phase01.qmd`).
+- **Unit of analysis:** the combined Cook County geography of Chicago community areas and suburban municipalities (N ≈ 200; see [Dataset Development](phase01.html)).
 - **Dependent variable (Aims 2 and 4):** the *rate* of pedestrian–motor vehicle crashes per areal unit (from IDOT crash records; not raw counts), modeled with count/rate-appropriate methods (Poisson or negative binomial regression, optionally with a spatial or Bayesian specification; see *Statistical Methods*, above). Aim 3's point-level FARS fatality analysis is modeled separately, at the individual-fatality level, and is not folded into this areal rate.
 - **Primary explanatory/exposure variable:** median crossing distance per areal unit, from the segmentation pipeline (Aim 1).
 - **Core covariates** (per the working hypotheses and the literature reviewed above):
@@ -88,12 +63,12 @@ Dataset development for this study is documented in [`phase01.html`](phase01.htm
   - Land use / socioeconomic context (e.g., percent low-income, percent minority population), following @cottrill2010evaluating
   - Pedestrian exposure and intersection/roadway density, following the FHWA exposure framework [@fhwa2018synthesis] and @moradi2016spatial
 
-The exact covariate set will be finalized once ADI and Census/LODES assembly (`phase01.qmd`) is complete and will be refined based on data availability and collinearity diagnostics in `phase02.qmd`.
+The exact covariate set will be finalized once ADI and Census/LODES assembly ([Dataset Development](phase01.html)) is complete and will be refined based on data availability and collinearity diagnostics in [Data Presentation and Analysis](phase02.html).
 
 ## Aims
 
 1. **Aim 1 — Countywide crossing-distance dataset.**
-   - **Aim 1a — Imagery source and segmentation model comparison.** On a sample of intersections across the study area, measure crossing distance using three imagery/model approaches — (i) 3-band RGB Cook County orthoimagery with the existing fine-tuned segmentation model (no retraining required), (ii) 4-band RGB+near-infrared Cook County orthoimagery with a channel-extended, re-fine-tuned model, and (iii) Google Maps imagery with the existing fine-tuned model (the reference methodology's original source, retained as the comparison baseline) — and compare all three against manually measured ground truth. See [`phase01_crosswalk_models.html`](phase01_crosswalk_models.html) for the detailed comparison design.
+   - **Aim 1a — Imagery source and segmentation model comparison.** On a sample of intersections across the study area, measure crossing distance using three imagery/model approaches — (i) 3-band RGB Cook County orthoimagery with the existing fine-tuned segmentation model (no retraining required), (ii) 4-band RGB+near-infrared Cook County orthoimagery with a channel-extended, re-fine-tuned model, and (iii) Google Maps imagery with the existing fine-tuned model (the reference methodology's original source, retained as the comparison baseline) — and compare all three against manually measured ground truth. See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design.
    - **Aim 1b — Countywide production dataset.** Using the approach Aim 1a's results support, produce a geographically consistent crossing-distance dataset spanning Chicago community areas and suburban Cook County municipalities.
 2. **Aim 2 — Municipal/community-area cross-sectional analysis.** Compare crossing distance across all ~200 Cook County municipalities/community areas against socioeconomic deprivation (ADI) and demographic/employment covariates.
 3. **Aim 3 — Point-level fatality analysis.** Relate measured crossing distance to individual pedestrian fatalities using FARS data, accounting for traffic volume and vehicle mix (IDOT AADT and truck AADT) on the adjacent roads.
@@ -112,6 +87,4 @@ The exact covariate set will be finalized once ADI and Census/LODES assembly (`p
 
 ## Next Steps
 
-Subsequent phases of this project (documented in `phase02.qmd` through `phase04.qmd`, to be added as work progresses) will cover descriptive and statistical analysis of the assembled dataset — including the spatial-autocorrelation diagnostics and regression approaches summarized above — presentation and interpretation of results, and discussion of study limitations, implications, and conclusions.
-
-## References
+Subsequent phases of this project (Phases 2–4 of this book, [Data Presentation and Analysis](phase02.html) through [Limitations and Conclusions](phase04.html), to be filled in as work progresses) will cover descriptive and statistical analysis of the assembled dataset — including the spatial-autocorrelation diagnostics and regression approaches summarized above — presentation and interpretation of results, and discussion of study limitations, implications, and conclusions.

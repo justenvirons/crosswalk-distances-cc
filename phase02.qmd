@@ -1,0 +1,14 @@
+# Data Presentation and Analysis {#sec-phase02}
+
+## Purpose
+
+This phase presents the assembled dataset ([Dataset Development](phase01.html)) and specifies and runs the statistical models for Aims 2–4 ([Background and Aims](phase00.html)). Work has not started; the tasks below are placeholders to be refined as Phase 1 is completed.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Assemble analysis dataset | Join study-area units, intersections, crossing distance, AADT, crashes/fatalities and socioeconomic covariates | Analysis-ready tables (areal and point level) | Not started |
+| Descriptive statistics | Summarize crossing distance, crash rates, fatalities and covariates by study-area unit and geography type | Descriptive tables and maps | Not started |
+| Spatial diagnostics | Test for spatial autocorrelation (Moran's I, LISA) | Diagnostic results | Not started |
+| Aim 2 models | Crossing distance vs. ADI and demographic/employment covariates | Model results | Not started |
+| Aim 3 models | Point-level fatality analysis (FARS) | Model results | Not started |
+| Aim 4 models | Areal pedestrian crash-rate models (Poisson/negative binomial, spatial or Bayesian variants) | Model results | Not started |
