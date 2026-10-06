@@ -430,6 +430,7 @@ aadt <- st_read("data/infrastructure/aadt.geojson") %>%
   mutate(miles = st_length(geometry),
          miles = set_units(miles, mi))
 
+st_write(aadt, "data/infrastructure/study_area_aadt.gpkg", delete_dsn = TRUE)
 ```
 
 ## Pedestrian Fatalities (FARS)
@@ -828,6 +829,35 @@ walkability <- st_read("data/infrastructure/walkability.gpkg") %>% st_transform(
 ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>% st_transform(crs=4326)
 ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg") %>% st_transform(crs=4326)
 adi <- read.csv("data/census/adi_study_area.csv")
+aadt <- st_read("data/infrastructure/study_area_aadt.gpkg") %>% st_transform(crs=4326)
+
+# Land use is mapped by major category only, so polygons are grouped into
+# CMAP's top-level LUI classes and dissolved by class, which shrinks the
+# ~countywide parcel-level layer enough to embed in the HTML map. Assumes
+# the LUI code column is `LANDUSE` (4-digit CMAP code, e.g. 1111) -- check
+# names(land_use_raw) if a future LUI release renames it.
+land_use_raw <- st_read("data/boundaries/land_use_2020.gpkg")
+
+land_use <- land_use_raw %>%
+  mutate(
+    lu_code = as.character(LANDUSE),
+    lu_category = case_when(
+      str_starts(lu_code, "11") ~ "Residential",
+      str_starts(lu_code, "12") ~ "Commercial",
+      str_starts(lu_code, "13") ~ "Institutional",
+      str_starts(lu_code, "14") ~ "Industrial",
+      str_starts(lu_code, "15") ~ "Transportation & Utilities",
+      str_starts(lu_code, "2")  ~ "Agriculture",
+      str_starts(lu_code, "3")  ~ "Open Space",
+      str_starts(lu_code, "4")  ~ "Vacant",
+      str_starts(lu_code, "5")  ~ "Water",
+      TRUE                      ~ "Other / Not Classified"
+    )
+  ) %>%
+  group_by(lu_category) %>%
+  summarise(.groups = "drop") %>%
+  st_simplify(preserveTopology = TRUE, dTolerance = 10) %>%  # 10 ft (EPSG:3435)
+  st_transform(crs=4326)
 
 ```
 
@@ -847,6 +877,8 @@ save(
   ped_fatalities,
   ped_bike_crashes,
   adi,
+  aadt,
+  land_use,
   file = "data/phase01_dataprep.RData"
 )
 ```

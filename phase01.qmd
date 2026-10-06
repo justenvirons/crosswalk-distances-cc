@@ -45,7 +45,7 @@ library(cli)
 library(tigris)
 library(units)
 library(leaflet)
-library(leaflet.extras)  # addResetMapButton(), addFullscreenControl()
+library(leaflet.extras)  # addResetMapButton(), addFullscreenControl(), addGroupedLayersControl()
 library(osmextract)
 library(readr)
 library(dplyr)
@@ -141,7 +141,7 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 
 ## Interactive Map (Data Exploration)
 
-Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian/bicycle crashes). The street network isn't included here — it's dense enough to warrant its own view rather than competing with everything else on one map. This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of `phase02.qmd`.
+Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian/bicycle crashes). The street network isn't included here — it's dense enough to warrant its own view rather than competing with everything else on one map. This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of `phase02.qmd`.
 
 ```{r}
 #| label: dataprep-map
@@ -151,7 +151,7 @@ Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) 
 library(sf)
 library(dplyr)
 library(leaflet)
-library(leaflet.extras)
+library(leaflet.extras)  # >= 2.1.0 for addGroupedLayersControl()
 
 load("data/phase01_dataprep.RData")
 
@@ -177,7 +177,32 @@ study_area_adi <- study_area %>%
 walk_pal <- colorNumeric("Greens", domain = walkability$NTAscore, na.color = "transparent")
 adi_pal  <- colorNumeric("YlOrRd", domain = study_area_adi$ADI, na.color = "transparent")
 
+# Land use: conventional planning colors (APA LBCS-style -- yellow residential,
+# red commercial, blue institutional, purple industrial, gray transportation)
+lu_colors <- c(
+  "Residential"                = "#FFFF00",
+  "Commercial"                 = "#FF0000",
+  "Institutional"              = "#0000FF",
+  "Industrial"                 = "#A020F0",
+  "Transportation & Utilities" = "#BEBEBE",
+  "Agriculture"                = "#C8D88C",
+  "Open Space"                 = "#4DAF4A",
+  "Vacant"                     = "#E8DCC8",
+  "Water"                      = "#7FB2E5",
+  "Other / Not Classified"     = "#DDDDDD"
+)
+
+# AADT: line color and width both step up with traffic volume
+aadt_map <- aadt %>% filter(!is.na(AADT), AADT > 0)
+aadt_bins <- c(0, 5000, 15000, 30000, Inf)
+aadt_pal <- colorBin(c("#fdd49e", "#fc8d59", "#d7301f", "#7f0000"),
+                     domain = aadt_map$AADT, bins = aadt_bins)
+aadt_weight <- c(1.5, 2.5, 3.5, 5)[cut(aadt_map$AADT, aadt_bins, labels = FALSE)]
+
 exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  # boundary lines get their own pane above the default overlay pane (z 400)
+  # so they stay on top of whichever thematic layer is switched on
+  addMapPane("boundary_lines", zIndex = 450) %>%
   addTiles(
     urlTemplate = paste0(
       "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=",
@@ -202,6 +227,7 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     opacity = 0.9,
     dashArray = "4",
     label = ~name,
+    options = pathOptions(pane = "boundary_lines"),
     group = "Councils of Mayors"
   ) %>%
   addPolygons(
@@ -221,6 +247,34 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     fillOpacity = 0.7,
     label = ~ paste0(name, " (", type, ") — ADI: ", round(ADI, 1)),
     group = "ADI by Study Area Unit"
+  ) %>%
+  addPolygons(
+    data = land_use,
+    fillColor = ~unname(lu_colors[lu_category]),
+    fillOpacity = 0.7,
+    stroke = FALSE,
+    label = ~lu_category,
+    group = "Land Use (CMAP 2020)"
+  ) %>%
+  addPolylines(
+    data = aadt_map,
+    color = ~aadt_pal(AADT),
+    weight = aadt_weight,
+    opacity = 0.9,
+    label = ~ paste0(
+      coalesce(na_if(ROAD_NAME, ""), na_if(MARKED_NAM, ""), "Unnamed segment"), " — AADT: ",
+      format(AADT, big.mark = ","), " vehicles/day (", AADT_YR, ")"
+    ),
+    group = "AADT"
+  ) %>%
+  addPolygons(
+    data = county_boundary,
+    fill = FALSE,
+    color = "#000",
+    weight = 4,
+    opacity = 1,
+    options = pathOptions(pane = "boundary_lines"),
+    group = "Cook County"
   ) %>%
   addCircleMarkers(
     data = intersections,
@@ -277,17 +331,28 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
   fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
   addResetMapButton() %>%
   addFullscreenControl() %>%
-  addLayersControl(
-    overlayGroups = c(
-      "Study Area", "Councils of Mayors", "Walkability (NTAscore)",
-      "ADI by Study Area Unit", "FARS Pedestrian Fatalities",
-      "IDOT Pedestrian/Bicycle Crashes"
+  # Grouped layer control (leaflet.extras >= 2.1.0): boundaries and crashes
+  # are checkboxes (any combination); the thematic layers are radio buttons
+  # (one at a time), with an empty "None" group so they can all be turned off.
+  addGroupedLayersControl(
+    overlayGroups = list(
+      "Boundaries" = c("Cook County", "Study Area", "Councils of Mayors"),
+      "Crashes" = c("FARS Pedestrian Fatalities", "IDOT Pedestrian/Bicycle Crashes"),
+      "Thematic (one at a time)" = c(
+        "None", "ADI by Study Area Unit", "Walkability (NTAscore)",
+        "Land Use (CMAP 2020)", "AADT"
+      )
     ),
-    options = layersControlOptions(collapsed = FALSE)
+    options = groupedLayersControlOptions(
+      exclusiveGroups = "Thematic (one at a time)",
+      groupCheckboxes = FALSE,
+      groupsCollapsed = FALSE,
+      collapsed = FALSE
+    )
   ) %>%
   hideGroup(c("Councils of Mayors", "Walkability (NTAscore)",
-      "ADI by Study Area Unit", "FARS Pedestrian Fatalities",
-      "IDOT Pedestrian/Bicycle Crashes")) %>%
+      "ADI by Study Area Unit", "Land Use (CMAP 2020)", "AADT",
+      "FARS Pedestrian Fatalities", "IDOT Pedestrian/Bicycle Crashes")) %>%
   htmlwidgets::onRender(
     sprintf(
       "function(el, x) {
@@ -316,7 +381,7 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
 exploration_map
 ```
 
-`Intersections` is deliberately left out of `overlayGroups` above (as in `Phase0.qmd`'s map) so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
+`Intersections` is deliberately left out of the layer control above (as in `Phase0.qmd`'s map) so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
 
 ## Open Items
 
