@@ -380,6 +380,7 @@ st_write(study_area_streets, "data/infrastructure/study_area_streets.gpkg", dele
 walkability <- st_read("data/infrastructure/Walkability.shp") %>% 
   st_transform(crs=3435) %>%
   st_intersection(st_geometry(cc_boundary)) %>%
+  st_as_sf() %>% 
   st_make_valid()
 
 st_write(walkability, "data/infrastructure/walkability.gpkg", delete_dsn = TRUE)
@@ -565,6 +566,7 @@ cc_crashes <- il_crashes %>%
     day = crashday,
     datetime = crash_dth,
     crash_type = collisiontypecode,
+    ped_bike = typeoffirstcrash,
     fatals = totalfatals,
     injurs = totalinjured,
     ainjurs = ainjuries,
@@ -771,14 +773,14 @@ ADI is a relative measure -- its value for a given area depends on which other a
 ### Read
 ```{r}
 
-county_boundary <- st_read(dsn = "data/boundaries/cc_boundary.gpkg")
-cog_boundaries <- st_read(dsn = "data/boundaries/cogs_boundaries.gpkg")
-study_area <- st_read(dsn = "data/boundaries/study_area.gpkg")
-intersections <- st_read("data/intersections/study_area_intersections.gpkg")
-streets <- st_read("data/infrastructure/study_area_streets.gpkg")
-walkability <- st_read("data/infrastructure/walkability.gpkg")
-ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>%  st_transform(crs = 3435)
-ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg")
+county_boundary <- st_read(dsn = "data/boundaries/cc_boundary.gpkg") %>% st_transform(crs=4326)
+cog_boundaries <- st_read(dsn = "data/boundaries/cogs_boundaries.gpkg") %>% st_transform(crs=4326)
+study_area <- st_read(dsn = "data/boundaries/study_area.gpkg") %>% st_transform(crs=4326)
+intersections <- st_read("data/intersections/study_area_intersections.gpkg") %>% st_transform(crs=4326)
+streets <- st_read("data/infrastructure/study_area_streets.gpkg") %>% st_transform(crs=4326)
+walkability <- st_read("data/infrastructure/walkability.gpkg") %>% st_transform(crs=4326)
+ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>% st_transform(crs=4326)
+ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg") %>% st_transform(crs=4326)
 adi <- read.csv("data/census/adi_study_area.csv")
 
 ```
