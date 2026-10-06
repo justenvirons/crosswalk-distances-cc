@@ -44,6 +44,7 @@ library(stringr)
 library(tidycensus)
 library(sociome)
 library(tidyr)
+library(arcgislayers)
 ```
 
 ## Study Area Geography
@@ -384,6 +385,36 @@ walkability <- st_read("data/infrastructure/Walkability.shp") %>%
   st_make_valid()
 
 st_write(walkability, "data/infrastructure/walkability.gpkg", delete_dsn = TRUE)
+```
+
+## Land Use Inventory (CMAP 2020)
+
+CMAP's 2020 Land Use Inventory (LUI) is downloaded from its ArcGIS feature service, and is clipped to Cook County. Features are first requested within Cook County's bounding box (server-side), which keeps the download from covering the full seven-county region, and then intersected with the county boundary.
+
+```{r}
+#| label: land-use-inventory
+
+lui_url <- "https://services5.arcgis.com/LcMXE3TFhi1BSaCY/arcgis/rest/services/LUI20_geodatabase_v1_CMAP/FeatureServer"
+
+# open the feature service; print `lui_fs` to list its layers if the layer
+# id below needs to change
+lui_fs <- arc_open(lui_url)
+lui_layer <- get_layer(lui_fs, id = 0)
+
+# arc_select() pages through the service's max record count automatically
+lui_raw <- arc_select(
+  lui_layer,
+  filter_geom = st_as_sfc(st_bbox(cc_boundary))
+)
+
+land_use <- lui_raw %>%
+  st_transform(3435) %>%
+  st_make_valid() %>%
+  st_intersection(st_geometry(cc_boundary)) %>%
+  st_collection_extract("POLYGON") %>%
+  st_as_sf()
+
+st_write(land_use, "data/infrastructure/land_use_2020.gpkg", delete_dsn = TRUE)
 ```
 
 ## Pedestrian Fatalities (FARS)
