@@ -417,6 +417,20 @@ land_use <- lui_raw %>%
 st_write(land_use, "data/infrastructure/land_use_2020.gpkg", delete_dsn = TRUE)
 ```
 
+## Annual Average Daily Traffic (AADT)
+https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt
+
+```{r}
+aadt <- st_read("data/infrastructure/aadt.geojson") %>% 
+  st_transform(3435) %>%
+  st_make_valid() %>%
+  st_intersection(st_geometry(cc_boundary)) %>% 
+  st_as_sf()
+
+```
+
+
+
 ## Pedestrian Fatalities (FARS)
 
 Fatal crash records for Cook County from 2010 to 2024 are pulled from NHTSA's Fatality Analysis Reporting System (FARS). The records are narrowed to crashes whose first harmful event involved a pedestrian. Crashes with missing or placeholder coordinates are dropped so that each remaining fatality can be mapped at its reported location. A readable date and time is added to each record for display on the map, using whichever date and time fields the data provides.
