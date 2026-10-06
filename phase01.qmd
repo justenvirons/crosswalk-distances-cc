@@ -34,25 +34,21 @@ editor_options:
 #| eval: true
 #| code-fold: true
 
-library(sf)
-library(reticulate)
-library(dplyr)
-library(purrr)
-library(readr)
-library(glue)
-library(janitor)
-library(cli)
-library(tigris)
-library(units)
-library(leaflet)
+library(sf)              # simple features: read, transform and map spatial data
+library(reticulate)      # call Python (osmnx) from R
+library(dplyr)           # data manipulation verbs (filter, mutate, select, joins)
+library(purrr)           # functional iteration (map) over lists and files
+library(readr)           # fast CSV reading/writing
+library(glue)            # string interpolation
+library(janitor)         # clean column names and tabulate (clean_names, tabyl)
+library(cli)             # console alerts and progress messages
+library(tigris)          # download Census TIGER/Line boundaries
+library(units)           # unit-aware areas and lengths
+library(leaflet)         # interactive web maps
 library(leaflet.extras)  # addResetMapButton(), addFullscreenControl(), addGroupedLayersControl()
-library(osmextract)
-library(readr)
-library(dplyr)
-library(sf)
-library(lubridate)
-library(purrr)
-library(stringr)
+library(osmextract)      # read OpenStreetMap extracts
+library(lubridate)       # date/time handling for crash records
+library(stringr)         # string helpers (str_replace, str_detect)
 
 # API key for leaflet maps
 CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
@@ -62,9 +58,9 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 ## Overview
 
-This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.qmd`](phase00.qmd): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
+This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.html`](phase00.html): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
 
-Implementation (dataset-creation) code lives in [`dataprep.qmd`](dataprep.qmd), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`Phase0.qmd`](Phase0.qmd) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd).
+Implementation (dataset-creation) code lives in [`dataprep.html`](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`archive/Phase0.html`](archive/Phase0.html) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.html`](scripts/QMD/idot_crashes.html).
 
 ## Study Area Geography
 
@@ -85,13 +81,13 @@ Supports **Aim 1** (defines candidate crossing locations for the segmentation pi
 | Consolidate intersections | Merge closely spaced OSM nodes into single intersection points, consistent with the reference methodology's approach | Countywide consolidated-intersection point layer (~170,000 points) | Complete |
 | Cache/skip already-downloaded units | Avoid re-downloading intersections for study-area units already processed in an earlier run | Resumable run list | Complete |
 
-The above runs one live Overpass query per study-area unit (~200), which is what the resumable run list exists to survive. [`phase01_intersections.qmd`](phase01_intersections.qmd) plans and verifies an offline alternative — clip and filter the Illinois OSM extract locally with `osmium`, then build the countywide graph once with `ox$graph_from_xml()` — that would replace this section's Overpass dependency entirely once validated.
+The above runs one live Overpass query per study-area unit (~200), which is what the resumable run list exists to survive. [`phase01_intersections.html`](phase01_intersections.html) plans and verifies an offline alternative — clip and filter the Illinois OSM extract locally with `osmium`, then build the countywide graph once with `ox$graph_from_xml()` — that would replace this section's Overpass dependency entirely once validated.
 
 ## Crossing Distance (Segmentation Models)
 
 Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.
 
-Per Aim 1a (`phase00.qmd`), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [`phase01_crosswalk_models.qmd`](phase01_crosswalk_models.qmd) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
+Per Aim 1a (`phase00.qmd`), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [`phase01_crosswalk_models.html`](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
 
 | Task | Description | Output | Status |
 |---|---|---|---|

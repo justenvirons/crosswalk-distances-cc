@@ -20,7 +20,7 @@ editor_options:
 
 ## Purpose
 
-This document builds the `sf` data tables that support [`phase01.qmd`](phase01.qmd)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
+This document builds the `sf` data tables that support [`phase01.html`](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
 
 ## Activate R Libraries
 
