@@ -41,26 +41,14 @@ This book is the project's working plan. It is organized into five parts, one pe
 | Street network and speed limits | OpenStreetMap via Geofabrik/`osmextract` | 3, 4 | Complete |
 | Traffic volume and vehicle mix (AADT, truck AADT) | Illinois Department of Transportation (IDOT) | 3, 4 | In progress |
 | Pedestrian fatalities | NHTSA FARS | 3 | Complete |
-| Crash records | Illinois Department of Transportation (IDOT) | 4 | In progress |
-| Area Deprivation Index (ADI) | Neighborhood Atlas (Univ. of Wisconsin) / ACS via `sociome`+`tidycensus` | 2 | In progress |
-| Population, housing, employment | U.S. Census ACS 5-year / LEHD LODES | 2 | Not started |
+| Crash records | Illinois Department of Transportation (IDOT) | 4 | Complete |
+| Area Deprivation Index (ADI) | Neighborhood Atlas (Univ. of Wisconsin) / ACS via `sociome`+`tidycensus` | 2 | Complete |
 | Crossing-distance imagery (candidate A) | Google Maps satellite tiles (reference methodology's original source) | 1a, 1b | Not started |
 | Crossing-distance imagery (candidate B) | Cook County 3-band RGB orthoimagery (leaf-off, single-vintage) | 1a, 1b | Not started |
 | Crossing-distance imagery (candidate C) | Cook County 4-band RGB+NIR orthoimagery (leaf-off, single-vintage) | 1a, 1b | Not started |
 | Crossing-distance segmentation pipeline | Fine-tuned SAM 2.1 + grow-cut (existing); channel-extended/re-fine-tuned variant for the 4-band candidate | 1a, 1b | Not started |
 
 See [Dataset Development](phase01.html) for the detailed, task-level status of each data layer.
-
-## Risks and Mitigations
-
-| Risk | Mitigation |
-|---|---|
-| OSM crossing-edge data is sparser and less consistent in lower-density suburbs than in Chicago's dense urban core | Document coverage completeness by municipality/community area; flag low-coverage units for interpretive caution in Aim 2 |
-| Municipal/community-area aggregation of block-group data (ADI, demographics) is sensitive to boundary choice (modifiable areal unit problem) | Use population-weighted crosswalks; sensitivity-test at multiple aggregation levels |
-| Ambiguity in matching FARS fatality points to a specific measured crossing | Predefine a buffer/network-distance matching rule; run a sensitivity analysis on buffer size |
-| EMS injury data access/timeline is uncertain, given the need for a data-use agreement | IDOT crash data (already in development, see [Dataset Development](phase01.html)) is the working primary source for Aim 4; EMS data is incorporated only if/when access is secured |
-| The 4-band imagery/model comparison arm (Aim 1a) requires ML engineering work (modifying and fine-tuning the segmentation model's input layer) beyond running the existing fine-tuned model, plus GPU compute for that fine-tuning run — a different kind of effort than this project's other data-assembly tasks | Prototype and validate the channel-extension/fine-tuning approach at small scale (e.g., in a notebook environment) before committing a full training run; if it doesn't clearly outperform the 3-band approach, proceed with 3-band Cook County imagery (or Google imagery, per Aim 1a's results) for Aim 1b without the added model complexity |
-| Aim 1a's ground-truth sample is specific to Cook County, which limits how far its imagery/model comparison findings generalize if pursued as a standalone methods paper | Document the sample's stratification (built form, tree canopy, position within source imagery) explicitly, so the paper's claims are scoped appropriately rather than overgeneralized |
 
 ## Anticipated Outputs
 
@@ -72,9 +60,3 @@ See [Dataset Development](phase01.html) for the detailed, task-level status of e
 6. Updated open-source codebase reflecting the countywide pipeline, including the channel-extended segmentation model if Aim 1a supports the 4-band approach.
 7. Interactive map/dashboard of Cook County crossing distances (optional, dissemination-stage).
 
-## Open Decisions Requiring Early Input
-
-- Should unincorporated Cook County areas be included, or only incorporated municipalities and Chicago community areas?
-- Which EMS data source, if any, is feasible as a supplement to IDOT crash data for Aim 4?
-- What buffer/matching rule will be used to associate FARS point fatalities with specific measured crossings?
-- Target FARS and IDOT crash year range (most recent years only, vs. multi-year pooled for statistical power)?

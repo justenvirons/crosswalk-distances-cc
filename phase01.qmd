@@ -115,15 +115,12 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 
 **Status: in progress.**
 
-- **In progress:** Area Deprivation Index (ADI) — 2024 ACS variables via `sociome`/`tidycensus`; 2020 census tracts are aggregated to community areas (Chicago Data Portal tract-to-community-area lookup), and ADI is computed directly by Census place for suburban municipalities.
-- **Complete (FFY2025 only):** Transportation investment data — CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) extracted to the Cook County municipality/project-type level and flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects): [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx). This is a candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations); extend with future years' reports.
-- **Not started:** Census demographic covariates — ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate).
-- **Not started:** Employment covariates — ACS/LEHD LODES (employment density, commute mode share, jobs-housing balance).
-- **Not started:** Other contextual covariates — incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability.
+- **Complete:** Area Deprivation Index (ADI) — 2024 ACS variables via `sociome`/`tidycensus`; 2020 census tracts are aggregated to community areas (Chicago Data Portal tract-to-community-area lookup), and ADI is computed directly by Census place for suburban municipalities.
+- **In progress:** Transportation investment data — CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) extracted to the Cook County municipality/project-type level and flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects): [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx). This is a candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations); extend with future years' reports.
 
 ## Interactive Map (Data Exploration)
 
-Loads a subset of [Data Preparation Code](dataprep.html)'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes). The street network isn't included here — it's dense enough to warrant its own view rather than competing with everything else on one map. This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of [Data Presentation and Analysis](phase02.html).
+Loads a subset of [Data Preparation Code](dataprep.html)'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes).
 
 ```{r}
 #| label: dataprep-map
@@ -255,7 +252,7 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     radius = 2,
     stroke = FALSE,
     fillOpacity = 0.6,
-    fillColor = "#333",
+    fillColor = "#555",
     group = "Intersections"
   ) %>%
   addCircleMarkers(
