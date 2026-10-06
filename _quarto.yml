@@ -59,8 +59,8 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    number-sections: true
-    number-depth: 1
+    number-sections: false
+    # number-depth: 1
     code-fold: true
 
 editor: source

@@ -10,6 +10,7 @@ output/ped_fatalities*.*
 output/all_ped_fatalities*.*
 data/osm/*
 *.pbf
+_book/*
 
 # History files
 .Rhistory
@@ -63,3 +64,5 @@ rsconnect/
 
 # Quarto
 /.quarto/
+
+**/*.quarto_ipynb

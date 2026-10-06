@@ -5,12 +5,10 @@ editor_options:
 
 # Dataset Development {#sec-phase01}
 
-## Step 1 — Activate R Packages, Connect R to the OSMnx Python environment
-
 ```{r}
 #| label: r-packages
 #| eval: true
-#| code-fold: true
+#| warning: false
 
 library(sf)              # simple features: read, transform and map spatial data
 library(reticulate)      # call Python (osmnx) from R
@@ -38,7 +36,7 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 This phase assembles every data layer needed to test the aims and hypotheses set out in [Background and Aims](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
 
-Implementation (dataset-creation) code lives in [Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. [Data Preparation Code](dataprep.html) supersedes the study-area/intersection/streets/FARS code originally developed in [`archive/Phase0.html`](archive/Phase0.html) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.html`](scripts/QMD/idot_crashes.html).
+Implementation (dataset-creation) code lives in [Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself.
 
 ## Study Area Geography
 
@@ -46,8 +44,7 @@ Supports **Aims 1–4** (defines the unit of geography used to organize and aggr
 
 | Task | Description | Output | Status |
 |---|---|---|---|
-| Combine Chicago community areas and suburban municipalities | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
-| Reconcile boundary source and projection | Source boundaries from Cook County/Chicago health-atlas geographies; standardize to a common projected CRS for area and distance calculations | Projected study-area boundary file | Complete |
+| Combine Chicago community areas and suburban municipalities (N=202) | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
 
 ## Street Intersections
 
@@ -370,8 +367,3 @@ exploration_map
 ```
 
 `Intersections` is deliberately left out of the layer control above (as in `Phase0.qmd`'s map) so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
-
-## Open Items
-
-- **EMS injury data.** The original plan identified Cook County/regional EMS-reported pedestrian injury data as a possible input to Aim 4, pending a data-use agreement. IDOT crash records (above) are the working primary data source for Aim 4; EMS data will be incorporated only if access is secured, without blocking dataset development or downstream analysis.
-- **Downstream phases.** Once the tables above are complete, dataset assembly and joins (study area + intersections + streets + AADT + crashes/fatalities + socioeconomic covariates) feed directly into [Data Presentation and Analysis](phase02.html) (data presentation and analysis).
