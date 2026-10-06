@@ -147,11 +147,7 @@ Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) 
 #| label: dataprep-map
 #| eval: true
 #| echo: true
-
-library(sf)
-library(dplyr)
-library(leaflet)
-library(leaflet.extras)  # >= 2.1.0 for addGroupedLayersControl()
+#| code-fold: true
 
 load("data/phase01_dataprep.RData")
 
@@ -163,11 +159,7 @@ type_pal <- colorFactor(c("#9e9e9e", "#616161"), domain = c("community area", "m
 
 # ADI by study area unit: `adi` (data/census/adi_study_area.csv) is a plain
 # table keyed by GEOID, not spatial -- join it onto study_area's polygons
-# to map it. GEOID join keys come from two different sources upstream
-# (community-area numbers vs. Census place GEOIDs, dataprep.qmd's ADI
-# section) -- any unit that fails to match comes through as NA ADI here
-# rather than erroring, which is the right failure mode for an exploration
-# map but worth noticing if a lot of units end up blank.
+# to map it. 
 study_area_adi <- study_area %>%
   left_join(
     adi %>% mutate(GEOID = as.character(GEOID)) %>% select(GEOID, ADI),
