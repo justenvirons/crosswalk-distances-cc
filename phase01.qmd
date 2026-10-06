@@ -34,28 +34,27 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 ## Overview
 
-This phase assembles every data layer needed to test the aims and hypotheses set out in [Background and Aims](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
+This phase assembles every data layer needed to test the aims and hypotheses set out in [Background and Aims](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; each section below summarizes what is complete, in progress, or not yet started, and notes the research aim(s) each data layer supports.
 
-Implementation (dataset-creation) code lives in [Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself.
+Implementation (dataset-creation) code lives in [Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this chapter describes what each step produces and why, not the implementation detail itself.
 
 ## Study Area Geography
 
 Supports **Aims 1–4** (defines the unit of geography used to organize and aggregate every other data layer).
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Combine Chicago community areas and suburban municipalities (N=202) | Build a single, internally consistent countywide geography spanning the City of Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small/fragmentary places) | Countywide study-area polygon layer (`study_area`), with a `type` field distinguishing community areas from municipalities | Complete |
+**Status: complete.**
+
+- **Complete:** Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small or fragmentary places) are combined into a single countywide polygon layer (`study_area`, N = 202), with a `type` field distinguishing community areas from municipalities.
 
 ## Street Intersections
 
 Supports **Aim 1** (defines candidate crossing locations for the segmentation pipeline) and **Aims 3–4** (defines the spatial units fatality/crash records are matched to).
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Clip OSM data to Cook County | Clip the Illinois OpenStreetMap extract from GeoFabrik to the Cook County boundary with `osmium extract` | Cook County OSM extract | Complete |
-| Filter to the drivable street network | Keep drivable road types and remove parking aisles, driveways, private roads, airport features and indoor ways with `osmium tags-filter` | Cook County drive-network OSM file | Complete |
-| Build street graph and consolidate intersections | Build one countywide street graph with OSMnx (`graph_from_xml()`), then merge OSM nodes within the default 10 m tolerance into single intersection points with `consolidate_intersections()`, excluding dead ends | Countywide intersection point layer (~170,000 points) | Complete |
-| Assign intersections to study-area units | Spatially join intersection points to the study-area geography | `data/intersections/study_area_intersections.gpkg`, with `geoid`, `name` and `type` | Complete |
+**Status: complete.**
+
+- **Complete:** The Illinois OpenStreetMap extract from GeoFabrik was clipped to Cook County (`osmium extract`) and filtered to the drivable street network, removing parking aisles, driveways, private roads, airport features and indoor ways (`osmium tags-filter`).
+- **Complete:** One countywide street graph was built with OSMnx (`graph_from_xml()`), and OSM nodes within the default 10 m tolerance were merged into single intersection points with `consolidate_intersections()`, excluding dead ends (~170,000 points).
+- **Complete:** Intersections were spatially joined to the study-area geography and saved to `data/intersections/study_area_intersections.gpkg`, with `geoid`, `name` and `type`.
 
 All processing uses a downloaded OSM file, so no online map service (Overpass API) is queried. See [Street Intersections](phase01_intersections.html) for a full description of the methods.
 
@@ -65,63 +64,62 @@ Supports **Aim 1** directly — this is the study's core measured variable, and 
 
 Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Imagery/model comparison (Aim 1a) | Measure crossing distance at a sample of intersections using all three imagery/model approaches; compare against manually measured ground truth | Comparison dataset and selected approach for full-scale production | Not started |
-| Countywide production run (Aim 1b) | Apply the approach Aim 1a's results support, at full scale across all study-area intersections | Countywide crossing-distance dataset | Not started (gated on Aim 1a) |
+**Status: not started.**
+
+- **Not started:** Imagery/model comparison (Aim 1a) — measure crossing distance at a sample of intersections with all three imagery/model approaches and compare against manually measured ground truth, to select the approach for full-scale production.
+- **Not started (depends on Aim 1a):** Countywide production run (Aim 1b) — apply the selected approach to all study-area intersections to produce the countywide crossing-distance dataset.
 
 ## Streets and Speed Limits
 
 Supports **Aims 3–4** (roadway functional class and speed limit are control variables in the fatality/injury models).
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Retrieve countywide street centerlines | Download Illinois streets via Geofabrik (`osmextract`) rather than per-municipality OSMnx calls, then clip to the study area | Countywide street centerline layer | Complete |
-| Parse speed limits | Extract and standardize OSM `maxspeed` tags to miles per hour | Street segments attributed with posted speed limit | Complete |
+**Status: complete.**
+
+- **Complete:** Countywide street centerlines were downloaded from Geofabrik (`osmextract`) and clipped to the study area.
+- **Complete:** OSM `maxspeed` tags were parsed and standardized to miles per hour, giving street segments with posted speed limits.
 
 ## Traffic Volume and Vehicle Mix (IDOT AADT)
 
 Supports **Aims 3–4** (traffic volume and heavy-vehicle mix are covariates in the fatality and crash-rate models; hypothesis H8 in [Background and Aims](phase00.html)). Traffic volume measures how many vehicles pedestrians are exposed to at a crossing, and it is closely tied to crossing distance, since busier roads tend to be wider; vehicle mix captures the share of trucks and freight vehicles, which are more likely to cause severe injuries. Source: IDOT's Annual Average Daily Traffic layer, which reports total AADT and heavy commercial vehicle AADT (single-unit trucks and buses, and multi-unit combination trucks) by road segment.
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Download and clip AADT segments | Download IDOT's AADT layer, clip it to Cook County, and recalculate segment length after clipping | `data/infrastructure/study_area_aadt.gpkg` | Complete |
-| Derive vehicle-mix measures | Compute heavy commercial vehicle share (`HCV_AADT` / `AADT`) and the single-unit and multi-unit truck shares for each segment; treat missing values as missing, not zero | AADT segments with total volume and truck-share attributes | Not started |
-| Attach AADT to fatality locations (Aim 3) | Assign each FARS fatality the AADT and truck share of the nearest road segment(s), or the maximum on the roads meeting at the nearest intersection | Fatality point layer with traffic volume and vehicle-mix covariates | Not started |
-| Summarize AADT by study-area unit (Aim 4) | Compute volume-weighted measures per community area/municipality, such as vehicle miles traveled (AADT × segment length), VMT per road mile, and VMT-weighted mean truck share | Study-area traffic volume and vehicle-mix covariate table | Not started |
-| Assess coverage and count years | Report the share of road miles with AADT values (coverage is strongest on state and major roads) and the range of count years by unit, to judge whether summaries are comparable across units | Coverage diagnostics table | Not started |
+**Status: in progress.**
+
+- **Complete:** IDOT's AADT layer was downloaded, clipped to Cook County, and segment lengths recalculated after clipping (`data/infrastructure/study_area_aadt.gpkg`).
+- **Not started:** Derive vehicle-mix measures — heavy commercial vehicle share (`HCV_AADT` / `AADT`) and single-unit and multi-unit truck shares for each segment, treating missing values as missing rather than zero.
+- **Not started:** Attach AADT and truck share to each FARS fatality (Aim 3), from the nearest road segment(s) or the maximum on the roads meeting at the nearest intersection.
+- **Not started:** Summarize AADT by study-area unit (Aim 4) — vehicle miles traveled (AADT × segment length), VMT per road mile, and VMT-weighted mean truck share.
+- **Not started:** Assess coverage and count years — the share of road miles with AADT values (coverage is strongest on state and major roads) and the range of count years by unit, to judge whether summaries are comparable across units.
 
 ## Pedestrian Fatalities (FARS)
 
 Supports **Aim 3** directly.
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Download FARS records | Pull NHTSA FARS data for Illinois/Cook County, 2010–2024 | Raw FARS extract | Complete |
-| Filter to pedestrian fatalities | Subset to pedestrian-involved fatalities with valid coordinates | Pedestrian-fatality point layer, with date/time-of-day attributes | Complete |
+**Status: complete.**
+
+- **Complete:** NHTSA FARS records for Illinois/Cook County, 2010–2024, were downloaded and filtered to pedestrian fatalities with valid coordinates, giving a point layer with date and time-of-day attributes.
 
 ## Crash Records (IDOT)
 
 Supports **Aim 4** directly (as the primary crash-injury data source; see *Open Items* below regarding EMS data).
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Stack yearly CSV exports | Combine 2022–2024 IDOT crash-report exports into a single table | Combined raw crash table | Complete |
-| Clean coordinates and dates | Prefer in-state ArcGIS `x`/`y` coordinates, falling back to IDOT's reported longitude/latitude; reconstruct crash date/time from `crashyr`/`crashmonth`/`crashday`/`crashhour` rather than the raw `crashdate` field (which is UTC-shifted) | Cleaned crash table with valid point geometry | Complete |
-| Identify pedestrian crashes and severity | Flag pedestrian-involved crashes from `typeoffirstcrash`; flag killed-or-seriously-injured (KSI) crashes from fatality/A-injury counts | `sf` point layer of pedestrian crashes, with severity and KSI flags | Complete |
-| Extend to additional crash years | Add IDOT crash-year extracts beyond 2022–2024 as they become available, to increase statistical power for Aim 4 | Extended multi-year crash table | In progress |
+**Status: complete for 2022–2024; additional years in progress.**
+
+- **Complete:** IDOT crash-report exports for 2022–2024 were combined into a single table.
+- **Complete:** Coordinates were cleaned (in-state ArcGIS `x`/`y` preferred, falling back to IDOT's reported longitude/latitude), and crash date/time was rebuilt from `crashyr`/`crashmonth`/`crashday`/`crashhour` rather than the UTC-shifted `crashdate` field.
+- **Complete:** Pedestrian crashes were flagged from `typeoffirstcrash`, and killed-or-seriously-injured (KSI) crashes from fatality and A-injury counts, giving a point layer of pedestrian crashes with severity and KSI flags.
+- **In progress:** Adding crash years beyond 2022–2024 as they become available, to increase statistical power for Aim 4.
 
 ## Socioeconomic and Contextual Data
 
 Supports **Aim 2** directly (ADI, demographics) and provides control variables for **Aims 3–4**.
 
-| Task | Description | Output | Status |
-|---|---|---|---|
-| Assemble Area Deprivation Index (ADI) | Download 2024 ACS variables via the `sociome`/`tidycensus` packages; aggregate 2020 census tracts (via a Chicago Data Portal tract-to-community-area lookup) to compute ADI by community area, and compute ADI directly by Census place for suburban municipalities | Community-area and suburban-municipality ADI tables | In progress |
-| Assemble Census demographic covariates | Download ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate) | Municipality/community-area demographic covariate table | Not started |
-| Assemble employment covariates | Download ACS/LEHD LODES data (employment density, commute mode share, jobs-housing balance) | Municipality/community-area employment covariate table | Not started |
-| Assemble other contextual covariates | Incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability | Supplementary covariate table | Not started |
-| Assemble transportation investment/obligations data | Extract CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) to Cook County municipality/project-type level, flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects) | [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx) — candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations) | Complete (FFY2025 only; extend with future years' reports) |
+**Status: in progress.**
+
+- **In progress:** Area Deprivation Index (ADI) — 2024 ACS variables via `sociome`/`tidycensus`; 2020 census tracts are aggregated to community areas (Chicago Data Portal tract-to-community-area lookup), and ADI is computed directly by Census place for suburban municipalities.
+- **Complete (FFY2025 only):** Transportation investment data — CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) extracted to the Cook County municipality/project-type level and flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects): [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx). This is a candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations); extend with future years' reports.
+- **Not started:** Census demographic covariates — ACS 5-year estimates (population density, housing tenure, vehicle ownership, age structure, poverty rate).
+- **Not started:** Employment covariates — ACS/LEHD LODES (employment density, commute mode share, jobs-housing balance).
+- **Not started:** Other contextual covariates — incorporation year, land area, and other municipal/community-area attributes needed for Aim 2 comparability.
 
 ## Interactive Map (Data Exploration)
 
