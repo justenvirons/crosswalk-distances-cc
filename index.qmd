@@ -20,7 +20,7 @@ This book is the project's working plan. It is organized into five parts, one pe
 | Phase | Focus | Chapter(s) | Status |
 |---|---|---|---|
 | 0 | Background, literature review, gaps in past research, study purpose, aims and hypotheses | [Background and Aims](phase00.html) | Complete |
-| 1 | Dataset development: study area boundaries, intersections, streets, crashes, fatalities, ADI, census, and other contextual data | [Dataset Development](phase01.html); [Street Intersections](phase01_intersections.html); [Crossing Distance Model Comparison](phase01_crosswalk_models.html); [Data Preparation Code](dataprep.html) | In progress |
+| 1 | Dataset development: study area boundaries, intersections, streets, crashes, fatalities, ADI, census, and other contextual data | [Dataset Development](phase01.html); [Street Intersections](phase01_intersections.html); [Crossing Distance Model Comparison](phase01_crosswalk_models.html); [Appendix A: Data Preparation Code](dataprep.html) | In progress |
 | 2 | Data presentation and analysis: descriptive statistics and statistical model specification/execution | [Data Presentation and Analysis](phase02.html) | Not started |
 | 3 | Results, interpretation, and discussion of statistical tests | [Results and Discussion](phase03.html) | Not started |
 | 4 | Study limitations, implications, conclusion, and next steps | [Limitations and Conclusions](phase04.html) | Not started |

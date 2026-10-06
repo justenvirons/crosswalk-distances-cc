@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This chapter operationalizes Aim 1a ([Background and Aims](phase00.html)): before producing the countywide crossing-distance dataset (Aim 1b), compare three imagery/segmentation-model approaches against manually measured ground truth on a sample of intersections across the study area, and use that comparison's results to decide which approach Aim 1b should run at full scale. It is a planning document — it lays out the comparison design and the steps to operationalize each approach in enough detail to implement, not runnable pipeline code (that will live alongside [Data Preparation Code](dataprep.html) once an approach is selected and implemented).
+This chapter operationalizes Aim 1a ([Background and Aims](phase00.html)): before producing the countywide crossing-distance dataset (Aim 1b), compare three imagery/segmentation-model approaches against manually measured ground truth on a sample of intersections across the study area, and use that comparison's results to decide which approach Aim 1b should run at full scale. It is a planning document — it lays out the comparison design and the steps to operationalize each approach in enough detail to implement, not runnable pipeline code (that will live alongside [Appendix A: Data Preparation Code](dataprep.html) once an approach is selected and implemented).
 
 This comparison is also designed to stand on its own as a methods contribution: a rigorous, ground-truth-validated test of whether a documented, single-vintage, leaf-off county orthoimagery product outperforms the commercial satellite basemap imagery the reference methodology [@moran2024multiscale; @moran2026scaling] was built on — independent of this project's applied safety analyses in Aims 2–4.
 
@@ -26,7 +26,7 @@ None of this guarantees the county imagery is *better* for this specific task, t
 
 Steps:
 
-1. For each sampled intersection (candidate list drawn from [Data Preparation Code](dataprep.html)'s `all_intersections_sf`), buffer to the same fixed radius the reference methodology uses around each candidate crossing location.
+1. For each sampled intersection (candidate list drawn from [Appendix A: Data Preparation Code](dataprep.html)'s `all_intersections_sf`), buffer to the same fixed radius the reference methodology uses around each candidate crossing location.
 2. Request the RGB clip via the ImageServer's `exportImage` operation: bounding box from step 1, `bandIds=0,1,2` (R, G, B; drop the NIR band), output format GeoTIFF, pixel size at native 6-inch resolution or resampled to match the model's expected input dimensions — resolve this choice empirically (native resolution preserves the county imagery's real advantage; resampling to the reference methodology's fixed pixel dimensions keeps the model's effective receptive field/input size consistent with what it was fine-tuned on). Reconcile the returned raster's exact CRS against this project's working CRS (`EPSG:3435`) before use — Cook County's NAD83(2011) realization and the NAD83 (1986) realization already used elsewhere in this pipeline are very close but not identical; be deliberate about which is authoritative for distance measurement rather than assuming they're interchangeable.
 3. Feed the clip directly into the existing fine-tuned SAM 2.1 checkpoint — no architecture or weight changes.
 4. Run the same grow-cut post-processing and crossing-distance measurement logic already implemented for the Google-imagery pipeline, unchanged.
@@ -55,7 +55,7 @@ Open question this approach tests: does the NIR band measurably reduce error bey
 
 ### Sample selection
 
-Draw a stratified sample of intersections from [Data Preparation Code](dataprep.html)'s countywide `all_intersections_sf` layer. Proposed stratification dimensions, chosen to target each hypothesis directly rather than sample uniformly at random:
+Draw a stratified sample of intersections from [Appendix A: Data Preparation Code](dataprep.html)'s countywide `all_intersections_sf` layer. Proposed stratification dimensions, chosen to target each hypothesis directly rather than sample uniformly at random:
 
 - **Geography type**: Chicago community area vs. suburban municipality (parallels H1's built-form comparison).
 - **Tree canopy cover**: high vs. low at each candidate location (from a canopy/land-cover layer, or a quick NDVI-based screen using the county imagery's own NIR band) — targets H5 and H7 directly.
@@ -87,7 +87,7 @@ Select the approach with the lowest error against ground truth and the lowest oc
 
 | Task | Description | Output | Status |
 |---|---|---|---|
-| Define comparison sample | Stratified sample of intersections (geography type × canopy cover × Google tile-position × street-network form), drawn from [Data Preparation Code](dataprep.html)'s `all_intersections_sf` | Sample intersection list | Not started |
+| Define comparison sample | Stratified sample of intersections (geography type × canopy cover × Google tile-position × street-network form), drawn from [Appendix A: Data Preparation Code](dataprep.html)'s `all_intersections_sf` | Sample intersection list | Not started |
 | Establish ground truth | Manually measure crossing distance at each sampled intersection, per the reference methodology's protocol | Ground-truth measurement table | Not started |
 | Approach A: 3-band Cook County RGB pipeline | Retrieve RGB clips via the ImageServer's `exportImage` operation; run the existing fine-tuned SAM 2.1 + grow-cut, unchanged | Approach A crossing-distance measurements | Not started |
 | Approach B: 4-band Cook County RGB+NIR pipeline | Retrieve 4-band clips; channel-extend and fine-tune the segmentation model's embedding layer + decoder; run + grow-cut | Approach B crossing-distance measurements | Not started |

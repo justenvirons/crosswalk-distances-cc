@@ -9,7 +9,7 @@ This chapter describes how the street intersection dataset for Cook County was c
 3. Build a street network graph and merge nearby nodes into single intersection points.
 4. Assign each intersection to a study-area unit (Chicago community area or suburban municipality).
 
-All processing is done locally on a downloaded OSM file, so no online map service (Overpass API) is queried. The implementation code is in [Data Preparation Code](dataprep.html) (*Street Intersections*); the code below summarizes it.
+All processing is done locally on a downloaded OSM file, so no online map service (Overpass API) is queried. The implementation code is in [Appendix A: Data Preparation Code](dataprep.html) (*Street Intersections*); the code below summarizes it.
 
 ## Software
 

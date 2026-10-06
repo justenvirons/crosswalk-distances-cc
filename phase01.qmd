@@ -36,7 +36,7 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 This phase assembles every data layer needed to test the aims and hypotheses set out in [Background and Aims](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; each section below summarizes what is complete, in progress, or not yet started, and notes the research aim(s) each data layer supports.
 
-Implementation (dataset-creation) code lives in [Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this chapter describes what each step produces and why, not the implementation detail itself.
+Implementation (dataset-creation) code lives in [Appendix A: Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this chapter describes what each step produces and why, not the implementation detail itself.
 
 ## Study Area Geography
 
@@ -120,7 +120,7 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 
 ## Interactive Map (Data Exploration)
 
-Loads a subset of [Data Preparation Code](dataprep.html)'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes).
+Loads a subset of [Appendix A: Data Preparation Code](dataprep.html)'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes).
 
 ```{r}
 #| label: dataprep-map
