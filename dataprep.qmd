@@ -20,7 +20,7 @@ editor_options:
 
 ## Purpose
 
-This document builds the `sf` data tables that support [`phase01.qmd`](phase01.qmd)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase1_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
+This document builds the `sf` data tables that support [`phase01.qmd`](phase01.qmd)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which `phase01.qmd` loads (a subset of) to build an interactive map for data exploration.
 
 ## Activate R Libraries
 
@@ -28,23 +28,22 @@ This document builds the `sf` data tables that support [`phase01.qmd`](phase01.q
 #| label: r-packages
 #| eval: true
 
-library(sf)
-library(reticulate)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(readr)
-library(glue)
-library(cli)
-library(tigris)
-library(units)
-library(osmextract)
-library(lubridate)
-library(stringr)
-library(tidycensus)
-library(sociome)
-library(tidyr)
-library(arcgislayers)
+library(sf)            # simple features: read/write, transform and join spatial data
+library(reticulate)    # call Python (osmnx, shapely) from R for intersection extraction
+library(dplyr)         # data manipulation verbs (filter, mutate, select, joins)
+library(tidyr)         # reshaping and missing-value helpers (drop_na, pivot_*)
+library(purrr)         # functional iteration (map) over crash files by year
+library(readr)         # fast CSV reading/writing (IDOT crashes, ADI tables)
+library(glue)          # string interpolation (osmium filter expressions)
+library(cli)           # console alerts/warnings for data-quality checks
+library(tigris)        # download Census TIGER/Line boundaries (Cook County)
+library(units)         # unit-aware areas and lengths (m^2 -> mi^2)
+library(osmextract)    # read OpenStreetMap extracts (street network, speed limits)
+library(lubridate)     # date/time construction for crash records
+library(stringr)       # string helpers (str_replace, str_starts)
+library(tidycensus)    # download American Community Survey (ACS) data
+library(sociome)       # compute Area Deprivation Index (ADI) from ACS data
+library(arcgislayers)  # query ArcGIS feature services (CMAP land use)
 ```
 
 ## Study Area Geography
@@ -536,7 +535,7 @@ st_write(ped_fatalities_formatted, "data/crashes/ped_fatalities.gpkg", delete_ds
 
 ## Crash Records (IDOT)
 
-Crash records for 2022 to 2024 are read from IDOT's annual crash files and combined into a single dataset. Each crash is mapped using its recorded coordinates, falling back to a second set of coordinates when the first is missing or falls outside Illinois. The date and time are built from the separate year, month, day and hour fields, since the combined date field can shift late-evening crashes to the next day. Each crash is flagged as a pedestrian or bicycle crash where applicable, and as a killed-or-seriously-injured (KSI) crash if anyone died or was seriously injured; a second output contains only the pedestrian and bicycle crashes.
+Crash records for 2022 to 2024 are read from IDOT's annual crash files and combined into a single dataset. Each crash is mapped using its recorded coordinates, falling back to a second set of coordinates when the first is missing or falls outside Illinois. The date and time are built from the separate year, month, day and hour fields, since the combined date field can shift late-evening crashes to the next day. Each crash is flagged as a pedestrian crash where applicable, and as a killed-or-seriously-injured (KSI) crash if anyone died or was seriously injured; a second output contains only the pedestrian crashes.
 
 ```{r}
 #| label: idot-crashes

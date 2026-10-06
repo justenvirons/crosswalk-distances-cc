@@ -64,7 +64,7 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.qmd`](phase00.qmd): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
 
-Implementation (dataset-creation) code lives in [`dataprep.qmd`](dataprep.qmd), which saves the resulting `sf` tables to `data/phase1_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`Phase0.qmd`](Phase0.qmd) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd).
+Implementation (dataset-creation) code lives in [`dataprep.qmd`](dataprep.qmd), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`Phase0.qmd`](Phase0.qmd) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.qmd`](scripts/QMD/idot_crashes.qmd).
 
 ## Study Area Geography
 
@@ -124,7 +124,7 @@ Supports **Aim 4** directly (as the primary crash-injury data source; see *Open 
 |---|---|---|---|
 | Stack yearly CSV exports | Combine 2022–2024 IDOT crash-report exports into a single table | Combined raw crash table | Complete |
 | Clean coordinates and dates | Prefer in-state ArcGIS `x`/`y` coordinates, falling back to IDOT's reported longitude/latitude; reconstruct crash date/time from `crashyr`/`crashmonth`/`crashday`/`crashhour` rather than the raw `crashdate` field (which is UTC-shifted) | Cleaned crash table with valid point geometry | Complete |
-| Identify pedestrian/bicycle crashes and severity | Flag pedestrian- and bicycle-involved crashes from `typeoffirstcrash`; flag killed-or-seriously-injured (KSI) crashes from fatality/A-injury counts | `sf` point layer of pedestrian/bicycle crashes, with severity and KSI flags | Complete |
+| Identify pedestrian crashes and severity | Flag pedestrian-involved crashes from `typeoffirstcrash`; flag killed-or-seriously-injured (KSI) crashes from fatality/A-injury counts | `sf` point layer of pedestrian crashes, with severity and KSI flags | Complete |
 | Extend to additional crash years | Add IDOT crash-year extracts beyond 2022–2024 as they become available, to increase statistical power for Aim 4 | Extended multi-year crash table | In progress |
 
 ## Socioeconomic and Contextual Data
@@ -141,7 +141,7 @@ Supports **Aim 2** directly (ADI, demographics) and provides control variables f
 
 ## Interactive Map (Data Exploration)
 
-Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian/bicycle crashes). The street network isn't included here — it's dense enough to warrant its own view rather than competing with everything else on one map. This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of `phase02.qmd`.
+Loads a subset of `dataprep.qmd`'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes). The street network isn't included here — it's dense enough to warrant its own view rather than competing with everything else on one map. This is an exploration view, not a finished figure — descriptive and statistical analysis of these layers is the subject of `phase02.qmd`.
 
 ```{r}
 #| label: dataprep-map
@@ -236,7 +236,7 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     fillOpacity = 0.65,
     stroke = FALSE,
     label = ~ paste0("Walkability (NTAscore): ", round(NTAscore, 1)),
-    group = "Walkability (NTAscore)"
+    group = "Walkability"
   ) %>%
   addPolygons(
     data = study_area_adi,
@@ -293,7 +293,7 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     fillOpacity = 0.8,
     fillColor = "darkred",
     # label = ~ paste0("Pedestrian fatality (FARS) — ", fatality_date, ", ", fatality_time),
-    group = "FARS Pedestrian Fatalities"
+    group = "FARS Ped Fatalities"
   ) %>%
   addCircleMarkers(
     data = ped_crashes,
@@ -302,12 +302,12 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     fillOpacity = 0.6,
     fillColor = "#3182bd",
     label = ~ paste0(ped, " crash — ", severity),
-    group = "IDOT Pedestrian Crashes"
+    group = "IDOT Ped Crashes"
   ) %>%
   # addLegend(
   #   "bottomleft",
-  #   colors = c("#9e9e9e", "#2b8cbe", "#333", "darkred", "#e6550d", "#3182bd"),
-  #   labels = c("Study area", "Councils of Mayors", "Intersections", "FARS fatality", "IDOT pedestrian crash", "IDOT bicycle crash"),
+  #   colors = c("#9e9e9e", "#2b8cbe", "#333", "darkred", "#3182bd"),
+  #   labels = c("Study area", "Councils of Mayors", "Intersections", "FARS fatality", "IDOT pedestrian crash"),
   #   opacity = 1
   # ) %>%
   # addLegend(
@@ -331,27 +331,37 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
   fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
   addResetMapButton() %>%
   addFullscreenControl() %>%
+  # Placeholder layer for the "None" radio option: an invisible point, so
+  # selecting "None" switches every thematic layer off. Every name listed in
+  # addGroupedLayersControl() must match a `group =` used above exactly, or
+  # that entry silently does nothing.
+  addCircleMarkers(
+    lng = mean(c(bbox[["xmin"]], bbox[["xmax"]])),
+    lat = mean(c(bbox[["ymin"]], bbox[["ymax"]])),
+    radius = 0, stroke = FALSE, fillOpacity = 0,
+    group = "None"
+  ) %>%
   # Grouped layer control (leaflet.extras >= 2.1.0): boundaries and crashes
   # are checkboxes (any combination); the thematic layers are radio buttons
-  # (one at a time), with an empty "None" group so they can all be turned off.
+  # (one at a time) via exclusiveGroups, which must name the "Thematic" group.
   addGroupedLayersControl(
     overlayGroups = list(
       "Boundaries" = c("Cook County", "Study Area", "Councils of Mayors"),
       "Crashes" = c("FARS Ped Fatalities", "IDOT Ped Crashes"),
-      "Thematic" = c(
-        "None", "ADI", "Walkability", "AADT"
-      )
+      "Thematic" = c("None", "ADI", "Walkability", "AADT")
     ),
     options = groupedLayersControlOptions(
-      exclusiveGroups = "Thematic (one at a time)",
+      exclusiveGroups = "Thematic",
       groupCheckboxes = FALSE,
       groupsCollapsed = FALSE,
       collapsed = FALSE
     )
   ) %>%
-  hideGroup(c("Councils of Mayors", "Walkability (NTAscore)",
-      "ADI", "Land Use (CMAP 2020)", "AADT",
-      "FARS Pedestrian Fatalities", "IDOT Pedestrian Crashes")) %>%
+  # Off by default (checked in the control to show): Councils of Mayors,
+  # all thematic layers except "None", and both crash layers
+  hideGroup(c("Councils of Mayors",
+              "ADI", "Walkability", "AADT",
+              "FARS Ped Fatalities", "IDOT Ped Crashes")) %>%
   htmlwidgets::onRender(
     sprintf(
       "function(el, x) {
