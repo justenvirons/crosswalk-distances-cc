@@ -246,16 +246,16 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     color = "#fff",
     fillOpacity = 0.7,
     label = ~ paste0(name, " (", type, ") — ADI: ", round(ADI, 1)),
-    group = "ADI by Study Area Unit"
+    group = "ADI"
   ) %>%
-  addPolygons(
-    data = land_use,
-    fillColor = ~unname(lu_colors[lu_category]),
-    fillOpacity = 0.7,
-    stroke = FALSE,
-    label = ~lu_category,
-    group = "Land Use (CMAP 2020)"
-  ) %>%
+  # addPolygons(
+  #   data = land_use,
+  #   fillColor = ~unname(lu_colors[lu_category]),
+  #   fillOpacity = 0.7,
+  #   stroke = FALSE,
+  #   label = ~lu_category,
+  #   group = "Land Use (CMAP 2020)"
+  # ) %>%
   addPolylines(
     data = aadt_map,
     color = ~aadt_pal(AADT),
@@ -292,17 +292,17 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     weight = 0.25,
     fillOpacity = 0.8,
     fillColor = "darkred",
-    label = ~ paste0("Pedestrian fatality (FARS) — ", fatality_date, ", ", fatality_time),
+    # label = ~ paste0("Pedestrian fatality (FARS) — ", fatality_date, ", ", fatality_time),
     group = "FARS Pedestrian Fatalities"
   ) %>%
   addCircleMarkers(
-    data = ped_bike_crashes,
+    data = ped_crashes,
     radius = 3.5,
     stroke = FALSE,
     fillOpacity = 0.6,
-    fillColor = ~ ifelse(ped_bike == "Pedestrian", "#e6550d", "#3182bd"),
-    label = ~ paste0(ped_bike, " crash — ", severity),
-    group = "IDOT Pedestrian/Bicycle Crashes"
+    fillColor = "#3182bd",
+    label = ~ paste0(ped, " crash — ", severity),
+    group = "IDOT Pedestrian Crashes"
   ) %>%
   # addLegend(
   #   "bottomleft",
@@ -337,10 +337,9 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
   addGroupedLayersControl(
     overlayGroups = list(
       "Boundaries" = c("Cook County", "Study Area", "Councils of Mayors"),
-      "Crashes" = c("FARS Pedestrian Fatalities", "IDOT Pedestrian/Bicycle Crashes"),
-      "Thematic (one at a time)" = c(
-        "None", "ADI by Study Area Unit", "Walkability (NTAscore)",
-        "Land Use (CMAP 2020)", "AADT"
+      "Crashes" = c("FARS Ped Fatalities", "IDOT Ped Crashes"),
+      "Thematic" = c(
+        "None", "ADI", "Walkability", "AADT"
       )
     ),
     options = groupedLayersControlOptions(
@@ -351,8 +350,8 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     )
   ) %>%
   hideGroup(c("Councils of Mayors", "Walkability (NTAscore)",
-      "ADI by Study Area Unit", "Land Use (CMAP 2020)", "AADT",
-      "FARS Pedestrian Fatalities", "IDOT Pedestrian/Bicycle Crashes")) %>%
+      "ADI", "Land Use (CMAP 2020)", "AADT",
+      "FARS Pedestrian Fatalities", "IDOT Pedestrian Crashes")) %>%
   htmlwidgets::onRender(
     sprintf(
       "function(el, x) {

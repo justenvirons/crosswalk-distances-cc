@@ -73,19 +73,7 @@ cc_boundary <- counties_il %>%
 st_write(cc_boundary, "data/boundaries/cc_boundary.gpkg", delete_dsn = TRUE)
 ```
 
-### Councils of mayors boundaries
-```{r}
-# import, process councils of Mayors boundaries for Cook County
-cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>% 
-  rename_with(tolower) %>% 
-  select(council,
-         name = fullname) %>% 
-  st_transform(crs = 3435) 
-
-st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.gpkg", delete_dsn = TRUE)
-```
-
-### Study areas boundaries (Chicago community area and Suburban municipalities)
+### Study areas boundaries
 ```{r}
 # download community areas from Chicago Health Atlas
 community_areas <- st_read(
@@ -128,7 +116,87 @@ st_write(study_area, "data/boundaries/study_area.gpkg", delete_dsn = TRUE)
 
 ```
 
-## Street Intersections
+## Councils of mayors boundaries (CMAP)
+```{r}
+# import, process councils of Mayors boundaries for Cook County
+cogs_boundaries <- st_read(dsn="data/boundaries/councils_of_mayors.shp") %>% 
+  rename_with(tolower) %>% 
+  select(council,
+         name = fullname) %>% 
+  st_transform(crs = 3435) 
+
+st_write(cogs_boundaries, "data/boundaries/cogs_boundaries.gpkg", delete_dsn = TRUE)
+```
+
+## Land Use Inventory (CMAP 2020)
+
+CMAP's 2020 Land Use Inventory (LUI) is downloaded from its ArcGIS feature service, and is clipped to Cook County. Features are first requested within Cook County's bounding box (server-side), which keeps the download from covering the full seven-county region, and then intersected with the county boundary. https://cmap.illinois.gov/data/land-use/land-use-inventory/
+
+```{r}
+#| label: land-use-inventory
+
+lui_url <- "https://services5.arcgis.com/LcMXE3TFhi1BSaCY/arcgis/rest/services/LUI20_geodatabase_v1_CMAP/FeatureServer"
+
+# open the feature service; print `lui_fs` to list its layers if the layer
+# id below needs to change
+lui_fs <- arc_open(lui_url)
+lui_layer <- get_layer(lui_fs, id = 0)
+
+# arc_select() pages through the service's max record count automatically
+lui_raw <- arc_select(
+  lui_layer)
+
+study_area_land_use <- lui_raw %>%
+  st_transform(3435) %>%
+  st_make_valid() %>%
+  st_intersection(st_geometry(cc_boundary)) %>%
+  st_collection_extract("POLYGON") %>%
+  st_as_sf()
+
+study_area_land_use_simplified <- study_area_land_use %>%
+  mutate(
+    lu_code = as.character(LANDUSE),
+    lu_category = case_when(
+      str_starts(lu_code, "11") ~ "Residential",
+      str_starts(lu_code, "12") ~ "Commercial",
+      str_starts(lu_code, "13") ~ "Institutional",
+      str_starts(lu_code, "14") ~ "Industrial",
+      str_starts(lu_code, "15") ~ "Transportation & Utilities",
+      str_starts(lu_code, "2")  ~ "Agriculture",
+      str_starts(lu_code, "3")  ~ "Open Space",
+      str_starts(lu_code, "4")  ~ "Vacant",
+      str_starts(lu_code, "5")  ~ "Water",
+      TRUE                      ~ "Other / Not Classified"
+    )
+  ) %>%
+  group_by(lu_category) %>%
+  summarise(.groups = "drop") %>%
+  st_simplify(preserveTopology = TRUE, dTolerance = 10)
+
+st_write(study_area_land_use, "data/boundaries/land_use_2020.gpkg", delete_dsn = TRUE)
+st_write(study_area_land_use_simplified, "data/boundaries/land_use_simplified_2020.gpkg", delete_dsn = TRUE)
+```
+
+## Walkability (CMAP)
+```{r}
+walkability <- st_read("data/infrastructure/Walkability.shp") %>% 
+  st_transform(crs=3435) %>%
+  st_intersection(st_geometry(cc_boundary)) %>%
+  st_as_sf() %>% 
+  st_make_valid()
+
+st_write(walkability, "data/infrastructure/walkability.gpkg", delete_dsn = TRUE)
+```
+
+## Trip Generation Zones (CMAP)
+https://datahub.cmap.illinois.gov/datasets/d52c6a01a673495698e57da02d33d4fe_0/explore?location=41.912110%2C-87.928194%2C8
+
+
+## Travel Demand Model Data (CMAP)
+https://datahub.cmap.illinois.gov/documents/a14d641dbe184704ab597479b103986c/explore
+
+
+## Street Intersections (OSM)
 
 Street intersections are derived offline from an Illinois-wide OpenStreetMap extract, downloaded from [GeoFabrik](https://download.geofabrik.de). The extract is first clipped to the Cook County and filtered to drivable road features using osmium. The resulting file is loaded with ox$graph_from_xml() to build a single drive-network graph covering the whole county. That graph is projected with project_graph(), and nearby nodes are merged into intersection points with consolidate_intersections().
 
@@ -306,7 +374,7 @@ test <- df %>% anti_join(train, by = ".id")
 
 ```
 
-## Streets and Speed Limits
+## Streets and Speed Limits (OSM)
 
 Street segments come from the Illinois OpenStreetMap extract, keeping only road features and clipping them to the county boundary. Each segment is assigned a speed limit from its posted value in OpenStreetMap where one is recorded. Where it isn't, a default is applied based on road type, such as 25 mph for residential streets, which matches the limit many Cook County suburbs post below the state's 30 mph urban default. A source field marks whether each segment's speed limit was posted or estimated, since the defaults are approximations rather than measured data.
 
@@ -376,46 +444,8 @@ study_area_streets <- il_streets %>%
 st_write(study_area_streets, "data/infrastructure/study_area_streets.gpkg", delete_dsn = TRUE)
 ```
 
-## Walkability 
-```{r}
-walkability <- st_read("data/infrastructure/Walkability.shp") %>% 
-  st_transform(crs=3435) %>%
-  st_intersection(st_geometry(cc_boundary)) %>%
-  st_as_sf() %>% 
-  st_make_valid()
 
-st_write(walkability, "data/infrastructure/walkability.gpkg", delete_dsn = TRUE)
-```
-
-## Land Use Inventory (CMAP 2020)
-
-CMAP's 2020 Land Use Inventory (LUI) is downloaded from its ArcGIS feature service, and is clipped to Cook County. Features are first requested within Cook County's bounding box (server-side), which keeps the download from covering the full seven-county region, and then intersected with the county boundary.
-
-```{r}
-#| label: land-use-inventory
-
-lui_url <- "https://services5.arcgis.com/LcMXE3TFhi1BSaCY/arcgis/rest/services/LUI20_geodatabase_v1_CMAP/FeatureServer"
-
-# open the feature service; print `lui_fs` to list its layers if the layer
-# id below needs to change
-lui_fs <- arc_open(lui_url)
-lui_layer <- get_layer(lui_fs, id = 0)
-
-# arc_select() pages through the service's max record count automatically
-lui_raw <- arc_select(
-  lui_layer)
-
-study_area_land_use <- lui_raw %>%
-  st_transform(3435) %>%
-  st_make_valid() %>%
-  st_intersection(st_geometry(cc_boundary)) %>%
-  st_collection_extract("POLYGON") %>%
-  st_as_sf()
-
-st_write(study_area_land_use, "data/boundaries/land_use_2020.gpkg", delete_dsn = TRUE)
-```
-
-## Annual Average Daily Traffic (AADT)
+## Annual Average Daily Traffic (IDOT)
 
 Annual average daily traffic (AADT) estimates come from the Illinois Department of Transportation's (IDOT) [Annual Average Daily Traffic layer](https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt), downloaded as GeoJSON to `data/infrastructure/aadt.geojson`. AADT is the estimated number of vehicles that travel a road segment on an average day of the year, in both directions. IDOT produces these estimates through its Traffic Count Program, which combines continuous counts from permanent stations with short-term counts, usually 24 hours long, taken at thousands of locations on a rotating multi-year schedule and adjusted to an annual average. Each feature is a road segment that records total daily traffic (`AADT`) and the year of that estimate (`AADT_YR`), along with daily heavy commercial vehicle volumes (`HCV_AADT`), split into single-unit trucks and buses (`SU_AADT`) and multi-unit combination trucks (`MU_AADT`), and the year of the truck estimate (`HCV_AADTYR`). The remaining columns identify the segment: IDOT's route inventory key (`INVENTORY`) and key route number (`KEY_RT_NBR`), the signed route name (`MARKED_NAM`), the local street name (`ROAD_NAME`), the county (`COUNTY_NAM`), and the segment's original length (`Shape_Length`).
 
@@ -538,7 +568,7 @@ read_crash_year <- function(year, dir) {
     mutate(source_file = basename(file))
 }
 
-process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
+process_crashes <- function(years, dir, crs_out = 4326, ped_only = FALSE) {
   crash_raw <- years %>%
     map(read_crash_year, dir = dir) %>%
     compact() %>%
@@ -579,9 +609,8 @@ process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
       # move late-evening crashes to the next calendar day.
       crash_date = make_date(crashyr + 2000, crashmonth, crashday),
       crash_dth   = crash_date + hours(crashhour),
-      ped_bike = case_when(
+      ped = case_when(
         typeoffirstcrash == "Pedestrian"   ~ "Pedestrian",
-        typeoffirstcrash == "Pedalcyclist" ~ "Bicycle",
         TRUE                               ~ NA_character_
       ),
       ksi = totalfatals > 0 | ainjuries > 0
@@ -592,7 +621,7 @@ process_crashes <- function(years, dir, crs_out = 4326, ped_bike_only = FALSE) {
     filter(in_il(lon, lat)) %>%
     st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE)
 
-  if (ped_bike_only) crash <- filter(crash, !is.na(ped_bike))
+  if (ped_only) crash <- filter(crash, !is.na(ped))
 
   st_transform(crash, crs_out)
 }
@@ -601,7 +630,7 @@ idot_years <- 2022:2024
 idot_dir   <- "data/crashes"
 
 il_crashes <- process_crashes(idot_years, dir = idot_dir)
-il_ped_bike_crashes <- process_crashes(idot_years, dir = idot_dir, ped_bike_only = TRUE)
+il_ped_crashes <- process_crashes(idot_years, dir = idot_dir, ped_only = TRUE)
 
 # join crashes with study area
 cc_crashes <- il_crashes %>%
@@ -613,7 +642,7 @@ cc_crashes <- il_crashes %>%
     day = crashday,
     datetime = crash_dth,
     crash_type = collisiontypecode,
-    ped_bike = typeoffirstcrash,
+    crash_first = typeoffirstcrash,
     fatals = totalfatals,
     injurs = totalinjured,
     ainjurs = ainjuries,
@@ -628,8 +657,8 @@ cc_crashes <- il_crashes %>%
   st_make_valid() %>%
   st_as_sf() 
 
-# join ped and bike crashes with study area
-cc_ped_bike_crashes <- il_ped_bike_crashes %>%
+# join ped crashes with study area
+cc_ped_crashes <- il_ped_crashes %>%
   select(
     x = lon,
     y = lat,
@@ -638,7 +667,7 @@ cc_ped_bike_crashes <- il_ped_bike_crashes %>%
     day = crashday,
     datetime = crash_dth,
     crash_type = collisiontypecode,
-    ped_bike,
+    ped,
     fatals = totalfatals,
     injurs = totalinjured,
     ainjurs = ainjuries,
@@ -655,7 +684,7 @@ cc_ped_bike_crashes <- il_ped_bike_crashes %>%
 
 # write to folder
 st_write(obj = cc_crashes, dsn = "data/crashes/cc_crashes_2022_2024.gpkg", append = FALSE)
-st_write(cc_ped_bike_crashes, "data/crashes/cc_ped_bike_crashes_2022_2024.gpkg", append = FALSE)
+st_write(cc_ped_crashes, "data/crashes/cc_ped_crashes_2022_2024.gpkg", append = FALSE)
 ```
 
 ## Area Deprivation Index (ADI)
@@ -675,13 +704,6 @@ tidycensus::census_api_key(CENSUS_API_KEY, install = TRUE, overwrite = TRUE)
 adi_year   <- 2024
 adi_survey <- "acs5"
 
-# sociome's internal "set1" ACS variable list, reconstructed from
-# data-raw/acs_vars.R (github.com/ClevelandClinicQHS/sociome) -- the set
-# get_adi() uses for ACS5/ACS3/ACS1 data, year >= 2011 (excluding the
-# 2015-2016-at-block-group exception, which doesn't apply here).
-# calculate_adi() requires these exact column names (no "E"/"M" suffix), so
-# the pull below uses output = "tidy" and pivots to wide manually rather
-# than tidycensus::get_acs(output = "wide")'s "<var>E"/"<var>M" columns.
 adi_acs_vars <- c(
   "B11005_001", "B15003_001", "B15003_002", "B15003_003", "B15003_004",
   "B15003_005", "B15003_006", "B15003_007", "B15003_008", "B15003_009",
@@ -697,10 +719,6 @@ adi_acs_vars <- c(
   "C17002_004", "C17002_005", "C24010_001", "C24010_003", "C24010_039"
 )
 
-# Four of the above are medians (dollar values), which can't be summed when
-# aggregating tracts up to a community area -- a population-weighted mean of
-# the tract medians approximates the aggregate median instead. Every other
-# variable is a count, and gets summed.
 adi_median_vars <- c("B19113_001", "B25064_001", "B25077_001", "B25088_002")
 adi_sum_vars    <- setdiff(adi_acs_vars, adi_median_vars)
 
@@ -810,11 +828,6 @@ adi_study_area <- adi_community_areas %>%
 write_csv(adi_study_area, "data/census/adi_study_area.csv")
 ```
 
-::: {.callout-note collapse="true"}
-## Note: two separate reference areas
-ADI is a relative measure -- its value for a given area depends on which other areas were included in the same `calculate_adi()` call (its "reference area"). The two calculations above use separate reference areas (77 community areas; suburban municipalities), so `adi_community_areas$ADI` and `adi_places$ADI` are not on a directly comparable scale, even though both used the same ACS variables/year. Combining them into one reference area (one `calculate_adi()` call over all ~200 units) would make them comparable, at the cost of mixing a tract-aggregated construct with a directly-measured one -- worth resolving explicitly in `phase02.qmd` before Aim 2 analysis, rather than assumed away here.
-:::
-
 ## Read, Format and Save
 
 ### Read
@@ -827,40 +840,12 @@ intersections <- st_read("data/intersections/study_area_intersections.gpkg") %>%
 streets <- st_read("data/infrastructure/study_area_streets.gpkg") %>% st_transform(crs=4326)
 walkability <- st_read("data/infrastructure/walkability.gpkg") %>% st_transform(crs=4326)
 ped_fatalities <- st_read("data/crashes/ped_fatalities.gpkg") %>% st_transform(crs=4326)
-ped_bike_crashes <- st_read("data/crashes/cc_ped_bike_crashes_2022_2024.gpkg") %>% st_transform(crs=4326)
+ped_crashes <- st_read("data/crashes/cc_ped_crashes_2022_2024.gpkg") %>% st_transform(crs=4326)
 adi <- read.csv("data/census/adi_study_area.csv")
 aadt <- st_read("data/infrastructure/study_area_aadt.gpkg") %>% st_transform(crs=4326)
-
-# Land use is mapped by major category only, so polygons are grouped into
-# CMAP's top-level LUI classes and dissolved by class, which shrinks the
-# ~countywide parcel-level layer enough to embed in the HTML map. Assumes
-# the LUI code column is `LANDUSE` (4-digit CMAP code, e.g. 1111) -- check
-# names(land_use_raw) if a future LUI release renames it.
-land_use_raw <- st_read("data/boundaries/land_use_2020.gpkg")
-
-land_use <- land_use_raw %>%
-  mutate(
-    lu_code = as.character(LANDUSE),
-    lu_category = case_when(
-      str_starts(lu_code, "11") ~ "Residential",
-      str_starts(lu_code, "12") ~ "Commercial",
-      str_starts(lu_code, "13") ~ "Institutional",
-      str_starts(lu_code, "14") ~ "Industrial",
-      str_starts(lu_code, "15") ~ "Transportation & Utilities",
-      str_starts(lu_code, "2")  ~ "Agriculture",
-      str_starts(lu_code, "3")  ~ "Open Space",
-      str_starts(lu_code, "4")  ~ "Vacant",
-      str_starts(lu_code, "5")  ~ "Water",
-      TRUE                      ~ "Other / Not Classified"
-    )
-  ) %>%
-  group_by(lu_category) %>%
-  summarise(.groups = "drop") %>%
-  st_simplify(preserveTopology = TRUE, dTolerance = 10) %>%  # 10 ft (EPSG:3435)
-  st_transform(crs=4326)
+land_use <- st_read("data/boundaries/land_use_simplified_2020.gpkg") %>% st_transform(crs=4326)
 
 ```
-
 
 Save the assembled `sf`/`tibble` tables to a single `.RData` file. `phase01.qmd` loads this file to build an interactive data-exploration map; downstream analysis in `phase02.qmd` will read from these same tables (or their saved shapefiles/CSVs under `output/`).
 
@@ -875,10 +860,10 @@ save(
   intersections,
   walkability,
   ped_fatalities,
-  ped_bike_crashes,
+  ped_crashes,
   adi,
   aadt,
-  land_use,
+  # land_use,
   file = "data/phase01_dataprep.RData"
 )
 ```
