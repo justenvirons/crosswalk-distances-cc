@@ -250,26 +250,26 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     label = ~ paste0(ped_bike, " crash — ", severity),
     group = "IDOT Pedestrian/Bicycle Crashes"
   ) %>%
-  addLegend(
-    "bottomleft",
-    colors = c("#9e9e9e", "#2b8cbe", "#333", "darkred", "#e6550d", "#3182bd"),
-    labels = c("Study area", "Councils of Mayors", "Intersections", "FARS fatality", "IDOT pedestrian crash", "IDOT bicycle crash"),
-    opacity = 1
-  ) %>%
-  addLegend(
-    "topright",
-    pal = walk_pal,
-    values = walkability$NTAscore,
-    title = "Walkability<br>(NTAscore)",
-    opacity = 0.8
-  ) %>%
-  addLegend(
-    "bottomright",
-    pal = adi_pal,
-    values = study_area_adi$ADI,
-    title = "ADI<br>(relative)",
-    opacity = 0.8
-  ) %>%
+  # addLegend(
+  #   "bottomleft",
+  #   colors = c("#9e9e9e", "#2b8cbe", "#333", "darkred", "#e6550d", "#3182bd"),
+  #   labels = c("Study area", "Councils of Mayors", "Intersections", "FARS fatality", "IDOT pedestrian crash", "IDOT bicycle crash"),
+  #   opacity = 1
+  # ) %>%
+  # addLegend(
+  #   "topright",
+  #   pal = walk_pal,
+  #   values = walkability$NTAscore,
+  #   title = "Walkability<br>(NTAscore)",
+  #   opacity = 0.8
+  # ) %>%
+  # addLegend(
+  #   "bottomright",
+  #   pal = adi_pal,
+  #   values = study_area_adi$ADI,
+  #   title = "ADI<br>(relative)",
+  #   opacity = 0.8
+  # ) %>%
   addScaleBar(
     position = "bottomright",
     options = scaleBarOptions(metric = TRUE, imperial = TRUE)
@@ -285,7 +285,9 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
     ),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
-  hideGroup(c("Walkability (NTAscore)", "ADI by Study Area Unit")) %>%
+  hideGroup(c("Councils of Mayors", "Walkability (NTAscore)",
+      "ADI by Study Area Unit", "FARS Pedestrian Fatalities",
+      "IDOT Pedestrian/Bicycle Crashes")) %>%
   htmlwidgets::onRender(
     sprintf(
       "function(el, x) {

@@ -427,12 +427,10 @@ aadt <- st_read("data/infrastructure/aadt.geojson") %>%
   st_make_valid() %>%
   st_intersection(st_geometry(cc_boundary)) %>% 
   st_as_sf() %>% 
-  mutate(length = st_length(geometry))
-  
+  mutate(miles = st_length(geometry),
+         miles = set_units(miles, mi))
 
 ```
-
-
 
 ## Pedestrian Fatalities (FARS)
 
@@ -496,7 +494,7 @@ ped_fatalities_formatted <- ped_fatalities %>%
   # rather than leaving them as loose chunk-local vectors -- otherwise
   # they never make it into the saved .gpkg (and, since drop_na(geoid) below
   # removes rows, couldn't safely be attached after the join anyway).
-  mutate(fatality_date = fatality_date, fatality_time = fatality_time) %>%
+  filter(caseyear >= 2022) %>% 
   st_join(study_area) %>%
   drop_na(geoid) %>%
   st_make_valid() %>%
