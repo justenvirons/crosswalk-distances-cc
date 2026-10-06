@@ -58,7 +58,7 @@ CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f
 
 ## Overview
 
-This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.html`](phase00.html): the countywide study-area geography, the street/intersection network, crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
+This phase assembles every data layer needed to test the aims and hypotheses set out in [`phase00.html`](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; the tables below record what is built, what is underway, and what has not yet started, organized by the research aim(s) each data layer supports.
 
 Implementation (dataset-creation) code lives in [`dataprep.html`](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this document describes what each step produces and why, not the implementation detail itself. `dataprep.qmd` supersedes the study-area/intersection/streets/FARS code originally developed in [`archive/Phase0.html`](archive/Phase0.html) (kept for reference) and the IDOT crash-processing logic prototyped in [`scripts/QMD/idot_crashes.html`](scripts/QMD/idot_crashes.html).
 
@@ -103,6 +103,18 @@ Supports **Aims 3–4** (roadway functional class and speed limit are control va
 |---|---|---|---|
 | Retrieve countywide street centerlines | Download Illinois streets via Geofabrik (`osmextract`) rather than per-municipality OSMnx calls, then clip to the study area | Countywide street centerline layer | Complete |
 | Parse speed limits | Extract and standardize OSM `maxspeed` tags to miles per hour | Street segments attributed with posted speed limit | Complete |
+
+## Traffic Volume and Vehicle Mix (IDOT AADT)
+
+Supports **Aims 3–4** (traffic volume and heavy-vehicle mix are covariates in the fatality and crash-rate models; hypothesis H8 in [`phase00.html`](phase00.html)). Traffic volume measures how many vehicles pedestrians are exposed to at a crossing, and it is closely tied to crossing distance, since busier roads tend to be wider; vehicle mix captures the share of trucks and freight vehicles, which are more likely to cause severe injuries. Source: IDOT's Annual Average Daily Traffic layer, which reports total AADT and heavy commercial vehicle AADT (single-unit trucks and buses, and multi-unit combination trucks) by road segment.
+
+| Task | Description | Output | Status |
+|---|---|---|---|
+| Download and clip AADT segments | Download IDOT's AADT layer, clip it to Cook County, and recalculate segment length after clipping | `data/infrastructure/study_area_aadt.gpkg` | Complete |
+| Derive vehicle-mix measures | Compute heavy commercial vehicle share (`HCV_AADT` / `AADT`) and the single-unit and multi-unit truck shares for each segment; treat missing values as missing, not zero | AADT segments with total volume and truck-share attributes | Not started |
+| Attach AADT to fatality locations (Aim 3) | Assign each FARS fatality the AADT and truck share of the nearest road segment(s), or the maximum on the roads meeting at the nearest intersection | Fatality point layer with traffic volume and vehicle-mix covariates | Not started |
+| Summarize AADT by study-area unit (Aim 4) | Compute volume-weighted measures per community area/municipality, such as vehicle miles traveled (AADT × segment length), VMT per road mile, and VMT-weighted mean truck share | Study-area traffic volume and vehicle-mix covariate table | Not started |
+| Assess coverage and count years | Report the share of road miles with AADT values (coverage is strongest on state and major roads) and the range of count years by unit, to judge whether summaries are comparable across units | Coverage diagnostics table | Not started |
 
 ## Pedestrian Fatalities (FARS)
 
@@ -384,4 +396,4 @@ exploration_map
 ## Open Items
 
 - **EMS injury data.** The original plan identified Cook County/regional EMS-reported pedestrian injury data as a possible input to Aim 4, pending a data-use agreement. IDOT crash records (above) are the working primary data source for Aim 4; EMS data will be incorporated only if access is secured, without blocking dataset development or downstream analysis.
-- **Downstream phases.** Once the tables above are complete, dataset assembly and joins (study area + intersections + streets + crashes/fatalities + socioeconomic covariates) feed directly into `phase02.qmd` (data presentation and analysis).
+- **Downstream phases.** Once the tables above are complete, dataset assembly and joins (study area + intersections + streets + AADT + crashes/fatalities + socioeconomic covariates) feed directly into `phase02.qmd` (data presentation and analysis).
