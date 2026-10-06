@@ -417,35 +417,9 @@ st_write(study_area_land_use, "data/boundaries/land_use_2020.gpkg", delete_dsn =
 
 ## Annual Average Daily Traffic (AADT)
 
-Illinois Department of Transportation (IDOT), [Annual Average Daily Traffic (AADT)](https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt), IDOT GIS Open Data portal. The file is downloaded manually as GeoJSON to `data/infrastructure/aadt.geojson`. AADT is the estimated number of vehicles that travel a road segment on an average day of the year, counting both directions. The estimates come from IDOT's Traffic Count Program. A small number of permanent stations count traffic continuously. Thousands of other locations get a short count, usually 24 hours, on a rotating multi-year schedule. IDOT adjusts these short counts for season and day of week to estimate a year-round average. The layer covers the state highway system and many local roads statewide. Each feature is a road segment (a line), with total traffic and heavy commercial vehicle (truck) volumes. The chunk below keeps only the segments inside Cook County. This project uses AADT as a measure of how much traffic a pedestrian is exposed to at each intersection and crosswalk.
+Annual average daily traffic (AADT) estimates come from the Illinois Department of Transportation's (IDOT) [Annual Average Daily Traffic layer](https://gis-idot.opendata.arcgis.com/datasets/annual-average-daily-traffic-aadt), downloaded as GeoJSON to `data/infrastructure/aadt.geojson`. AADT is the estimated number of vehicles that travel a road segment on an average day of the year, in both directions. IDOT produces these estimates through its Traffic Count Program, which combines continuous counts from permanent stations with short-term counts, usually 24 hours long, taken at thousands of locations on a rotating multi-year schedule and adjusted to an annual average. Each feature is a road segment that records total daily traffic (`AADT`) and the year of that estimate (`AADT_YR`), along with daily heavy commercial vehicle volumes (`HCV_AADT`), split into single-unit trucks and buses (`SU_AADT`) and multi-unit combination trucks (`MU_AADT`), and the year of the truck estimate (`HCV_AADTYR`). The remaining columns identify the segment: IDOT's route inventory key (`INVENTORY`) and key route number (`KEY_RT_NBR`), the signed route name (`MARKED_NAM`), the local street name (`ROAD_NAME`), the county (`COUNTY_NAM`), and the segment's original length (`Shape_Length`).
 
-**Things to know before using it:**
-
-- **Count years vary.** `AADT_YR` gives the year each segment's value is from. Segments counted in earlier rounds keep that older value, so one download mixes several years. Truck volumes have their own year field, `HCV_AADTYR`.
-- **Not every street has a value.** Coverage is best on state and major roads. Many residential streets are missing or have no count. Expect gaps when joining to intersections, and handle them explicitly rather than treating them as zero.
-- **Some segments may be double-counted.** On divided highways and one-way pairs, check whether each direction is a separate segment with its own value, so traffic isn't counted twice when values are added up.
-- **`Shape_Length` is not updated after clipping.** It keeps the length of the original, unclipped segment. Recompute length with `st_length()` after `st_intersection()` if you need it.
-- **Some column names are shortened** (`MARKED_NAM`, `COUNTY_NAM`) because of the 10-character limit in shapefile exports.
-
-These are the columns in the IDOT AADT layer. Most of the definitions are my reading of IDOT's descriptions and FHWA vehicle-class conventions. Confirm them against the layer's metadata on the portal before relying on them, and run `names(aadt)` to check what this download actually contains.
-
-| Column | Type | Description |
-|---|---|---|
-| `INVENTORY` | text | IDOT inventory key that identifies the route section in the Illinois Roadway Information System (IRIS). Use it to link to other IDOT roadway data. |
-| `KEY_RT_NBR` | text | IDOT key route number, IDOT's internal ID for the route. |
-| `MARKED_NAM` | text | Signed route name, such as `I 90`, `US 41` or `IL 50`. Usually blank for unnumbered local streets. |
-| `ROAD_NAME` | text | Local street name for the segment, such as `CICERO AVE`. |
-| `COUNTY_NAM` | text | County the segment is in (e.g., `COOK`). Redundant after the Cook County clip. |
-| `AADT` | integer | Annual average daily traffic: estimated vehicles per day, all vehicle types, both directions. |
-| `AADT_YR` | integer | Year the `AADT` value comes from (the count year or the year it was estimated for). |
-| `HCV_AADT` | integer | Heavy commercial vehicle AADT: estimated trucks and buses per day, roughly FHWA vehicle classes 4–13. Equals `SU_AADT` + `MU_AADT`. |
-| `SU_AADT` | integer | Single-unit truck AADT: estimated single-unit trucks and buses per day (roughly FHWA classes 4–7), such as box trucks, dump trucks and buses. |
-| `MU_AADT` | integer | Multi-unit truck AADT: estimated combination trucks per day (roughly FHWA classes 8–13), such as tractor-trailers. |
-| `HCV_AADTYR` | integer | Year the heavy commercial vehicle values (`HCV_AADT`, `SU_AADT`, `MU_AADT`) come from. Can differ from `AADT_YR`. |
-| `Shape_Length` | numeric | Segment length in the source layer's units, calculated before clipping. |
-| `geometry` | LINESTRING / MULTILINESTRING | Road segment geometry. EPSG:3435 (Illinois State Plane East, US feet) after the chunk below. |
-
-Useful derived measures: the truck share of traffic, `HCV_AADT / AADT`, and AADT grouped into volume bands (e.g., <5k, 5–15k, 15–30k, >30k vehicles per day) for modeling pedestrian exposure.
+A few points matter when using these data. Count years differ by segment, so a single download mixes estimates from several years. Coverage is strongest on state and major roads, and many local streets have no value, which should be treated as missing rather than zero. `Shape_Length` reflects the unclipped segment, so length is recalculated with `st_length()` after clipping to Cook County. In this project, AADT serves as a measure of the vehicle traffic pedestrians are exposed to at intersections and crosswalks. The column definitions above are informal and should be checked against the layer's metadata on the IDOT portal.
 
 ```{r}
 aadt <- st_read("data/infrastructure/aadt.geojson") %>% 
@@ -453,7 +427,7 @@ aadt <- st_read("data/infrastructure/aadt.geojson") %>%
   st_make_valid() %>%
   st_intersection(st_geometry(cc_boundary)) %>% 
   st_as_sf() %>% 
-  mutate(length = st_length(geomtry))
+  mutate(length = st_length(geometry))
   
 
 ```
