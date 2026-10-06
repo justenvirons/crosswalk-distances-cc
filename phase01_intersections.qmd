@@ -141,7 +141,7 @@ reticulate::conda_run2(
 
 The filtered file was loaded with OSMnx's `graph_from_xml()` to build one street network graph for the whole county. Only the largest connected part of the network was kept (`retain_all = FALSE`), which removes small, disconnected fragments. The graph was projected to a local metric coordinate system with `project_graph()`.
 
-Intersections were then identified with `consolidate_intersections()`. A single real-world intersection is often represented in OSM by several nodes — for example, where a divided road meets a cross street. This function merges nodes that lie within 10 meters of each other (the OSMnx default tolerance) into one point at their center. Dead ends (cul-de-sacs and other nodes connected to only one street) were excluded (`dead_ends = FALSE`). The resulting points were converted to longitude/latitude.
+Intersections were then identified with `consolidate_intersections()`. A single real-world intersection is often represented in OSM by several nodes — for example, where a divided road meets a cross street. This function merges nodes that lie within 10 meters of each other into one point at their center, using the OSMnx default tolerance. Dead ends (cul-de-sacs and other nodes connected to only one street) were excluded (`dead_ends = FALSE`). The resulting points were converted to longitude/latitude.
 
 ```r
 G_drive <- ox$graph_from_xml("data/osm/cook_drive_network.osm", retain_all = FALSE)

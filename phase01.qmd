@@ -77,11 +77,12 @@ Supports **Aim 1** (defines candidate crossing locations for the segmentation pi
 
 | Task | Description | Output | Status |
 |---|---|---|---|
-| Extract street network per study-area unit | Pull the OSM drive network for each municipality/community area via OSMnx | Per-unit street network graphs | Complete |
-| Consolidate intersections | Merge closely spaced OSM nodes into single intersection points, consistent with the reference methodology's approach | Countywide consolidated-intersection point layer (~170,000 points) | Complete |
-| Cache/skip already-downloaded units | Avoid re-downloading intersections for study-area units already processed in an earlier run | Resumable run list | Complete |
+| Clip OSM data to Cook County | Clip the Illinois OpenStreetMap extract from GeoFabrik to the Cook County boundary with `osmium extract` | Cook County OSM extract | Complete |
+| Filter to the drivable street network | Keep drivable road types and remove parking aisles, driveways, private roads, airport features and indoor ways with `osmium tags-filter` | Cook County drive-network OSM file | Complete |
+| Build street graph and consolidate intersections | Build one countywide street graph with OSMnx (`graph_from_xml()`), then merge OSM nodes within the default 10 m tolerance into single intersection points with `consolidate_intersections()`, excluding dead ends | Countywide intersection point layer (~170,000 points) | Complete |
+| Assign intersections to study-area units | Spatially join intersection points to the study-area geography | `data/intersections/study_area_intersections.gpkg`, with `geoid`, `name` and `type` | Complete |
 
-The above runs one live Overpass query per study-area unit (~200), which is what the resumable run list exists to survive. [`phase01_intersections.html`](phase01_intersections.html) plans and verifies an offline alternative — clip and filter the Illinois OSM extract locally with `osmium`, then build the countywide graph once with `ox$graph_from_xml()` — that would replace this section's Overpass dependency entirely once validated.
+All processing uses a downloaded OSM file, so no online map service (Overpass API) is queried. See [`phase01_intersections.html`](phase01_intersections.html) for a full description of the methods.
 
 ## Crossing Distance (Segmentation Models)
 
