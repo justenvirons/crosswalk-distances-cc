@@ -361,4 +361,4 @@ exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
 exploration_map
 ```
 
-`Intersections` is deliberately left out of the layer control above (as in `Phase0.qmd`'s map) so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
+`Intersections` is deliberately left out of the layer control so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
