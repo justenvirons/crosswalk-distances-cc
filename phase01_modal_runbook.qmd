@@ -1,0 +1,391 @@
+---
+title: "Phase 1 — Modal + SAM 2.1 Runbook: Crossing-Distance Imagery Comparison"
+subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
+author:
+  - name: "C. Scott Smith, PhD AICP"
+    affiliations:
+      - name: "DePaul University"
+      - name: "Cook County Department of Public Health (CCDPH)"
+    email: c.scott.smith@depaul.edu
+  - name: "Zane Sufi"
+    affiliations:
+      - name: "Oak Park River Forest High School"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+    code-copy: true
+  pdf:
+    toc: true
+    number-sections: true
+editor: source
+bibliography: references.bib
+---
+
+## Read First
+
+This runbook takes a fresh Ubuntu server to crossing-distance measurements for Approaches A and C (`phase01_crosswalk_models.qmd`) on a stratified sample of Cook County intersections, with Modal doing all GPU and bulk-fetch work. The scripts it calls are in `crosswalk_pipeline.tar.gz` and unpack into the server's existing `~/crosswalk/pipeline` folder.
+
+::: {.callout-warning}
+## Two blockers to clear before starting
+
+1. **The fine-tuned SAM 2.1 checkpoint is not public.** The reference repo loads it from a Modal volume (`sam2-weights`) in the authors' own account (`sam_test` environment, run folders `train_9`/`train_10`). Request `checkpoint.pt` from the production run from the authors [@moran2026scaling]. Until it arrives, everything can run with Meta's base SAM 2.1 weights, but those results are zero-shot and are not Approach C.
+2. **The reference code pins `modal==0.77`** (Modal is now at 1.6.1) and uses APIs removed in 1.0 (`modal.Mount`, `concurrency_limit`, `.lookup()`). It is also wired to the authors' account (W&B secret, hard-coded `train_10/backfill` paths, a `city_code_mapping.csv` not in the repo). This runbook therefore uses new Modal 1.x scripts for fetch and segmentation, and reuses the reference code unchanged only where it runs locally: OSM crossing extraction and grow-cut.
+:::
+
+| Script | Runs on | Does | Approach |
+|---|---|---|---|
+| `00_osm_crossings.py` | server | Reference `osm_ingest_local` for Cook County → OSM crossing edges | all |
+| `01_build_candidates.py` | server | Intersections with an OSM crossing ≤ 25 m, tagged Chicago/suburban + tile position | all |
+| `cc_fetch.py` | Modal CPU | 50 m clips: Google z22 (C), county RGB (A), county RGBN (B, pool) | A, B, C |
+| `02_select_sample.py` | server | Stratified sample (geography × canopy × tile position) + OSM road lines | all |
+| `cc_weights.py` | Modal | Base SAM 2.1 weights to a volume; GPU smoke test | all |
+| `cc_segment.py` | Modal GPU | SAM 2.1 masks → drivable polygons (`cross_walks.geojson`) + QA overlays | A, C |
+| `03_grow_cut.sh` | server | Reference grow-cut, unchanged → `refined_crosswalks_v3_0_4.csv` (`length_ft`) | A, B, C |
+| `05_inflate_4band.py` | Modal/any | 3 → 4 input channels on the SAM 2.1 patch embedding | B |
+
+: Pipeline scripts {.striped}
+
+None of these scripts has yet been run against Modal or the Cook County ImageServer, so expect a round of small fixes on first run; each step below says how to check that it worked.
+
+## Server Sizing
+
+Recommended: **8 vCPU, 32 GB RAM, 250 GB SSD, Ubuntu 24.04 LTS, no GPU.** The server is an orchestrator: SAM inference, fine-tuning, and bulk imagery fetches all run on Modal, so a GPU on the server would sit idle.
+
+| Resource | Minimum | Recommended | What drives it |
+|---|---|---|---|
+| CPU | 4 vCPU | 8 vCPU | OSM graph build for all of Cook County (long, mostly single-threaded); grow-cut runs 5 threads; R/Quarto alongside |
+| RAM | 16 GB | 32 GB | `osm_ingest_local` loads the full `network_type="all"`, unsimplified, `retain_all` graph for the county — the largest single job; 16 GB is tight |
+| Disk | 100 GB | 250 GB SSD | OS + Python/R environments ~25 GB; OSM cache + outputs < 5 GB; sample QA images < 1 GB. 500 GB only if countywide Aim 1b imagery will be mirrored locally |
+| GPU | none | none | Runs on Modal (L4/L40S/H100 billed per second) |
+| Network | — | stable, unmetered | Overpass downloads; `modal volume get` of results |
+| OS | Ubuntu 22.04 | Ubuntu 24.04 LTS | uv supplies Python 3.11/3.12 regardless of system Python |
+
+: Server resources {.striped}
+
+At Aim 1b scale, the reference study pulled about 2.8 MB per clip (8.3 TB for ~3 million clips) and needed roughly 80,000 clips for Chicago alone [@moran2026scaling]. Keep countywide imagery on Modal volumes and download only results.
+
+Add 8 GB of swap so an OSM build that overshoots RAM slows down instead of being killed:
+
+```bash
+sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+```
+
+## 1. Ubuntu Server Setup
+
+After this step the server has two Python environments: one for the new Modal 1.x pipeline and one for the reference repo (used locally only).
+
+1. System packages:
+
+    ```bash
+    sudo apt update && sudo apt -y upgrade
+    sudo apt -y install git curl build-essential tmux unzip \
+        gdal-bin libgdal-dev libspatialindex-dev osmium-tool
+    ```
+
+2. Install uv (manages Python versions and virtual environments):
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source ~/.bashrc   # or open a new shell
+    uv --version
+    ```
+
+3. Unpack the scripts into the existing folders (`data/`, `logs/`, `pipeline/` stay as they are) and add working subfolders:
+
+    ```bash
+    cd ~ && tar xzf crosswalk_pipeline.tar.gz     # files land in ~/crosswalk/pipeline
+    mkdir -p ~/crosswalk/data/{inputs,osm,sample,results}
+    ```
+
+4. Pipeline environment (Modal 1.x, geopandas, osmnx):
+
+    ```bash
+    cd ~/crosswalk/pipeline
+    uv python install 3.12
+    uv sync            # reads pyproject.toml, creates .venv
+    uv run python -c "import modal, geopandas, osmnx; print(modal.__version__)"
+    ```
+
+5. Reference repo, cloned inside the pipeline folder (the scripts expect this path):
+
+    ```bash
+    cd ~/crosswalk/pipeline
+    git clone https://github.com/agupta01/crossing-distances.git
+    cd crossing-distances
+    uv sync                        # Python 3.12, modal==0.77 from uv.lock
+    uv pip install osmnx semver    # osmnx is imported but not in its pyproject
+    ```
+
+6. Copy this project's intersections (the 169,456-point `all_intersections` layer, WGS84) into the inputs folder:
+
+    ```bash
+    cp <path-to>/crosswalk-distances-cc/output/all_intersections.* ~/crosswalk/data/inputs/
+    ```
+
+Layout when done:
+
+```
+~/crosswalk/
+  data/   inputs/  osm/  sample/  results/
+  logs/
+  pipeline/   *.py, 03_grow_cut.sh, pyproject.toml, .venv/
+              crossing-distances/   (reference repo + its own .venv)
+```
+
+Run long jobs inside `tmux new -s cw` so they survive a dropped SSH session.
+
+## 2. Modal Setup
+
+All project objects live in one Modal environment, `cook`, so they stay separate from anything else in the workspace.
+
+1. Create an account at [modal.com](https://modal.com) and add billing (see [modal.com/pricing](https://modal.com/pricing) for current free credit and GPU rates).
+
+2. Authenticate the headless server. On a laptop, open the Modal dashboard → Settings → API Tokens → *New token*, then on the server:
+
+    ```bash
+    cd ~/crosswalk/pipeline
+    uv run modal token set --token-id ak-XXXX --token-secret as-XXXX
+    ```
+
+    (`uv run modal token new` also works headless: it prints a URL to open on any machine.) The token is saved to `~/.modal.toml` and shared by both environments.
+
+3. Create and select the environment:
+
+    ```bash
+    uv run modal environment create cook
+    uv run modal config set-environment cook
+    echo 'export MODAL_ENVIRONMENT=cook' >> ~/.bashrc && source ~/.bashrc
+    ```
+
+    The reference code reads `MODAL_ENVIRONMENT` at import time, so keep it exported.
+
+4. Create the three volumes (the scripts also create them on first use; doing it now confirms access):
+
+    ```bash
+    for v in cc-imagery cc-sam2-weights cc-results; do uv run modal volume create $v; done
+    uv run modal volume ls
+    ```
+
+    | Volume | Holds |
+    |---|---|
+    | `cc-imagery` | `/C_google`, `/A_cook_rgb`, `/B_cook_rgbn`, `/pool_rgbn` GeoTIFF clips |
+    | `cc-sam2-weights` | `/base/…` (Meta) and `/pcd_finetuned/checkpoint.pt` (authors) |
+    | `cc-results` | `/inputs/osm_drivable.geojson`; `/<approach>/<run>/cross_walks.geojson`, stats, QA images |
+
+5. Verify end to end with a 30-second job. Create `~/crosswalk/data/sample/test.csv` containing:
+
+    ```csv
+    id,lat,lon
+    x,41.878123,-87.629456
+    ```
+
+    then:
+
+    ```bash
+    uv run modal run cc_fetch.py --source A --input ../data/sample/test.csv --out-csv ../logs/test_A.csv
+    uv run modal volume ls cc-imagery /A_cook_rgb
+    ```
+
+    Expect `done: 1 ok, 0 failed` and one `.tif` listed.
+
+W&B logging is not used by these scripts, so no `wandb-secret` is needed (the reference inference requires one).
+
+## 3. Segment Anything (SAM 2.1) Setup
+
+SAM 2.1 runs inside a Modal container image defined in `cc_segment.py`; nothing is installed on the server except for optional local testing. The model follows the reference study: SAM 2.1 Hiera Base+ (`configs/sam2.1/sam2.1_hiera_b+.yaml`), images resized to 1024 × 1024, a 16 × 16 point grid [@moran2026scaling].
+
+1. **Container image** (built automatically on the first `modal run`, ~5–8 min once, then cached): Debian slim, Python 3.11, `torch 2.5.1` + `torchvision 0.20.1`, then `sam2` from Meta's GitHub with `SAM2_BUILD_CUDA=0`. That flag skips SAM 2's optional CUDA extension (used only for hole-filling post-processing); the reference image compiles it with nvcc, the most fragile part of their build.
+
+2. **Base weights** (Meta, public, ~320 MB) straight into the volume, no server download:
+
+    ```bash
+    cd ~/crosswalk/pipeline
+    uv run modal run cc_weights.py --action base
+    ```
+
+3. **Fine-tuned weights** (from the authors; see *Read First*). The reference loads `<run>/checkpoints/checkpoint.pt` saved by SAM 2's training script — a dict with a `"model"` key, the format `build_sam2()` expects. Upload it:
+
+    ```bash
+    uv run modal volume put cc-sam2-weights ~/Downloads/checkpoint.pt /pcd_finetuned/checkpoint.pt
+    ```
+
+    Ask the authors which run is production (their inference defaults to `train_9`; their grow-cut reads `train_10` output) and record the answer in `data/results/README`.
+
+4. **Smoke test** on an L4 (a minute or two):
+
+    ```bash
+    uv run modal run cc_weights.py --action smoke-test --checkpoint base/sam2.1_hiera_base_plus.pt
+    uv run modal run cc_weights.py --action smoke-test --checkpoint pcd_finetuned/checkpoint.pt
+    ```
+
+    Expect `OK: torch 2.5.1…, GPU NVIDIA L4, N masks`. A `RuntimeError` right after a `missing_keys`/`unexpected_keys` log means the checkpoint is not a SAM 2.1 b+ state dict (wrong model size or a SAM 2.0 file).
+
+5. **Optional local CPU install** for reading code or debugging masks on the server (slow; not used by the pipeline):
+
+    ```bash
+    cd ~/crosswalk && uv venv sam-local --python 3.11 && source sam-local/bin/activate
+    uv pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+    SAM2_BUILD_CUDA=0 uv pip install 'git+https://github.com/facebookresearch/sam2.git'
+    ```
+
+6. **If fine-tuning** (needed for Approach B, optional otherwise): the reference trained with a fork of SAM 2's training code (`DSC-Qian/sam2`, config `configs/train.yaml`) on an H100, using 193 hand-labelled high-entropy images augmented to 5,790 [@moran2026scaling]. Labels marked all *non-drivable* surfaces (sidewalks, buildings, parks, refuge islands) and left roads unlabelled. Annotate in COCO format (Roboflow or CVAT export) so SAM 2's training loader can read it; the repo's `sam2-fine-tune-roboflow.ipynb` shows the authors' Roboflow route.
+
+## 4. Run the Comparison Pipeline
+
+Run every command from `~/crosswalk/pipeline` with `MODAL_ENVIRONMENT=cook` exported unless a step says otherwise. Each step ends with its check.
+
+### 4.1 OSM crossing edges for Cook County
+
+Server, 30–90 min, the RAM-heavy step. Uses the reference repo's own extraction, so seed edges match the method:
+
+```bash
+cd ~/crosswalk/pipeline/crossing-distances
+nohup uv run python ../00_osm_crossings.py --place "Cook County, Illinois, USA" \
+    --out ~/crosswalk/data/osm > ~/crosswalk/logs/osm_ingest.log 2>&1 &
+tail -f ~/crosswalk/logs/osm_ingest.log
+```
+
+If Overpass times out, add `--overpass-url https://overpass.kumi.systems/api`. **Check:** `data/osm/crosswalk_edges_v2_0.shp` exists and holds tens of thousands of lines.
+
+### 4.2 Candidate pool
+
+Server, seconds:
+
+```bash
+cd ~/crosswalk/pipeline
+uv run python 01_build_candidates.py --intersections ../data/inputs/all_intersections.shp \
+    --crosswalk-edges ../data/osm/crosswalk_edges_v2_0.shp \
+    --out ../data/sample/candidates.csv --pool-per-group 300
+```
+
+Keeps intersections with an OSM crossing within 25 m (measured in EPSG:3435), labels them `chicago`/`suburban`, computes `tile_offset` (0 = centre, 1 = edge of the zoom-19 Web Mercator tile), and draws 300 per geography. **Check:** the printed count per group is 300.
+
+### 4.3 Canopy screen: 4-band clips for the pool
+
+Modal CPU, ~600 requests at 8 at a time, a few minutes:
+
+```bash
+uv run modal run cc_fetch.py --source pool --input ../data/sample/candidates.csv \
+    --out-csv ../data/sample/pool_ndvi.csv
+```
+
+Each clip gets `veg_frac`, the share of pixels with NDVI > 0.2. **Check:** `pool_ndvi.csv` has `veg_frac` values spread between 0 and ~0.8 and few `error` rows.
+
+### 4.4 Stratified sample and OSM road lines
+
+Server, ~1 min:
+
+```bash
+uv run python 02_select_sample.py --candidates ../data/sample/candidates.csv \
+    --ndvi ../data/sample/pool_ndvi.csv --n 150 \
+    --out ../data/sample/sample.csv --osm-out ../data/sample/osm_drivable.geojson
+uv run modal volume put cc-results ../data/sample/osm_drivable.geojson /inputs/osm_drivable.geojson
+```
+
+Eight cells (geography × canopy high/low terciles × tile centre/edge), ~19 each. **Check:** the printed cell table; thin cells mean the pool needs to be larger (`--pool-per-group 600` in 4.2).
+
+### 4.5 Imagery for the sample
+
+Modal CPU:
+
+```bash
+uv run modal run cc_fetch.py --source C --input ../data/sample/sample.csv --out-csv ../logs/fetch_C.csv
+uv run modal run cc_fetch.py --source A --input ../data/sample/sample.csv --out-csv ../logs/fetch_A.csv
+uv run modal run cc_fetch.py --source B --input ../data/sample/sample.csv --out-csv ../logs/fetch_B.csv
+```
+
+**Check:** zero `error` rows; `ground_res_m` ≈ 0.028 for C (zoom 22 at Chicago's latitude) and ≈ 0.049 for A/B (1024 px over 50 m). Pull a few to inspect: `uv run modal volume get cc-imagery /A_cook_rgb ../data/results/peek_A`.
+
+### 4.6 Segmentation
+
+Modal GPU (L40S); ~150 images ≈ 10–20 min per run:
+
+```bash
+uv run modal run cc_segment.py --source C --checkpoint pcd_finetuned/checkpoint.pt --run-name ft
+uv run modal run cc_segment.py --source A --checkpoint pcd_finetuned/checkpoint.pt --run-name ft
+```
+
+Before the authors' weights arrive, test the plumbing with `--checkpoint base/sam2.1_hiera_base_plus.pt --run-name base --limit 10`. **Check:** `segment_stats.csv` shows `kept` > 0 on most images, and the QA overlays (`uv run modal volume get cc-results /A_cook_rgb/ft/qa ../data/results/qa_A`) show magenta on sidewalks and buildings, not roads.
+
+### 4.7 Grow-cut
+
+Server, minutes; reference code unchanged:
+
+```bash
+./03_grow_cut.sh C ft
+./03_grow_cut.sh A ft
+```
+
+Output per approach in `data/results/<approach>/ft/`: `refined_crosswalks_v3_0_4.geojson` and `.csv` with `length_ft`. **Check:** line counts per approach are similar and lengths fall mostly between 20 and 100 ft.
+
+### 4.8 Post-filter before comparing
+
+The reference drops crossings shorter than 6 ft or longer than 160 ft [@moran2026scaling]; that filter is not in `grow_cut.py`, so apply it in R when joining the three approaches to the ground-truth table.
+
+Ground truth (manual measurement) and the paired comparison are not scripted here; the QA overlays from 4.6 are a convenient base for the manual measurement pass.
+
+## 5. Approach B: 4-Band Model
+
+Approach B is a separate ML sub-project: the clips are already fetched in 4.5, but the model needs surgery, labels, and a training run before `cc_segment.py` can use it.
+
+1. **Inflate the input layer.** SAM 2's Hiera trunk builds its patch embedding (`image_encoder.trunk.patch_embed.proj`, a 7 × 7 stride-4 `Conv2d`) with a hard-coded 3 input channels, and `build_sam2()` loads checkpoints strictly. Inflation therefore happens on the built model, not the checkpoint file: `05_inflate_4band.py` builds the 3-channel model from the fine-tuned checkpoint, swaps in a 4-channel conv (RGB filters copied, NIR filters zero), and saves the state dict. On RGB input the result is identical to the original.
+2. **Normalisation.** SAM 2 normalises inputs with ImageNet mean/std for 3 channels (`sam2/utils/transforms.py`, `SAM2Transforms`). Extend both lists to 4 values, using the NIR band's mean/std computed from the `pool_rgbn` clips.
+3. **Loading.** Build the 3-channel model with no checkpoint (`build_sam2(cfg, None)`), call `inflate_to_4band(model)`, then `model.load_state_dict(torch.load(path)["model"])`. `cc_segment.py` needs that branch plus reading all 4 bands; add it once training works.
+4. **Labels.** If the authors' annotations are georeferenced polygons, rasterise them onto the county clips' grid (each GeoTIFF carries its transform). If they are pixel masks tied to Google tiles, annotate new county clips; the reference used 193 images, so plan for 100–200.
+5. **Training on Modal.** One A10G or L4 is enough for patch-embed + mask-decoder training with the trunk frozen. Prototype the loop in Colab or `modal shell` first, then wrap it in a `@app.function(gpu="L4", timeout=6*3600)` that writes checkpoints to `cc-sam2-weights:/pcd_4band/`.
+6. **Decision rule** (from `phase01_crosswalk_models.qmd`): carry B forward only if it beats A on error against ground truth, especially at high-canopy sites.
+
+## 6. Notes and Troubleshooting
+
+### Native resolution vs. resampling
+
+The "native 6-inch vs. resampled" open question mostly dissolves. SAM 2.1 resizes every image to 1024 px, so what the model sees is set by the clip's footprint, not the pixel count requested. With the reference 50 m clip, the model input is ~4.9 cm/px for every approach. County imagery at 15 cm and Google zoom 22 (~2.8 cm/px nominal at Chicago's latitude, itself upsampled from coarser source imagery) both pass through that same grid. Keep the 25 m radius fixed; changing it is the real knob, and it changes what the model was tuned on. The paper's "30 cm per pixel, 1629 × 1629" figure does not match its code's zoom-22 setting; the `ground_res_m` column in the fetch logs records what each clip actually is.
+
+### Deviations from the reference code
+
+| Item | Reference | Here |
+|---|---|---|
+| Georeferencing of masks | Rebuilt from the file name, assuming a 25 m radius | Read from each GeoTIFF's transform, so county and Google clips are handled the same way |
+| Coordinate CSV | README says EPSG:3857; code actually uses lon/lat degrees | `lat`, `lon` in WGS84 throughout |
+| "Within 25 m of a crossing" join | Done in EPSG:3857 (≈ 18.6 m on the ground at 41.9° N) | EPSG:3435 feet, true 25 m |
+| SAM 2 CUDA extension | Compiled with nvcc | Skipped (`SAM2_BUILD_CUDA=0`); affects only optional hole-filling |
+| OSM road filter | City-wide `features_from_place` per run | Only roads around the sample, downloaded once (4.4) |
+| Grow-cut | — | Reference code, unchanged |
+
+: Where the scripts differ from agupta01/crossing-distances {.striped}
+
+### CRS and datum
+
+Cook County serves NAD83(2011) Illinois East (US ft). The fetcher asks the server for EPSG:3857 so all clips share one grid; the NAD83(2011) → WGS84 shift (≈ 1 m) moves positions slightly but not lengths. If positional agreement with OSM edges matters, compare a few QA overlays from A and C at the same intersection.
+
+### Google imagery terms
+
+Approach C bulk-downloads basemap tiles the way the reference study did; Google's Maps Platform terms restrict that, so confirm it fits the project's data-use approvals.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `KeyError: 'MODAL_ENVIRONMENT'` | Reference code reads it at import | `export MODAL_ENVIRONMENT=cook` |
+| Modal says the client is too old (reference venv) | `modal==0.77` pin | Only matters if Modal is called from that venv; the runbook uses it locally only |
+| `exportImage failed … 4xx/5xx` | County server busy, or bbox outside the 995,000–1,212,500 / 1,740,000–2,007,500 ft extent | Rerun the step (clips are overwritten, not duplicated); lower `max_containers` in `cc_fetch.py` |
+| `RuntimeError` after a `missing_keys` log | Checkpoint is not SAM 2.1 b+ | Confirm run and config with the authors; try `sam2.1_hiera_l.yaml` if it is the large model |
+| Magenta on road surfaces in QA | Zero-shot or wrong weights; OSM filter off | Check `run.json` checkpoint; confirm `/inputs/osm_drivable.geojson` was uploaded |
+| Grow-cut finds 0 crosswalks | Masks and edges don't overlap | Check both layers in QGIS; edges must come from 4.1 |
+| OSM build killed | Out of memory | Add swap, or run 4.1 once on a 64 GB machine and copy the shapefile |
+
+: Common failures {.striped}
+
+## Sources
+
+- [agupta01/crossing-distances](https://github.com/agupta01/crossing-distances)
+- [justenvirons/crosswalk-distances-cc](https://github.com/justenvirons/crosswalk-distances-cc) and `phase01_crosswalk_models.qmd`
+- [CookOrtho2025 ImageServer](https://gis.cookcountyil.gov/imagery/rest/services/CookOrtho2025/ImageServer)
+- [Modal 1.0 migration guide](https://modal.com/docs/guide/modal-1-0-migration)
+- [facebookresearch/sam2](https://github.com/facebookresearch/sam2)
