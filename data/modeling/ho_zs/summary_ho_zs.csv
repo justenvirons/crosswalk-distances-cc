@@ -1,0 +1,2 @@
+config,mode,fusion,prompts,negatives,rule,prob_thd,fill_holes_m2,n,iou_mean,iou_median,bf1_mean,bf1_median,bf1_prec,bf1_rec,bf1_1m_mean,area_ratio_median,box_fallback
+text__fused__road+car+crosswalk__neg-sidewalk+grass+building+tree__t0.15_c0.5_fill25,text,fused,road+car+crosswalk,sidewalk+grass+building+tree,positive,0.15,25.0,40,0.6890179185240553,0.7614708818877836,0.44116228803355695,0.4204131519203069,0.38485809472588073,0.5463087130079596,0.543604317987485,0.9254784841705461,0.0

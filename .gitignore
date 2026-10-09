@@ -4,7 +4,7 @@ data/infrastructure/*
 data/census/*
 data/crashes/*
 data/boundaries/*
-data/modeling/*
+data/modeling/c25q4_100*
 output/all_streets*.*
 output/ped_fatalities*.*
 output/all_ped_fatalities*.*

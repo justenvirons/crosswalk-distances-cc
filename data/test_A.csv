@@ -1,0 +1,2 @@
+id,lat,lon,path,width,height,bands,ground_res_m
+41878123N_87629456W,41.878123,-87.629456,/imagery/A_cook_rgb/crosswalk_41878123N_87629456W.tif,1024,1024,3,0.04888282384282575
