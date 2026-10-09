@@ -406,8 +406,10 @@ The reference repo is cloned next to the OSM files, and the packages its OSM cod
 # `import osmnx` fails until R is restarted.
 reticulate::use_condaenv("osmnx-env", required = TRUE)
 if (!grepl("osmnx-env", reticulate::py_config()$python, fixed = TRUE)) {
-  stop("Python is already bound to ", reticulate::py_config()$python,
-       ". Restart R (Session > Restart R) and run this chunk before the Python chunk below.")
+  stop("Python is bound to ", reticulate::py_config()$python, ", not osmnx-env. ",
+       "If RETICULATE_PYTHON is set (Sys.getenv(\"RETICULATE_PYTHON\"); RStudio sets it ",
+       "from Tools > Global/Project Options > Python), clear it or point it at osmnx-env; ",
+       "then restart R and run this chunk before the Python chunk below.")
 }
 
 if (!dir.exists("data/osm/crossing-distances")) {
