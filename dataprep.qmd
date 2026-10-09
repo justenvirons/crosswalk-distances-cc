@@ -10,7 +10,7 @@ editor_options:
 
 ## Purpose
 
-This chapter contains the code that builds the `sf` data tables that support [Dataset Development](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which [Dataset Development](phase01.html) loads (a subset of) to build an interactive map for data exploration.
+This chapter contains the code that builds the `sf` data tables that support [Dataset Development](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, OSM crossing edges and the crossing-distance comparison sample, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which [Dataset Development](phase01.html) loads (a subset of) to build an interactive map for data exploration.
 
 ## Activate R Libraries
 
@@ -344,24 +344,229 @@ st_write(study_area_intersections, "data/intersections/study_area_intersections.
 
 ```
 
-### Sample of intersections
-```{r}
-library(dplyr)
+### OSM crossing edges
 
-all_intersections <- st_read("output/all_intersections.shp")
+The grow-cut step of the reference methodology measures each crossing along an OSM crossing line, so the comparison sample (and later the countywide run) is limited to intersections with an OSM crossing nearby. The reference code builds these lines in `osm_ingest_local()` (`inference/osm_ingest.py` in [agupta01/crossing-distances](https://github.com/agupta01/crossing-distances)) from three Overpass queries for the whole county:
+
+1. the full, unsimplified OSM network (`network_type = "all"`), from which every edge that is not a pedestrian crossing is removed;
+2. the drive network, from which it derives intersections;
+3. crossing features (`highway=crossing` or any `crossing` tag).
+
+Here the same function runs unchanged, but the three queries read local OSM XML files cut from the Cook County extract above. This takes minutes instead of hours of Overpass queries, and uses the same OSM snapshot as the intersections. The drive network is `cook_drive_network.osm` from the previous step: its five osmium passes apply the same tag filter as the reference code's drive query (`drive_filter`). The other two files are built here. The full-network pass mirrors OSMnx's own `"all"` filter: ways with a `highway` tag, excluding areas and highways that are abandoned, planned, proposed, razed, raceways, platforms, rest areas or services.
+
+```{r}
+#| label: osm-crossing-files
+
+# 1. Full network: every highway way, minus the classes OSMnx's "all" filter drops
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "data/osm/cook_extract.osm.pbf",
+    "w/highway",
+    "-o", "data/osm/cook_all_01_highway.osm.pbf", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "-i", "data/osm/cook_all_01_highway.osm.pbf",
+    "w/area=yes",
+    "w/highway=abandoned,construction,no,planned,platform,proposed,raceway,razed,rest_area,services",
+    "-o", "data/osm/cook_all_network.osm", "-f", "osm", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+# 2. Crossing features: nodes, ways and relations tagged highway=crossing or
+#    carrying any crossing tag (osmium adds the nodes that crossing ways reference)
+reticulate::conda_run2(
+  cmd = "osmium",
+  args = c(
+    "tags-filter", "data/osm/cook_extract.osm.pbf",
+    "nwr/highway=crossing", "nwr/crossing",
+    "-o", "data/osm/cook_crossings.osm", "-f", "osm", "--overwrite"
+  ),
+  envname = "osmnx-env"
+)
+
+file.exists(c("data/osm/cook_all_network.osm", "data/osm/cook_crossings.osm",
+              "data/osm/cook_drive_network.osm"))
+```
+
+The reference repo is cloned next to the OSM files, and the packages its OSM code imports are added to `osmnx-env`. `modal` is needed only because the reference module imports it at load time; nothing is sent to Modal.
+
+```{r}
+#| label: reference-repo
+
+if (!dir.exists("data/osm/crossing-distances")) {
+  system2("git", c("clone", "https://github.com/agupta01/crossing-distances.git",
+                   "data/osm/crossing-distances"))
+}
+reticulate::py_install(c("modal", "geopy", "tqdm"), envname = "osmnx-env", pip = TRUE)
+```
+
+`osm_ingest_local()` is then called with OSMnx's two place-based download functions pointed at the local files. The reference code expects the OSMnx 1.x feature index names (`element_type`, `osmid`); OSMnx 2.x renamed them to `element` and `id`, so the replacement for `features_from_place` renames them back. Building the unsimplified countywide graph is the memory-heavy step (plan on 16–32 GB of RAM).
+
+```{python}
+#| label: osm-crossing-edges
+
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath("data/osm/crossing-distances"))
+os.environ.setdefault("MODAL_ENVIRONMENT", "cook")  # read when the reference module loads
+
+import osmnx as ox
+from inference import osm_ingest
+
+ALL_XML = "data/osm/cook_all_network.osm"
+DRIVE_XML = "data/osm/cook_drive_network.osm"
+CROSSING_XML = "data/osm/cook_crossings.osm"
+
+
+def graph_from_local(query, network_type="all", simplify=True, retain_all=False,
+                     custom_filter=None, **kwargs):
+    # the reference code passes a custom_filter only for the drive network
+    path = DRIVE_XML if custom_filter else ALL_XML
+    return ox.graph_from_xml(path, simplify=simplify, retain_all=retain_all)
+
+
+def features_from_local(query, tags):
+    gdf = ox.features_from_xml(CROSSING_XML, tags=tags)
+    return gdf.rename_axis(index={"element": "element_type", "id": "osmid"})
+
+
+ox.graph_from_place = graph_from_local
+ox.features_from_place = features_from_local
+
+osm_ingest.osm_ingest_local(place="Cook County, Illinois, USA", filepath="data/osm")
+```
+
+The function writes `crosswalk_edges_v2_0.shp` (crossing lines, EPSG:3857), `raw_intersection_coordinates_v2_0.csv` (its own drive-network intersections, which duplicate `all_intersections`) and `intersection_coordinates_v2_0.csv` to `data/osm/`. Copy the `crosswalk_edges_v2_0.*` files to `~/crosswalk/data/osm/` on the server in place of the runbook's step 4.1.
+
+```{r}
+#| label: osm-crossing-edges-check
+
+crosswalk_edges <- st_read("data/osm/crosswalk_edges_v2_0.shp") %>%
+  st_transform(crs = 3435)
+
+nrow(crosswalk_edges)  # expect tens of thousands of lines
+```
+
+### Candidate pool
+
+Equivalent to the runbook's `01_build_candidates.py` (step 4.2). It keeps intersections with an OSM crossing edge within 25 m, labels each as Chicago or suburban, and computes its position within the zoom-19 Google tile grid (`tile_offset`: 0 = tile centre, 1 = tile edge). It then draws up to 300 per geography. The `id` follows the reference repo's clip naming (e.g. `41878123N_87629456W`), which the Modal fetch step also uses, so later tables join on it. The draws use R's random number generator, so they differ from the Python script's at the same seed.
+
+```{r}
+#| label: candidate-pool
+
+radius_ft      <- 25 * 3.28084  # 25 m in EPSG:3435 US feet
+pool_per_group <- 300
+
+crosswalk_id <- function(lat, lon) {
+  sprintf("%.0f%s_%.0f%s",
+          round(abs(lat) * 1e6), if_else(lat > 0, "N", "S"),
+          round(abs(lon) * 1e6), if_else(lon > 0, "E", "W"))
+}
+
+# position within the Web Mercator tile containing the point
+tile_offset <- function(lat, lon, z = 19) {
+  n  <- 2^z
+  xt <- (lon + 180) / 360 * n
+  yt <- (1 - asinh(tan(lat * pi / 180)) / pi) / 2 * n
+  2 * pmax(abs(xt %% 1 - 0.5), abs(yt %% 1 - 0.5))
+}
+
+all_intersections <- st_read("output/all_intersections.shp") %>%
+  st_transform(crs = 3435)
+
+nearest_edge <- st_nearest_feature(all_intersections, crosswalk_edges)
+
+candidates <- all_intersections %>%
+  mutate(dist_to_osm_crossing_ft = as.numeric(
+    st_distance(all_intersections, crosswalk_edges[nearest_edge, ], by_element = TRUE)
+  )) %>%
+  filter(dist_to_osm_crossing_ft <= radius_ft)
+
+cli::cli_alert_info(
+  "{nrow(candidates)} of {nrow(all_intersections)} intersections have an OSM crossing within 25 m"
+)
+
+ll <- st_coordinates(st_transform(candidates, 4326))
 
 set.seed(42)
+candidates <- candidates %>%
+  st_drop_geometry() %>%
+  mutate(
+    lat = round(ll[, "Y"], 6),
+    lon = round(ll[, "X"], 6),
+    id = crosswalk_id(lat, lon),
+    geography = if_else(muni_name == "Chicago", "chicago", "suburban"),
+    tile_offset = tile_offset(lat, lon)
+  ) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  group_by(geography) %>%
+  slice_sample(n = pool_per_group) %>%
+  ungroup() %>%
+  select(id, lat, lon, geography, muni_name, tile_offset, dist_to_osm_crossing_ft)
 
-# add row number
-all_intersections_id <- all_intersections %>% mutate(.id = row_number())
+count(candidates, geography)  # expect 300 per geography
 
-all_intersections_sample <- all_intersections_id %>%
-  # group_by(region) %>%   # strata nested within geography
-  slice_sample(n = 50)
-
-test <- df %>% anti_join(train, by = ".id")
-
+dir.create("data/sample", showWarnings = FALSE)
+write_csv(candidates, "data/sample/candidates.csv")
 ```
+
+Copy `data/sample/candidates.csv` to `~/crosswalk/data/sample/` on the server and run the canopy screen (runbook step 4.3). It writes `pool_ndvi.csv`, with `veg_frac`, the share of each 4-band clip's pixels with NDVI above 0.2. Copy it back to `data/sample/`.
+
+### Evaluation sample and pilot set
+
+Equivalent to the runbook's `02_select_sample.py` (step 4.4). Candidates are split into canopy terciles by `veg_frac` and into tile centre/edge at the median `tile_offset`. The middle canopy tercile is dropped so the high/low contrast is clean, leaving 8 strata (geography × canopy × tile position). Each stratum contributes `ceiling(n / 8)` intersections, 19 for `n = 150`, or 152 in total. The pilot set draws 15 more per geography from the remaining candidates, middle tercile included, and never overlaps the evaluation sample. It is used only to check segmentation settings on county imagery (runbook step 4.8).
+
+```{r}
+#| label: evaluation-sample
+
+n_eval  <- 150
+n_pilot <- 30
+
+pool_ndvi <- read_csv("data/sample/pool_ndvi.csv")
+if ("error" %in% names(pool_ndvi)) pool_ndvi <- filter(pool_ndvi, is.na(error))
+
+pool <- candidates %>%
+  inner_join(select(pool_ndvi, id, veg_frac, ndvi_mean), by = "id")
+
+canopy_breaks <- quantile(pool$veg_frac, c(1/3, 2/3))
+
+pool <- pool %>%
+  mutate(
+    canopy = cut(veg_frac, c(-1, canopy_breaks, 2), labels = c("low", "mid", "high")),
+    tile_pos = if_else(tile_offset >= median(tile_offset), "edge", "centre")
+  )
+
+strata <- filter(pool, canopy != "mid")
+per_cell <- ceiling(n_eval / n_distinct(strata$geography, strata$canopy, strata$tile_pos))
+
+set.seed(42)
+eval_sample <- strata %>%
+  group_by(geography, canopy, tile_pos) %>%
+  slice_sample(n = per_cell) %>%
+  ungroup()
+
+count(eval_sample, geography, canopy, tile_pos)  # thin cells: raise pool_per_group to 600
+
+set.seed(43)
+pilot_sample <- pool %>%
+  anti_join(eval_sample, by = "id") %>%
+  group_by(geography) %>%
+  slice_sample(n = ceiling(n_pilot / 2)) %>%
+  ungroup()
+
+write_csv(eval_sample, "data/sample/sample.csv")
+write_csv(pilot_sample, "data/sample/pilot.csv")
+```
+
+Copy `sample.csv` and `pilot.csv` to `~/crosswalk/data/sample/` on the server and continue with the runbook at step 4.5.
 
 ## Streets and Speed Limits (OSM)
 
@@ -855,19 +1060,5 @@ save(
   # land_use,
   file = "data/phase01_dataprep.RData"
 )
-```
-
-### Sample of intersections
-```{r}
-
-# Fixed number of rows
-sample_intersections <- intersections %>% slice_sample(n = 50) %>%
-  mutate(x = st_coordinates(.)[, "X"],        # longitude
-         y = st_coordinates(.)[, "Y"]) %>%         # latitude
-  st_drop_geometry() %>% 
-  select(x,y)
-
-write.csv(sample_intersections, file = "data/sample_intersections.csv")
-
 ```
 
