@@ -243,6 +243,68 @@ uv run modal volume put --env cook cc-results ../data/sample/osm_roads.geojson /
 
 Drivable classes only (trunk, primary, secondary, tertiary, unclassified, residential, living streets, busways, and motorway links); service roads, alleys, and private access are excluded. **Check:** a few thousand lines; open the file in QGIS over the sample points.
 
+### SAM 3 runs and model selection (draft)
+
+Draft, to be refined as runs are added. It traces the SAM 3 runs that shaped the chosen configuration, from the zero-shot benchmark (4.6) through fine-tuning and the holdout comparison (4.7) to the county pilot (4.8), and what still follows. Scores are boundary F1 at 0.5 m (bF1) and IoU, on the 208 de-duplicated benchmark clips for `zs*` runs and on the 40 held-out Google clips for `ho_*` runs. Green: done; amber: decision; blue: open or not yet run.
+
+```{mermaid}
+%%| label: fig-sam3-selection
+%%| fig-cap: "SAM 3 runs and configuration selection (draft)."
+flowchart TD
+  DATA["Satellite Curb Segmentation, version 15<br/>208 de-duplicated clips, 165 coordinate-named Google clips"]
+
+  subgraph S46["4.6 Zero-shot benchmark"]
+    ZS2["zs2: 45-config grid<br/>mode × fusion × phrase × negatives<br/>best: text, fused, 'road' + negatives<br/>bF1 0.35, IoU 0.64"]
+    BOX["Box prompts not supported<br/>6 clips with boxes: text+box 0.25 vs text 0.34"]
+    ZS3["zs3: fixes for under-called road<br/>'road, car, crosswalk' + negatives incl. tree<br/>threshold 0.15, holes under 25 m² filled<br/>bF1 0.43, IoU 0.70"]
+    D1{"bF1 good enough<br/>to hand to grow-cut?"}
+  end
+
+  subgraph S47["4.7 Fine-tune and holdout"]
+    SPLIT["05_make_holdout: split by original image<br/>holdout 40 Google clips · validation 15 · training 153"]
+    FT1["ft1: fine-tune segmentation head only<br/>2.3 M of ~850 M parameters, 12 epochs<br/>validation bF1 0.41 → 0.54 after 1 epoch, then flat"]
+    HOZS["ho_zs: zero-shot, zs3 settings<br/>bF1 0.44"]
+    HOBEST["ho_ft1: best-validation head, epoch 1<br/>bF1 0.49"]
+    HOLAST["ho_ft1_last: final head, epoch 12<br/>bF1 0.54, IoU 0.78 at threshold 0.4"]
+    D2{"Beats zero-shot<br/>by more than 0.05?"}
+    CHOSEN["Chosen configuration<br/>seg_head_last.pt · text 'road' · semantic fusion<br/>threshold 0.4 · holes under 25 m² filled"]
+  end
+
+  subgraph S48["4.8 County pilot, 30 clips, no labels"]
+    PILOT["pilot: same configuration on A (Google) and B (county)<br/>thresholds 0.3 / 0.4 / 0.5<br/>at 0.4: A empty on 2 of 30 (canopy, building shadow)<br/>B spills onto parking lots"]
+    OSM["pilot_osm: + OSM centre-line corridor clip<br/>A–B road-fraction correlation 0.76 → 0.96<br/>open: corridor cuts real road on a few clips"]
+    D3{"County imagery clearly<br/>worse for every finalist?"}
+    LABEL["Label 20–30 county clips<br/>and score B directly"]
+  end
+
+  subgraph NEXT["4.9–4.12 Evaluation"]
+    SEG["Fetch and segment the 152-clip<br/>evaluation sample, A and B"]
+    GC["Grow-cut crossing lengths"]
+    CMP["Compare A and B against<br/>measured crossing distances"]
+  end
+
+  DATA --> ZS2
+  ZS2 --> BOX
+  ZS2 --> ZS3 --> D1
+  D1 -- "no: under-calls road" --> SPLIT --> FT1
+  FT1 --> HOBEST
+  FT1 --> HOLAST
+  ZS3 --> HOZS
+  HOZS --> D2
+  HOBEST --> D2
+  HOLAST --> D2
+  D2 -- "yes: final head +0.10" --> CHOSEN --> PILOT --> OSM --> D3
+  D3 -- "no" --> SEG --> GC --> CMP
+  D3 -. "yes" .-> LABEL -.-> SEG
+
+  classDef done fill:#e3f1e6,stroke:#3b7d4f,color:#1d3b26
+  classDef decision fill:#fbeed5,stroke:#b07d1e,color:#4a3510
+  classDef open fill:#e3ecf8,stroke:#3d6aa8,color:#1b2f4d,stroke-dasharray:4 3
+  class DATA,ZS2,BOX,ZS3,SPLIT,FT1,HOZS,HOBEST,HOLAST,CHOSEN,PILOT done
+  class D1,D2,D3 decision
+  class OSM,LABEL,SEG,GC,CMP open
+```
+
 ### 4.6 Benchmark on labelled data
 
 Choose the SAM 3 configuration by measurement, not by eye. The public [Satellite Curb Segmentation](https://universe.roboflow.com/pcd-rxiqe/satellite-curb-segmentation) dataset (CC BY 4.0) is hand-labelled Google clips of US intersections from the reference study, with sidewalks, buildings, parks, and refuge islands marked non-drivable — exactly this task.
