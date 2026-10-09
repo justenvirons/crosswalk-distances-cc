@@ -344,7 +344,7 @@ st_write(study_area_intersections, "data/intersections/study_area_intersections.
 
 ```
 
-### OSM crossing edges
+## OSM crossing edges
 
 The grow-cut step of the reference methodology measures each crossing along an OSM crossing line, so the comparison sample (and later the countywide run) is limited to intersections with an OSM crossing nearby. The reference code builds these lines in `osm_ingest_local()` (`inference/osm_ingest.py` in [agupta01/crossing-distances](https://github.com/agupta01/crossing-distances)) from three Overpass queries for the whole county:
 
