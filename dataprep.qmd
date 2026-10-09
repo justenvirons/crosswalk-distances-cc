@@ -819,7 +819,7 @@ write_csv(adi_study_area, "data/census/adi_study_area.csv")
 
 ## Read, Format and Save
 
-### Read
+### Read datasets
 ```{r}
 
 county_boundary <- st_read(dsn = "data/boundaries/cc_boundary.gpkg") %>% st_transform(crs=4326)
@@ -856,3 +856,18 @@ save(
   file = "data/phase01_dataprep.RData"
 )
 ```
+
+### Sample of intersections
+```{r}
+
+# Fixed number of rows
+sample_intersections <- intersections %>% slice_sample(n = 50) %>%
+  mutate(x = st_coordinates(.)[, "X"],        # longitude
+         y = st_coordinates(.)[, "Y"]) %>%         # latitude
+  st_drop_geometry() %>% 
+  select(x,y)
+
+write.csv(sample_intersections, file = "data/sample_intersections.csv")
+
+```
+

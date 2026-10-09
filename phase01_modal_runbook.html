@@ -8,9 +8,9 @@
 
 <meta name="author" content="C. Scott Smith, PhD AICP">
 <meta name="author" content="Zane Sufi">
-<meta name="dcterms.date" content="2026-10-07">
+<meta name="dcterms.date" content="2026-10-08">
 
-<title>Phase 1 — Modal + SAM 2.1 Runbook: Crossing-Distance Imagery Comparison</title>
+<title>Phase 1 — Modal + SAM 3 Runbook: Crossing-Distance Imagery Comparison</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -2234,25 +2234,29 @@ vertical-align: -.125em;
   <li><a href="#server-sizing" id="toc-server-sizing" class="nav-link" data-scroll-target="#server-sizing">Server Sizing</a></li>
   <li><a href="#ubuntu-server-setup" id="toc-ubuntu-server-setup" class="nav-link" data-scroll-target="#ubuntu-server-setup">1. Ubuntu Server Setup</a></li>
   <li><a href="#modal-setup" id="toc-modal-setup" class="nav-link" data-scroll-target="#modal-setup">2. Modal Setup</a></li>
-  <li><a href="#segment-anything-sam-2.1-setup" id="toc-segment-anything-sam-2.1-setup" class="nav-link" data-scroll-target="#segment-anything-sam-2.1-setup">3. Segment Anything (SAM 2.1) Setup</a></li>
+  <li><a href="#sam-3-and-data-access" id="toc-sam-3-and-data-access" class="nav-link" data-scroll-target="#sam-3-and-data-access">3. SAM 3 and Data Access</a></li>
   <li><a href="#run-the-comparison-pipeline" id="toc-run-the-comparison-pipeline" class="nav-link" data-scroll-target="#run-the-comparison-pipeline">4. Run the Comparison Pipeline</a>
   <ul class="collapse">
   <li><a href="#osm-crossing-edges-for-cook-county" id="toc-osm-crossing-edges-for-cook-county" class="nav-link" data-scroll-target="#osm-crossing-edges-for-cook-county">4.1 OSM crossing edges for Cook County</a></li>
   <li><a href="#candidate-pool" id="toc-candidate-pool" class="nav-link" data-scroll-target="#candidate-pool">4.2 Candidate pool</a></li>
-  <li><a href="#canopy-screen-4-band-clips-for-the-pool" id="toc-canopy-screen-4-band-clips-for-the-pool" class="nav-link" data-scroll-target="#canopy-screen-4-band-clips-for-the-pool">4.3 Canopy screen: 4-band clips for the pool</a></li>
-  <li><a href="#stratified-sample-and-osm-road-lines" id="toc-stratified-sample-and-osm-road-lines" class="nav-link" data-scroll-target="#stratified-sample-and-osm-road-lines">4.4 Stratified sample and OSM road lines</a></li>
-  <li><a href="#imagery-for-the-sample" id="toc-imagery-for-the-sample" class="nav-link" data-scroll-target="#imagery-for-the-sample">4.5 Imagery for the sample</a></li>
-  <li><a href="#segmentation" id="toc-segmentation" class="nav-link" data-scroll-target="#segmentation">4.6 Segmentation</a></li>
-  <li><a href="#grow-cut" id="toc-grow-cut" class="nav-link" data-scroll-target="#grow-cut">4.7 Grow-cut</a></li>
-  <li><a href="#post-filter-before-comparing" id="toc-post-filter-before-comparing" class="nav-link" data-scroll-target="#post-filter-before-comparing">4.8 Post-filter before comparing</a></li>
+  <li><a href="#canopy-screen" id="toc-canopy-screen" class="nav-link" data-scroll-target="#canopy-screen">4.3 Canopy screen</a></li>
+  <li><a href="#evaluation-sample-and-pilot-set" id="toc-evaluation-sample-and-pilot-set" class="nav-link" data-scroll-target="#evaluation-sample-and-pilot-set">4.4 Evaluation sample and pilot set</a></li>
+  <li><a href="#osm-road-centre-lines-for-box-prompts" id="toc-osm-road-centre-lines-for-box-prompts" class="nav-link" data-scroll-target="#osm-road-centre-lines-for-box-prompts">4.5 OSM road centre-lines for box prompts</a></li>
+  <li><a href="#benchmark-on-labelled-data" id="toc-benchmark-on-labelled-data" class="nav-link" data-scroll-target="#benchmark-on-labelled-data">4.6 Benchmark on labelled data</a></li>
+  <li><a href="#fine-tune-sam-3-on-the-curb-labels" id="toc-fine-tune-sam-3-on-the-curb-labels" class="nav-link" data-scroll-target="#fine-tune-sam-3-on-the-curb-labels">4.7 Fine-tune SAM 3 on the curb labels</a></li>
+  <li><a href="#county-pilot-check" id="toc-county-pilot-check" class="nav-link" data-scroll-target="#county-pilot-check">4.8 County pilot check</a></li>
+  <li><a href="#imagery-for-the-evaluation-sample" id="toc-imagery-for-the-evaluation-sample" class="nav-link" data-scroll-target="#imagery-for-the-evaluation-sample">4.9 Imagery for the evaluation sample</a></li>
+  <li><a href="#segmentation" id="toc-segmentation" class="nav-link" data-scroll-target="#segmentation">4.10 Segmentation</a></li>
+  <li><a href="#grow-cut" id="toc-grow-cut" class="nav-link" data-scroll-target="#grow-cut">4.11 Grow-cut</a></li>
+  <li><a href="#hand-off-to-the-comparison" id="toc-hand-off-to-the-comparison" class="nav-link" data-scroll-target="#hand-off-to-the-comparison">4.12 Hand-off to the comparison</a></li>
   </ul></li>
-  <li><a href="#approach-b-4-band-model" id="toc-approach-b-4-band-model" class="nav-link" data-scroll-target="#approach-b-4-band-model">5. Approach B: 4-Band Model</a></li>
-  <li><a href="#notes-and-troubleshooting" id="toc-notes-and-troubleshooting" class="nav-link" data-scroll-target="#notes-and-troubleshooting">6. Notes and Troubleshooting</a>
+  <li><a href="#notes-and-troubleshooting" id="toc-notes-and-troubleshooting" class="nav-link" data-scroll-target="#notes-and-troubleshooting">5. Notes and Troubleshooting</a>
   <ul class="collapse">
-  <li><a href="#native-resolution-vs.-resampling" id="toc-native-resolution-vs.-resampling" class="nav-link" data-scroll-target="#native-resolution-vs.-resampling">Native resolution vs. resampling</a></li>
-  <li><a href="#deviations-from-the-reference-code" id="toc-deviations-from-the-reference-code" class="nav-link" data-scroll-target="#deviations-from-the-reference-code">Deviations from the reference code</a></li>
-  <li><a href="#crs-and-datum" id="toc-crs-and-datum" class="nav-link" data-scroll-target="#crs-and-datum">CRS and datum</a></li>
-  <li><a href="#google-imagery-terms" id="toc-google-imagery-terms" class="nav-link" data-scroll-target="#google-imagery-terms">Google imagery terms</a></li>
+  <li><a href="#why-boxes-from-osm" id="toc-why-boxes-from-osm" class="nav-link" data-scroll-target="#why-boxes-from-osm">Why boxes from OSM</a></li>
+  <li><a href="#resolution" id="toc-resolution" class="nav-link" data-scroll-target="#resolution">Resolution</a></li>
+  <li><a href="#if-the-fine-tuned-head-is-still-not-enough" id="toc-if-the-fine-tuned-head-is-still-not-enough" class="nav-link" data-scroll-target="#if-the-fine-tuned-head-is-still-not-enough">If the fine-tuned head is still not enough</a></li>
+  <li><a href="#differences-from-the-reference-code" id="toc-differences-from-the-reference-code" class="nav-link" data-scroll-target="#differences-from-the-reference-code">Differences from the reference code</a></li>
+  <li><a href="#crs-datum-and-data-terms" id="toc-crs-datum-and-data-terms" class="nav-link" data-scroll-target="#crs-datum-and-data-terms">CRS, datum, and data terms</a></li>
   <li><a href="#troubleshooting" id="toc-troubleshooting" class="nav-link" data-scroll-target="#troubleshooting">Troubleshooting</a></li>
   </ul></li>
   <li><a href="#sources" id="toc-sources" class="nav-link" data-scroll-target="#sources">Sources</a></li>
@@ -2263,7 +2267,7 @@ vertical-align: -.125em;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Phase 1 — Modal + SAM 2.1 Runbook: Crossing-Distance Imagery Comparison</h1>
+<h1 class="title">Phase 1 — Modal + SAM 3 Runbook: Crossing-Distance Imagery Comparison</h1>
 <p class="subtitle lead">Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County</p>
 </div>
 
@@ -2299,7 +2303,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">October 7, 2026</p>
+      <p class="date">October 8, 2026</p>
     </div>
   </div>
   
@@ -2313,25 +2317,9 @@ vertical-align: -.125em;
 
 <section id="read-first" class="level2">
 <h2 class="anchored" data-anchor-id="read-first">Read First</h2>
-<p>This runbook takes a fresh Ubuntu server to crossing-distance measurements for Approaches A and C (<code>phase01_crosswalk_models.qmd</code>) on a stratified sample of Cook County intersections, with Modal doing all GPU and bulk-fetch work. The scripts it calls are in <code>crosswalk_pipeline.tar.gz</code> and unpack into the server’s existing <code>~/crosswalk/pipeline</code> folder.</p>
-<div class="callout callout-style-default callout-warning callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Two blockers to clear before starting
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li><strong>The fine-tuned SAM 2.1 checkpoint is not public.</strong> The reference repo loads it from a Modal volume (<code>sam2-weights</code>) in the authors’ own account (<code>sam_test</code> environment, run folders <code>train_9</code>/<code>train_10</code>). Request <code>checkpoint.pt</code> from the production run from the authors <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>. Until it arrives, everything can run with Meta’s base SAM 2.1 weights, but those results are zero-shot and are not Approach C.</li>
-<li><strong>The reference code pins <code>modal==0.77</code></strong> (Modal is now at 1.6.1) and uses APIs removed in 1.0 (<code>modal.Mount</code>, <code>concurrency_limit</code>, <code>.lookup()</code>). It is also wired to the authors’ account (W&amp;B secret, hard-coded <code>train_10/backfill</code> paths, a <code>city_code_mapping.csv</code> not in the repo). This runbook therefore uses new Modal 1.x scripts for fetch and segmentation, and reuses the reference code unchanged only where it runs locally: OSM crossing extraction and grow-cut.</li>
-</ol>
-</div>
-</div>
+<p>This runbook takes a fresh Ubuntu server to crossing-distance measurements from two imagery sources, segmented by one model, on a stratified sample of Cook County intersections. Modal does all GPU and bulk-fetch work. The scripts are in <code>crosswalk_pipeline.tar.gz</code> and unpack into <code>~/crosswalk/pipeline</code>.</p>
 <table class="table-striped caption-top table">
-<caption>Pipeline scripts</caption>
+<caption>Imagery candidates for Aims 1a and 1b</caption>
 <colgroup>
 <col style="width: 25%">
 <col style="width: 25%">
@@ -2340,10 +2328,105 @@ vertical-align: -.125em;
 </colgroup>
 <thead>
 <tr class="header">
+<th>Candidate</th>
+<th>Imagery</th>
+<th>Segmentation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A</td>
+<td>Google Maps satellite tiles (reference methodology’s original source)</td>
+<td>SAM 3, configuration chosen by benchmark</td>
+<td>Not started</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td>Cook County 3-band RGB orthoimagery (CookOrtho2025, leaf-off, single vintage)</td>
+<td>SAM 3, same configuration</td>
+<td>Not started</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Design.</strong> Both candidates go through the same model, the same prompt configuration, and the same measurement step, so differences in error against ground truth are attributable to the imagery. Instead of the reference methodology’s SAM 2.1 mask grid and privately fine-tuned checkpoint <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>, SAM 3 <span class="citation" data-cites="carion2025sam3segmentconcepts">(<a href="#ref-carion2025sam3segmentconcepts" role="doc-biblioref">Carion et al. 2025</a>)</span> is asked for the drivable surface directly. The reference’s OSM crossing extraction and grow-cut measurement are reused unchanged. County 4-band imagery is used only to screen candidate intersections for canopy cover when stratifying the sample.</p>
+<p><strong>How SAM 3 is used.</strong> Recent evaluations show that text-only prompting is SAM 3’s weak point from overhead, and roads are its weakest class. In a July 2026 study on the DIOR aerial benchmark, a single exemplar box scored 66.6 mAP against 11.7 for text alone. SegEarth-OV3, a training-free SAM 3 method for remote sensing, raised road IoU by fusing SAM 3’s semantic head with its instance masks. The pipeline therefore supports three prompt modes and three fusion rules:</p>
+<table class="table-striped caption-top table">
+<caption>SAM 3 configuration options</caption>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Setting</th>
+<th>Options</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Prompt mode</td>
+<td><code>text</code> (a phrase such as “road”); <code>box</code> (5 m exemplar boxes on OSM road centre-lines ~15 m from the intersection, no text); <code>text+box</code></td>
+</tr>
+<tr class="even">
+<td>Fusion</td>
+<td><code>instance</code> (union of instance masks, SAM 3’s default output); <code>semantic</code> (semantic head × presence); <code>fused</code> (max of instance and semantic, × presence, threshold 0.3 — the SegEarth-OV3 rule)</td>
+</tr>
+<tr class="odd">
+<td>Negatives</td>
+<td>Optional competing phrases (e.g. sidewalk, grass, building): a pixel is road only where road scores highest</td>
+</tr>
+<tr class="even">
+<td>Rule</td>
+<td><code>positive</code> (road probability above threshold) or <code>complement</code> (road = wherever no non-drivable phrase — sidewalk, grass, building, tree — exceeds the threshold, matching how the labels were drawn)</td>
+</tr>
+<tr class="odd">
+<td>Threshold</td>
+<td>Probability cut-off, default 0.3; lower values reach further toward the curb</td>
+</tr>
+<tr class="even">
+<td>Hole fill</td>
+<td>Fill enclosed non-road holes smaller than N m² (parked cars, crosswalk paint); holes touching the clip edge and larger islands are kept</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration is chosen on labelled data before any Cook County measurement (4.6–4.7), then frozen for both candidates.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What has and hasn’t been tested
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Tested locally on 2026-10-08:</p>
+<ul>
+<li>Segmentation helpers on a synthetic clip georeferenced exactly as the fetcher writes it: pixel area within 0.3%, polygon area within 0.2%.</li>
+<li>The reference grow-cut, unchanged, measured a 12 m crossing at 39.51 ft (true 39.37 ft).</li>
+<li>Exemplar boxes land 15 m out on every approach leg and lie wholly on a 12 m road.</li>
+<li>Boundary F1 at 0.5 m separates a 0.3 m curb error (1.00) from a 1 m error (0.50), while IoU barely moves (0.98).</li>
+<li>The fusion and negative-class decision rules.</li>
+<li>Benchmark preparation on a synthetic COCO export with Roboflow-style file names.</li>
+<li>Sample selection on the project’s 169,456-point intersection layer.</li>
+<li>Fine-tuning plumbing on a randomly initialised SAM 3 (CPU): gradients reach only the segmentation head, and the saved head reloads. Also the curb weighting, the augmentation and the holdout split, which has no original shared across holdout, validation and training.</li>
+</ul>
+<p>Not yet tested: a fine-tuning run with the real SAM 3 weights on a GPU, live calls to Modal, the Cook County ImageServer, Google tiles, Overpass, and Roboflow. Expect small fixes on the first run.</p>
+</div>
+</div>
+<table class="table-striped caption-top table">
+<caption>Pipeline scripts</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
 <th>Script</th>
 <th>Runs on</th>
 <th>Does</th>
-<th>Approach</th>
 </tr>
 </thead>
 <tbody>
@@ -2351,57 +2434,73 @@ vertical-align: -.125em;
 <td><code>00_osm_crossings.py</code></td>
 <td>server</td>
 <td>Reference <code>osm_ingest_local</code> for Cook County → OSM crossing edges</td>
-<td>all</td>
 </tr>
 <tr class="even">
 <td><code>01_build_candidates.py</code></td>
 <td>server</td>
-<td>Intersections with an OSM crossing ≤ 25 m, tagged Chicago/suburban + tile position</td>
-<td>all</td>
+<td>Intersections with an OSM crossing ≤ 25 m, tagged Chicago/suburban + Google tile position</td>
 </tr>
 <tr class="odd">
 <td><code>cc_fetch.py</code></td>
 <td>Modal CPU</td>
-<td>50 m clips: Google z22 (C), county RGB (A), county RGBN (B, pool)</td>
-<td>A, B, C</td>
+<td>50 m clips: Google z22 (A), county RGB (B), county RGB+NIR (canopy pool)</td>
 </tr>
 <tr class="even">
 <td><code>02_select_sample.py</code></td>
 <td>server</td>
-<td>Stratified sample (geography × canopy × tile position) + OSM road lines</td>
-<td>all</td>
+<td>Stratified evaluation sample + separate pilot set</td>
 </tr>
 <tr class="odd">
-<td><code>cc_weights.py</code></td>
-<td>Modal</td>
-<td>Base SAM 2.1 weights to a volume; GPU smoke test</td>
-<td>all</td>
+<td><code>02b_osm_roads.py</code></td>
+<td>server</td>
+<td>OSM drivable centre-lines around clips, for box prompts</td>
 </tr>
 <tr class="even">
-<td><code>cc_segment.py</code></td>
-<td>Modal GPU</td>
-<td>SAM 2.1 masks → drivable polygons (<code>cross_walks.geojson</code>) + QA overlays</td>
-<td>A, C</td>
+<td><code>cc_weights.py</code></td>
+<td>Modal</td>
+<td>SAM 3 checkpoint from Hugging Face to a volume; GPU smoke test</td>
 </tr>
 <tr class="odd">
+<td><code>04_bench_prep.py</code></td>
+<td>server</td>
+<td>Public curb dataset → images, ground-truth road masks, OSM prompt boxes</td>
+</tr>
+<tr class="even">
+<td><code>cc_benchmark.py</code></td>
+<td>Modal GPU</td>
+<td>Scores every SAM 3 configuration against the labels (IoU, boundary F1); <code>--subset holdout</code>, <code>--delta</code></td>
+</tr>
+<tr class="odd">
+<td><code>05_make_holdout.py</code></td>
+<td>server</td>
+<td>Holdout / validation / training split of the curb dataset by original image</td>
+</tr>
+<tr class="even">
+<td><code>cc_finetune.py</code></td>
+<td>Modal GPU</td>
+<td>Fine-tunes SAM 3’s segmentation head on the curb labels → <code>seg_head_best.pt</code></td>
+</tr>
+<tr class="odd">
+<td><code>cc_segment.py</code></td>
+<td>Modal GPU</td>
+<td>Chosen configuration → <code>cross_walks.geojson</code> + QA overlays; pilot grid mode</td>
+</tr>
+<tr class="even">
 <td><code>03_grow_cut.sh</code></td>
 <td>server</td>
 <td>Reference grow-cut, unchanged → <code>refined_crosswalks_v3_0_4.csv</code> (<code>length_ft</code>)</td>
-<td>A, B, C</td>
 </tr>
-<tr class="even">
-<td><code>05_inflate_4band.py</code></td>
-<td>Modal/any</td>
-<td>3 → 4 input channels on the SAM 2.1 patch embedding</td>
-<td>B</td>
+<tr class="odd">
+<td><code>cc_sam3.py</code>, <code>cc_geom.py</code>, <code>cc_common.py</code></td>
+<td>shared</td>
+<td>SAM 3 core; box geometry and metrics; constants</td>
 </tr>
 </tbody>
 </table>
-<p>None of these scripts has yet been run against Modal or the Cook County ImageServer, so expect a round of small fixes on first run; each step below says how to check that it worked.</p>
 </section>
 <section id="server-sizing" class="level2">
 <h2 class="anchored" data-anchor-id="server-sizing">Server Sizing</h2>
-<p>Recommended: <strong>8 vCPU, 32 GB RAM, 250 GB SSD, Ubuntu 24.04 LTS, no GPU.</strong> The server is an orchestrator: SAM inference, fine-tuning, and bulk imagery fetches all run on Modal, so a GPU on the server would sit idle.</p>
+<p>Recommended: <strong>8 vCPU, 32 GB RAM, 250 GB SSD, Ubuntu 24.04 LTS, no GPU.</strong> The server is an orchestrator; SAM 3 inference and bulk fetches run on Modal.</p>
 <table class="table-striped caption-top table">
 <caption>Server resources</caption>
 <colgroup>
@@ -2423,99 +2522,82 @@ vertical-align: -.125em;
 <td>CPU</td>
 <td>4 vCPU</td>
 <td>8 vCPU</td>
-<td>OSM graph build for all of Cook County (long, mostly single-threaded); grow-cut runs 5 threads; R/Quarto alongside</td>
+<td>OSM graph build for all of Cook County (long, mostly single-threaded); grow-cut; R/Quarto alongside</td>
 </tr>
 <tr class="even">
 <td>RAM</td>
 <td>16 GB</td>
 <td>32 GB</td>
-<td><code>osm_ingest_local</code> loads the full <code>network_type=&quot;all&quot;</code>, unsimplified, <code>retain_all</code> graph for the county — the largest single job; 16 GB is tight</td>
+<td><code>osm_ingest_local</code> loads the full, unsimplified <code>network_type=&quot;all&quot;</code> graph for the county — the largest single job</td>
 </tr>
 <tr class="odd">
 <td>Disk</td>
 <td>100 GB</td>
 <td>250 GB SSD</td>
-<td>OS + Python/R environments ~25 GB; OSM cache + outputs &lt; 5 GB; sample QA images &lt; 1 GB. 500 GB only if countywide Aim 1b imagery will be mirrored locally</td>
+<td>OS + environments ~25 GB; OSM cache + outputs &lt; 5 GB; QA images and benchmark &lt; 2 GB</td>
 </tr>
 <tr class="even">
 <td>GPU</td>
 <td>none</td>
 <td>none</td>
-<td>Runs on Modal (L4/L40S/H100 billed per second)</td>
+<td>Runs on Modal (L4 for the smoke test, L40S for benchmark and segmentation)</td>
 </tr>
 <tr class="odd">
-<td>Network</td>
-<td>—</td>
-<td>stable, unmetered</td>
-<td>Overpass downloads; <code>modal volume get</code> of results</td>
-</tr>
-<tr class="even">
 <td>OS</td>
 <td>Ubuntu 22.04</td>
 <td>Ubuntu 24.04 LTS</td>
-<td>uv supplies Python 3.11/3.12 regardless of system Python</td>
+<td>uv supplies Python regardless of system Python</td>
 </tr>
 </tbody>
 </table>
-<p>At Aim 1b scale, the reference study pulled about 2.8 MB per clip (8.3 TB for ~3 million clips) and needed roughly 80,000 clips for Chicago alone <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>. Keep countywide imagery on Modal volumes and download only results.</p>
 <p>Add 8 GB of swap so an OSM build that overshoots RAM slows down instead of being killed:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> fallocate <span class="at">-l</span> 8G /swapfile <span class="kw">&amp;&amp;</span> <span class="fu">sudo</span> chmod 600 /swapfile</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> mkswap /swapfile <span class="kw">&amp;&amp;</span> <span class="fu">sudo</span> swapon /swapfile</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="ubuntu-server-setup" class="level2">
 <h2 class="anchored" data-anchor-id="ubuntu-server-setup">1. Ubuntu Server Setup</h2>
-<p>After this step the server has two Python environments: one for the new Modal 1.x pipeline and one for the reference repo (used locally only).</p>
+<p>The server gets two Python environments: one for the Modal pipeline, and one for the reference repo, which supplies OSM crossing extraction and grow-cut and runs locally only.</p>
 <ol type="1">
 <li><p>System packages:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt update <span class="kw">&amp;&amp;</span> <span class="fu">sudo</span> apt <span class="at">-y</span> upgrade</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt <span class="at">-y</span> install git curl build-essential tmux unzip <span class="dt">\</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    gdal-bin libgdal-dev libspatialindex-dev osmium-tool</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Install uv (manages Python versions and virtual environments):</p>
+<li><p>Install uv:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-LsSf</span> https://astral.sh/uv/install.sh <span class="kw">|</span> <span class="fu">sh</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> ~/.bashrc   <span class="co"># or open a new shell</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> <span class="at">--version</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Unpack the scripts into the existing folders (<code>data/</code>, <code>logs/</code>, <code>pipeline/</code> stay as they are) and add working subfolders:</p>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> ~/.bashrc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p>Unpack the scripts and add working folders:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~ <span class="kw">&amp;&amp;</span> <span class="fu">tar</span> xzf crosswalk_pipeline.tar.gz     <span class="co"># files land in ~/crosswalk/pipeline</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/crosswalk/data/<span class="dt">{inputs</span><span class="op">,</span><span class="dt">osm</span><span class="op">,</span><span class="dt">sample</span><span class="op">,</span><span class="dt">results}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Pipeline environment (Modal 1.x, geopandas, osmnx):</p>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/crosswalk/data/<span class="dt">{inputs</span><span class="op">,</span><span class="dt">osm</span><span class="op">,</span><span class="dt">sample</span><span class="op">,</span><span class="dt">results</span><span class="op">,</span><span class="dt">bench}</span> ~/crosswalk/logs</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p>Pipeline environment (Modal 1.x, geopandas, osmnx, roboflow):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> python install 3.12</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync            <span class="co"># reads pyproject.toml, creates .venv</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-c</span> <span class="st">&quot;import modal, geopandas, osmnx; print(modal.__version__)&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-c</span> <span class="st">&quot;import modal, geopandas, osmnx, roboflow; print(modal.__version__)&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 <li><p>Reference repo, cloned inside the pipeline folder (the scripts expect this path):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/agupta01/crossing-distances.git</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> crossing-distances</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync                        <span class="co"># Python 3.12, modal==0.77 from uv.lock</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> pip install osmnx semver    <span class="co"># osmnx is imported but not in its pyproject</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Copy this project’s intersections (the 169,456-point <code>all_intersections</code> layer, WGS84) into the inputs folder:</p>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync                        <span class="co"># uses its uv.lock: Python 3.12, pandas 2.3, modal 0.77</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> pip install osmnx semver    <span class="co"># osmnx is imported but missing from its pyproject</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Keep grow-cut in this locked environment: under pandas 3.x it fails with <code>TypeError: Invalid value &#39;[]&#39; for dtype &#39;int64&#39;</code>.</p></li>
+<li><p>Copy the project’s intersections into the inputs folder:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> <span class="op">&lt;</span>path-to<span class="op">&gt;</span>/crosswalk-distances-cc/output/all_intersections.<span class="pp">*</span> ~/crosswalk/data/inputs/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 </ol>
-<p>Layout when done:</p>
-<pre><code>~/crosswalk/
-  data/   inputs/  osm/  sample/  results/
-  logs/
-  pipeline/   *.py, 03_grow_cut.sh, pyproject.toml, .venv/
-              crossing-distances/   (reference repo + its own .venv)</code></pre>
 <p>Run long jobs inside <code>tmux new -s cw</code> so they survive a dropped SSH session.</p>
 </section>
 <section id="modal-setup" class="level2">
 <h2 class="anchored" data-anchor-id="modal-setup">2. Modal Setup</h2>
-<p>All project objects live in one Modal environment, <code>cook</code>, so they stay separate from anything else in the workspace.</p>
+<p>All project objects live in one Modal environment, <code>cook</code>.</p>
 <ol type="1">
-<li><p>Create an account at <a href="https://modal.com">modal.com</a> and add billing (see <a href="https://modal.com/pricing">modal.com/pricing</a> for current free credit and GPU rates).</p></li>
-<li><p>Authenticate the headless server. On a laptop, open the Modal dashboard → Settings → API Tokens → <em>New token</em>, then on the server:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal token set <span class="at">--token-id</span> ak-XXXX <span class="at">--token-secret</span> as-XXXX</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>(<code>uv run modal token new</code> also works headless: it prints a URL to open on any machine.) The token is saved to <code>~/.modal.toml</code> and shared by both environments.</p></li>
+<li><p>Create an account at <a href="https://modal.com">modal.com</a> and add billing (<a href="https://modal.com/pricing">pricing</a>).</p></li>
+<li><p>Authenticate the server. In the Modal dashboard, go to Settings → API Tokens → <strong>New token</strong>. The secret is shown only once, so copy the full <code>modal token set …</code> command and run it on the server prefixed with <code>uv run</code>. Alternatively, <code>uv run modal token new</code> prints a URL to approve in any logged-in browser.</p></li>
 <li><p>Create and select the environment:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal environment create cook</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal config set-environment cook</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export MODAL_ENVIRONMENT=cook&#39;</span> <span class="op">&gt;&gt;</span> ~/.bashrc <span class="kw">&amp;&amp;</span> <span class="bu">source</span> ~/.bashrc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The reference code reads <code>MODAL_ENVIRONMENT</code> at import time, so keep it exported.</p></li>
-<li><p>Create the three volumes (the scripts also create them on first use; doing it now confirms access):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> v <span class="kw">in</span> cc-imagery cc-sam2-weights cc-results<span class="kw">;</span> <span class="cf">do</span> <span class="ex">uv</span> run modal volume create <span class="va">$v</span><span class="kw">;</span> <span class="cf">done</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume ls</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal environment create cook</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal config set-environment cook</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export MODAL_ENVIRONMENT=cook&#39;</span> <span class="op">&gt;&gt;</span> ~/.bashrc <span class="kw">&amp;&amp;</span> <span class="bu">source</span> ~/.bashrc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p>Create the volumes:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> v <span class="kw">in</span> cc-imagery cc-sam3-weights cc-results<span class="kw">;</span> <span class="cf">do</span> <span class="ex">uv</span> run modal volume create <span class="va">$v</span><span class="kw">;</span> <span class="cf">done</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -2530,48 +2612,48 @@ vertical-align: -.125em;
 <tbody>
 <tr class="odd">
 <td><code>cc-imagery</code></td>
-<td><code>/C_google</code>, <code>/A_cook_rgb</code>, <code>/B_cook_rgbn</code>, <code>/pool_rgbn</code> GeoTIFF clips</td>
+<td><code>/A_google</code>, <code>/B_cook_rgb</code>, <code>/pool_rgbn</code>, <code>/pilot_A</code>, <code>/pilot_B</code> GeoTIFF clips</td>
 </tr>
 <tr class="even">
-<td><code>cc-sam2-weights</code></td>
-<td><code>/base/…</code> (Meta) and <code>/pcd_finetuned/checkpoint.pt</code> (authors)</td>
+<td><code>cc-sam3-weights</code></td>
+<td><code>/sam3/sam3.pt</code>, <code>/sam3/config.json</code></td>
 </tr>
 <tr class="odd">
 <td><code>cc-results</code></td>
-<td><code>/inputs/osm_drivable.geojson</code>; <code>/&lt;approach&gt;/&lt;run&gt;/cross_walks.geojson</code>, stats, QA images</td>
+<td><code>/inputs/osm_roads.geojson</code>; <code>/bench</code> (benchmark data); <code>/bench_runs/&lt;run&gt;</code>; <code>/&lt;folder&gt;/&lt;run&gt;/</code> segmentation outputs</td>
 </tr>
 </tbody>
 </table></li>
-<li><p>Verify end to end with a 30-second job. Create <code>~/crosswalk/data/sample/test.csv</code> containing:</p>
-<pre class="csv"><code>id,lat,lon
-x,41.878123,-87.629456</code></pre>
-<p>then:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> A <span class="at">--input</span> ../data/sample/test.csv <span class="at">--out-csv</span> ../logs/test_A.csv</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume ls cc-imagery /A_cook_rgb</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Expect <code>done: 1 ok, 0 failed</code> and one <code>.tif</code> listed.</p></li>
+<li><p>Verify with a one-clip fetch. Create <code>~/crosswalk/data/sample/test.csv</code> containing <code>id,lat,lon</code> and <code>x,41.878123,-87.629456</code> on two lines, then:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> B <span class="at">--input</span> ../data/sample/test.csv <span class="at">--out-csv</span> ../logs/test_B.csv</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume ls <span class="at">--env</span> cook cc-imagery /B_cook_rgb</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Expect <code>done: 1 ok, 0 failed</code>. Files live on the Modal volume, not the server; <code>/imagery/...</code> paths in logs are container paths. Use <code>modal volume get</code> to download any file for inspection. The local destination must be a folder that already exists; a remote folder is written inside it under its own name (e.g. <code>/bench_runs/zs1</code> → <code>…/bench/zs1/</code>).</p></li>
 </ol>
-<p>W&amp;B logging is not used by these scripts, so no <code>wandb-secret</code> is needed (the reference inference requires one).</p>
 </section>
-<section id="segment-anything-sam-2.1-setup" class="level2">
-<h2 class="anchored" data-anchor-id="segment-anything-sam-2.1-setup">3. Segment Anything (SAM 2.1) Setup</h2>
-<p>SAM 2.1 runs inside a Modal container image defined in <code>cc_segment.py</code>; nothing is installed on the server except for optional local testing. The model follows the reference study: SAM 2.1 Hiera Base+ (<code>configs/sam2.1/sam2.1_hiera_b+.yaml</code>), images resized to 1024 × 1024, a 16 × 16 point grid <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>.</p>
+<section id="sam-3-and-data-access" class="level2">
+<h2 class="anchored" data-anchor-id="sam-3-and-data-access">3. SAM 3 and Data Access</h2>
+<p>SAM 3 runs inside a Modal container image defined in <code>cc_segment.py</code> (Python 3.12, PyTorch 2.10 for CUDA 12.8, SAM 3 from Meta’s GitHub). Nothing is installed on the server.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>SAM 3 vs. SAM 3.1
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>SAM 3.1 (March 2026) adds <em>Object Multiplex</em>, a faster way to track many objects through video, with a new video checkpoint. Still images use the SAM 3 image checkpoint (<code>facebook/sam3</code>, <code>sam3.pt</code>), which is what this pipeline loads. As of October 2026 no newer Meta image checkpoint exists; recent progress on overhead imagery has come from how SAM 3 is prompted and how its outputs are combined, which this pipeline adopts.</p>
+</div>
+</div>
 <ol type="1">
-<li><p><strong>Container image</strong> (built automatically on the first <code>modal run</code>, ~5–8 min once, then cached): Debian slim, Python 3.11, <code>torch 2.5.1</code> + <code>torchvision 0.20.1</code>, then <code>sam2</code> from Meta’s GitHub with <code>SAM2_BUILD_CUDA=0</code>. That flag skips SAM 2’s optional CUDA extension (used only for hole-filling post-processing); the reference image compiles it with nvcc, the most fragile part of their build.</p></li>
-<li><p><strong>Base weights</strong> (Meta, public, ~320 MB) straight into the volume, no server download:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_weights.py <span class="at">--action</span> base</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p><strong>Fine-tuned weights</strong> (from the authors; see <em>Read First</em>). The reference loads <code>&lt;run&gt;/checkpoints/checkpoint.pt</code> saved by SAM 2’s training script — a dict with a <code>&quot;model&quot;</code> key, the format <code>build_sam2()</code> expects. Upload it:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put cc-sam2-weights ~/Downloads/checkpoint.pt /pcd_finetuned/checkpoint.pt</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Ask the authors which run is production (their inference defaults to <code>train_9</code>; their grow-cut reads <code>train_10</code> output) and record the answer in <code>data/results/README</code>.</p></li>
-<li><p><strong>Smoke test</strong> on an L4 (a minute or two):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_weights.py <span class="at">--action</span> smoke-test <span class="at">--checkpoint</span> base/sam2.1_hiera_base_plus.pt</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_weights.py <span class="at">--action</span> smoke-test <span class="at">--checkpoint</span> pcd_finetuned/checkpoint.pt</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Expect <code>OK: torch 2.5.1…, GPU NVIDIA L4, N masks</code>. A <code>RuntimeError</code> right after a <code>missing_keys</code>/<code>unexpected_keys</code> log means the checkpoint is not a SAM 2.1 b+ state dict (wrong model size or a SAM 2.0 file).</p></li>
-<li><p><strong>Optional local CPU install</strong> for reading code or debugging masks on the server (slow; not used by the pipeline):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk <span class="kw">&amp;&amp;</span> <span class="ex">uv</span> venv sam-local <span class="at">--python</span> 3.11 <span class="kw">&amp;&amp;</span> <span class="bu">source</span> sam-local/bin/activate</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> pip install torch==2.5.1 torchvision==0.20.1 <span class="at">--index-url</span> https://download.pytorch.org/whl/cpu</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="va">SAM2_BUILD_CUDA</span><span class="op">=</span>0 <span class="ex">uv</span> pip install <span class="st">&#39;git+https://github.com/facebookresearch/sam2.git&#39;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p><strong>If fine-tuning</strong> (needed for Approach B, optional otherwise): the reference trained with a fork of SAM 2’s training code (<code>DSC-Qian/sam2</code>, config <code>configs/train.yaml</code>) on an H100, using 193 hand-labelled high-entropy images augmented to 5,790 <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>. Labels marked all <em>non-drivable</em> surfaces (sidewalks, buildings, parks, refuge islands) and left roads unlabelled. Annotate in COCO format (Roboflow or CVAT export) so SAM 2’s training loader can read it; the repo’s <code>sam2-fine-tune-roboflow.ipynb</code> shows the authors’ Roboflow route.</p></li>
+<li><p><strong>SAM 3 weights.</strong> Request access at <a href="https://huggingface.co/facebook/sam3">huggingface.co/facebook/sam3</a> (accept Meta’s licence terms; wait for approval). Create a read token under Settings → Access Tokens, store it as a Modal secret, then download and smoke-test:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal secret create huggingface HF_TOKEN=hf_XXXX</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_weights.py <span class="at">--action</span> download</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_weights.py <span class="at">--action</span> smoke-test</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The first run builds the SAM 3 image (several minutes, once). Expect <code>OK: torch 2.10…, GPU NVIDIA L4, prompt &#39;road&#39; -&gt; N instance(s)</code>.</p></li>
+<li><p><strong>Roboflow API key</strong> (for the benchmark dataset). Create a free account at <a href="https://roboflow.com">roboflow.com</a> and copy your API key from workspace settings. Use the project’s own key; the reference repo’s notebook contains the original authors’ key, which should not be used.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export ROBOFLOW_API_KEY=xxxx&#39;</span> <span class="op">&gt;&gt;</span> ~/.bashrc <span class="kw">&amp;&amp;</span> <span class="bu">source</span> ~/.bashrc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 </ol>
 </section>
 <section id="run-the-comparison-pipeline" class="level2">
@@ -2579,88 +2661,150 @@ x,41.878123,-87.629456</code></pre>
 <p>Run every command from <code>~/crosswalk/pipeline</code> with <code>MODAL_ENVIRONMENT=cook</code> exported unless a step says otherwise. Each step ends with its check.</p>
 <section id="osm-crossing-edges-for-cook-county" class="level3">
 <h3 class="anchored" data-anchor-id="osm-crossing-edges-for-cook-county">4.1 OSM crossing edges for Cook County</h3>
-<p>Server, 30–90 min, the RAM-heavy step. Uses the reference repo’s own extraction, so seed edges match the method:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline/crossing-distances</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">nohup</span> uv run python ../00_osm_crossings.py <span class="at">--place</span> <span class="st">&quot;Cook County, Illinois, USA&quot;</span> <span class="dt">\</span></span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ~/crosswalk/data/osm <span class="op">&gt;</span> ~/crosswalk/logs/osm_ingest.log <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">&amp;</span></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-f</span> ~/crosswalk/logs/osm_ingest.log</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Server, 30–90 min, the RAM-heavy step. Uses the reference repo’s own extraction, so the lines grow-cut measures along match the reference method:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline/crossing-distances</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">nohup</span> uv run python ../00_osm_crossings.py <span class="at">--place</span> <span class="st">&quot;Cook County, Illinois, USA&quot;</span> <span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ~/crosswalk/data/osm <span class="op">&gt;</span> ~/crosswalk/logs/osm_ingest.log <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">&amp;</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-f</span> ~/crosswalk/logs/osm_ingest.log</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If Overpass times out, add <code>--overpass-url https://overpass.kumi.systems/api</code>. <strong>Check:</strong> <code>data/osm/crosswalk_edges_v2_0.shp</code> exists and holds tens of thousands of lines.</p>
 </section>
 <section id="candidate-pool" class="level3">
 <h3 class="anchored" data-anchor-id="candidate-pool">4.2 Candidate pool</h3>
-<p>Server, seconds:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 01_build_candidates.py <span class="at">--intersections</span> ../data/inputs/all_intersections.shp <span class="dt">\</span></span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--crosswalk-edges</span> ../data/osm/crosswalk_edges_v2_0.shp <span class="dt">\</span></span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../data/sample/candidates.csv <span class="at">--pool-per-group</span> 300</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Keeps intersections with an OSM crossing within 25 m (measured in EPSG:3435), labels them <code>chicago</code>/<code>suburban</code>, computes <code>tile_offset</code> (0 = centre, 1 = edge of the zoom-19 Web Mercator tile), and draws 300 per geography. <strong>Check:</strong> the printed count per group is 300.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/crosswalk/pipeline</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 01_build_candidates.py <span class="at">--intersections</span> ../data/inputs/all_intersections.shp <span class="dt">\</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--crosswalk-edges</span> ../data/osm/crosswalk_edges_v2_0.shp <span class="dt">\</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../data/sample/candidates.csv <span class="at">--pool-per-group</span> 300</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Keeps intersections with an OSM crossing within 25 m (measured in EPSG:3435), labels them <code>chicago</code>/<code>suburban</code>, computes <code>tile_offset</code> (0 = centre, 1 = edge of the zoom-19 Web Mercator tile), and draws up to 300 per geography. <strong>Check:</strong> the printed count per group is 300.</p>
 </section>
-<section id="canopy-screen-4-band-clips-for-the-pool" class="level3">
-<h3 class="anchored" data-anchor-id="canopy-screen-4-band-clips-for-the-pool">4.3 Canopy screen: 4-band clips for the pool</h3>
-<p>Modal CPU, ~600 requests at 8 at a time, a few minutes:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> pool <span class="at">--input</span> ../data/sample/candidates.csv <span class="dt">\</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out-csv</span> ../data/sample/pool_ndvi.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Each clip gets <code>veg_frac</code>, the share of pixels with NDVI &gt; 0.2. <strong>Check:</strong> <code>pool_ndvi.csv</code> has <code>veg_frac</code> values spread between 0 and ~0.8 and few <code>error</code> rows.</p>
+<section id="canopy-screen" class="level3">
+<h3 class="anchored" data-anchor-id="canopy-screen">4.3 Canopy screen</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> pool <span class="at">--input</span> ../data/sample/candidates.csv <span class="dt">\</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out-csv</span> ../data/sample/pool_ndvi.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Each 4-band clip gets <code>veg_frac</code>, the share of pixels with NDVI &gt; 0.2. <strong>Check:</strong> <code>veg_frac</code> spreads between 0 and ~0.8, with few <code>error</code> rows.</p>
 </section>
-<section id="stratified-sample-and-osm-road-lines" class="level3">
-<h3 class="anchored" data-anchor-id="stratified-sample-and-osm-road-lines">4.4 Stratified sample and OSM road lines</h3>
-<p>Server, ~1 min:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 02_select_sample.py <span class="at">--candidates</span> ../data/sample/candidates.csv <span class="dt">\</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--ndvi</span> ../data/sample/pool_ndvi.csv <span class="at">--n</span> 150 <span class="dt">\</span></span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../data/sample/sample.csv <span class="at">--osm-out</span> ../data/sample/osm_drivable.geojson</span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put cc-results ../data/sample/osm_drivable.geojson /inputs/osm_drivable.geojson</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Eight cells (geography × canopy high/low terciles × tile centre/edge), ~19 each. <strong>Check:</strong> the printed cell table; thin cells mean the pool needs to be larger (<code>--pool-per-group 600</code> in 4.2).</p>
+<section id="evaluation-sample-and-pilot-set" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-sample-and-pilot-set">4.4 Evaluation sample and pilot set</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 02_select_sample.py <span class="at">--candidates</span> ../data/sample/candidates.csv <span class="dt">\</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--ndvi</span> ../data/sample/pool_ndvi.csv <span class="at">--n</span> 150 <span class="at">--n-pilot</span> 30 <span class="dt">\</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../data/sample/sample.csv <span class="at">--pilot-out</span> ../data/sample/pilot.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The evaluation sample has 8 strata (geography × canopy high/low terciles × tile centre/edge) of 19 each, 152 in total; the pilot set is 30 other intersections. <strong>Check:</strong> the printed stratum table; thin cells mean the pool needs to be larger (<code>--pool-per-group 600</code> in 4.2).</p>
 </section>
-<section id="imagery-for-the-sample" class="level3">
-<h3 class="anchored" data-anchor-id="imagery-for-the-sample">4.5 Imagery for the sample</h3>
-<p>Modal CPU:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> C <span class="at">--input</span> ../data/sample/sample.csv <span class="at">--out-csv</span> ../logs/fetch_C.csv</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> A <span class="at">--input</span> ../data/sample/sample.csv <span class="at">--out-csv</span> ../logs/fetch_A.csv</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> B <span class="at">--input</span> ../data/sample/sample.csv <span class="at">--out-csv</span> ../logs/fetch_B.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Check:</strong> zero <code>error</code> rows; <code>ground_res_m</code> ≈ 0.028 for C (zoom 22 at Chicago’s latitude) and ≈ 0.049 for A/B (1024 px over 50 m). Pull a few to inspect: <code>uv run modal volume get cc-imagery /A_cook_rgb ../data/results/peek_A</code>.</p>
+<section id="osm-road-centre-lines-for-box-prompts" class="level3">
+<h3 class="anchored" data-anchor-id="osm-road-centre-lines-for-box-prompts">4.5 OSM road centre-lines for box prompts</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 02b_osm_roads.py <span class="at">--inputs</span> ../data/sample/sample.csv,../data/sample/pilot.csv <span class="dt">\</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--out</span> ../data/sample/osm_roads.geojson</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put <span class="at">--env</span> cook cc-results ../data/sample/osm_roads.geojson /inputs/osm_roads.geojson</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Drivable classes only (trunk, primary, secondary, tertiary, unclassified, residential, living streets, busways, and motorway links); service roads, alleys, and private access are excluded. <strong>Check:</strong> a few thousand lines; open the file in QGIS over the sample points.</p>
+</section>
+<section id="benchmark-on-labelled-data" class="level3">
+<h3 class="anchored" data-anchor-id="benchmark-on-labelled-data">4.6 Benchmark on labelled data</h3>
+<p>Choose the SAM 3 configuration by measurement, not by eye. The public <a href="https://universe.roboflow.com/pcd-rxiqe/satellite-curb-segmentation">Satellite Curb Segmentation</a> dataset (CC BY 4.0) is hand-labelled Google clips of US intersections from the reference study, with sidewalks, buildings, parks, and refuge islands marked non-drivable — exactly this task.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 04_bench_prep.py <span class="at">--list-versions</span>          <span class="co"># pick the version with the reference clips</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 04_bench_prep.py <span class="at">--version</span> 15 <span class="at">--out</span> ../data/bench</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume rm <span class="at">--env</span> cook <span class="at">-r</span> cc-results /bench      <span class="co"># clear any earlier benchmark set (ignore &#39;not found&#39;)</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put <span class="at">--env</span> cook cc-results ../data/bench /bench</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_benchmark.py <span class="at">--run-name</span> zs1</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data/results/bench</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume get <span class="at">--env</span> cook <span class="at">--force</span> cc-results /bench_runs/zs1 ../data/results/bench/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>04_bench_prep.py</code> uses all splits and drops Roboflow’s augmented duplicates (copies named <code>&lt;original&gt;.rf.&lt;hash&gt;.jpg</code>), keeping the test/valid copy where one exists. It prints a table of image sources: version 6 mixes the reference study’s coordinate-named Google clips with Esri patches (e.g. <code>boston_patch_2_esri</code>) and screenshots. OSM boxes can only be placed on unaugmented clips whose file names carry coordinates; all other images are scored with text prompts, and box-mode configurations fall back to text on them (<code>box_fallback</code> in the summary). Choose the version first: <code>--list-versions</code> prints each version’s image count, splits, date, and augmentation. Version 6 — the one named in the reference repo’s notebook — now holds only 15 Esri patches and screenshots and no coordinate-named clips, so it cannot benchmark box prompts or stand in for Google imagery. Version 15 (May 2025) is the reference study’s set: 579 training images are 193 originals × 3 augmented copies, plus 15 test images. After de-duplication it yields 208 images, 165 of them coordinate-named Google clips (157 train, 8 test); the rest are Esri patches, screenshots, and clips named by ID. Text-prompt configurations are scored on all 208. OSM boxes go only on the 8 unaugmented test clips, too few to judge box modes. To evaluate box prompts on all 165 clips, fork the dataset into your own Roboflow workspace (Fork Dataset on its Universe page), generate a version with no augmentation, and run the prep with <code>--workspace &lt;your-workspace&gt; --project &lt;your-project&gt; --version &lt;N&gt;</code>. The default grid is 45 configurations: 3 modes × 3 fusions × 4 phrases (“road”, “street”, “roadway”, “asphalt road”) × with/without negatives. Box-only mode has no phrase, and instance fusion has no negatives, which brings the count down from the full product to 45.</p>
+<p>In <code>../data/results/bench/zs1/</code>, <code>summary.csv</code> ranks configurations by mean <strong>boundary F1 at 0.5 m</strong> — how closely the predicted road edge follows the true curb, the quantity grow-cut cuts on — with IoU alongside. <code>summary_by_source.csv</code> repeats the scores by image source and by whether OSM boxes were available; judge box modes only on the <code>has_boxes = True</code> rows, and give most weight to the coordinate-named Google clips, which match candidate A’s imagery. The 0.5 m tolerance assumes a 50 m clip; for Esri patches and screenshots the scale is unknown, so there it is a fixed ~10 px tolerance, comparable across configurations but not in metres. Review <code>qa/&lt;config&gt;/</code> for the top few: road tinted, predicted edge magenta, true curb green, prompt boxes yellow.</p>
+<p><strong>Round 2 (after the first run).</strong> On the 165 Google clips the first run’s best setting (“road”, fused) reached IoU 0.65 but boundary F1 of only 0.35, and predicted road area was a median 77% of the true drivable area. SAM 3’s “road” leaves out parked cars, crosswalk paint and shadows that the labels count as drivable, and each hole adds a false edge inside the road. A second grid tests fixes for that:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_benchmark.py <span class="at">--run-name</span> zs3 <span class="at">--modes</span> text <span class="at">--fusions</span> fused <span class="dt">\</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prompt-sets</span> <span class="st">&quot;road;road,car,crosswalk&quot;</span> <span class="at">--negative-sets</span> <span class="st">&quot;;sidewalk,grass,building,tree&quot;</span> <span class="dt">\</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prob-thds</span> 0.3,0.2,0.15 <span class="at">--fill-holes</span> 0,10,25 <span class="at">--rules</span> positive,complement</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>45 configurations. <code>summary.csv</code> now also reports boundary F1 at 1.0 m (<code>bf1_1m_mean</code>) and the median predicted/true road area (<code>area_ratio_median</code>, below 1 = road under-called).</p>
+<p><strong>Round 2 result.</strong> The best zero-shot setting on the 165 Google clips was “road, car, crosswalk” with negatives “sidewalk, grass, building, tree”, fused, threshold 0.15, holes under 25 m² filled: boundary F1 0.44 at 0.5 m and 0.55 at 1 m, IoU 0.70, road area 93% of true. The threshold, the negatives and the hole fill each added 2–3 points; the complement rule was worse (over-calls road by about 20%). Record this as the zero-shot baseline in <code>data/results/README</code>. At this level fewer than half the clips have a curb edge within 1 m of the truth along most of its length, which is too weak to hand to grow-cut, so fine-tune (4.7) and compare on held-out clips before choosing.</p>
+</section>
+<section id="fine-tune-sam-3-on-the-curb-labels" class="level3">
+<h3 class="anchored" data-anchor-id="fine-tune-sam-3-on-the-curb-labels">4.7 Fine-tune SAM 3 on the curb labels</h3>
+<p>Zero-shot SAM 3’s notion of “road” is not the labels’ notion of drivable surface (curb to curb, parked cars and paint included). <code>cc_finetune.py</code> retrains only SAM 3’s segmentation head — 2.3 M of its ~850 M parameters: the pixel decoder, the prompt cross-attention and the semantic head — on the curb dataset, with the image and text encoders frozen. The loss is binary cross-entropy weighted up to 5× within about 1 m of a true curb, plus Dice. Training adds random rotations, flips and mild colour jitter on top of Roboflow’s own augmented copies. The result is a small file (about 10 MB) that is loaded on top of the standard SAM 3 checkpoint, so one model serves both candidates.</p>
+<p><strong>Split by original image.</strong> Roboflow stores three augmented copies of each training image, so the split is made by original name: a copy of a test image in training would leak its labels. <code>05_make_holdout.py</code> sets aside 40 coordinate-named Google clips as the <strong>holdout</strong> (all 8 test-split clips, then 32 random training originals; seed 2026) and 15 other originals as <strong>validation</strong>, used only to pick the best epoch. Everything else is training data (about 450 images with copies).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># training set: all splits, augmented copies kept, no OSM boxes</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 04_bench_prep.py <span class="at">--version</span> 15 <span class="at">--keep-duplicates</span> <span class="at">--no-osm</span> <span class="at">--out</span> ../data/train_full</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put <span class="at">--env</span> cook <span class="at">--force</span> cc-results ../data/train_full /train_full</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="co"># holdout / validation / training split, from the de-duplicated benchmark set of 4.6</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python 05_make_holdout.py <span class="at">--meta</span> ../data/bench/meta.json <span class="at">--out</span> ../data/bench/holdout.json</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume put <span class="at">--env</span> cook <span class="at">--force</span> cc-results ../data/bench/holdout.json /bench/holdout.json</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co"># plumbing test (~5 min): 20 images, one validation pass before and after</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_finetune.py <span class="at">--run-name</span> smoke <span class="at">--epochs</span> 1 <span class="at">--max-steps</span> 20</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="co"># full run (L40S, roughly an hour)</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_finetune.py <span class="at">--run-name</span> ft1 <span class="at">--epochs</span> 12</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data/results/finetune</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume get <span class="at">--env</span> cook <span class="at">--force</span> cc-results /finetune_runs/ft1 ../data/results/finetune/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>05_make_holdout.py</code> prints <code>holdout 40 (Google clips; 8 from the test split) | val 15 | train 153 originals</code>. The training log prints the number of training images and confirms that the 40 holdout originals are excluded. Each epoch prints the training loss and the validation IoU and boundary F1 (semantic fusion, threshold 0.4, holes under 25 m² filled); epoch 0 is the untrained head, for reference. The head with the best validation boundary F1 is saved to <code>cc-sam3-weights:/finetuned/ft1/seg_head_best.pt</code> and the final epoch to <code>seg_head_last.pt</code>; <code>log.csv</code> holds the curve. <strong>Check:</strong> validation boundary F1 rises clearly above epoch 0 within a few epochs. If the training loss keeps falling while validation turns down, the best-epoch file has already captured the peak; a second run with <code>--lr 5e-5</code> or <code>--curb-weight 2</code> is the first thing to try.</p>
+<p><strong>Score on the holdout.</strong> Run the zero-shot baseline and the fine-tuned head on the same 40 holdout clips:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_benchmark.py <span class="at">--run-name</span> ho_zs <span class="at">--subset</span> holdout <span class="at">--modes</span> text <span class="at">--fusions</span> fused <span class="dt">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prompt-sets</span> <span class="st">&quot;road,car,crosswalk&quot;</span> <span class="at">--negative-sets</span> <span class="st">&quot;sidewalk,grass,building,tree&quot;</span> <span class="dt">\</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prob-thds</span> 0.15 <span class="at">--fill-holes</span> 25</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_benchmark.py <span class="at">--run-name</span> ho_ft1 <span class="at">--subset</span> holdout <span class="dt">\</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--delta</span> finetuned/ft1/seg_head_best.pt <span class="at">--modes</span> text <span class="at">--fusions</span> semantic,fused <span class="dt">\</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prompt-sets</span> <span class="st">&quot;road&quot;</span> <span class="at">--negative-sets</span> <span class="st">&quot;;sidewalk,grass,building,tree&quot;</span> <span class="dt">\</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prob-thds</span> 0.3,0.4,0.5 <span class="at">--fill-holes</span> 0,25</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume get <span class="at">--env</span> cook <span class="at">--force</span> cc-results /bench_runs/ho_zs ../data/results/bench/</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume get <span class="at">--env</span> cook <span class="at">--force</span> cc-results /bench_runs/ho_ft1 ../data/results/bench/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Both runs print <code>subset holdout: 40 of 40 listed originals found</code>. The head is trained on the semantic map for “road”, so semantic fusion with “road” alone is the expected winner; the fused and negative-class variants check whether the instance masks or other phrases still help. The zero-shot baseline’s settings were chosen on all 165 clips, holdout included, so its holdout score is, if anything, flattering. <strong>Choose:</strong> adopt the fine-tuned head if its best configuration beats the baseline’s boundary F1 by more than ~0.05 on the holdout and its QA overlays (<code>qa/&lt;config&gt;/</code>) follow the curbs. Record both scores, the run name, and the chosen configuration in <code>data/results/README</code>. Then use <code>--delta finetuned/ft1/seg_head_best.pt</code> with that configuration in 4.8 and 4.10.</p>
+</section>
+<section id="county-pilot-check" class="level3">
+<h3 class="anchored" data-anchor-id="county-pilot-check">4.8 County pilot check</h3>
+<p>The benchmark is Google imagery only. Check that the top two or three configurations behave on county imagery too, on the pilot set (no labels; visual check):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> A <span class="at">--input</span> ../data/sample/pilot.csv <span class="at">--subdir</span> pilot_A <span class="at">--out-csv</span> ../logs/pilot_A.csv</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> B <span class="at">--input</span> ../data/sample/pilot.csv <span class="at">--subdir</span> pilot_B <span class="at">--out-csv</span> ../logs/pilot_B.csv</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> A <span class="at">--input-dir</span> pilot_A <span class="at">--pilot</span> <span class="at">--run-name</span> pilot <span class="dt">\</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--modes</span> <span class="st">&quot;text+box&quot;</span> <span class="at">--fusions</span> fused <span class="at">--prompt-sets</span> <span class="st">&quot;road&quot;</span> <span class="at">--negative-sets</span> <span class="st">&quot;;sidewalk,grass,building&quot;</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> B <span class="at">--input-dir</span> pilot_B <span class="at">--pilot</span> <span class="at">--run-name</span> pilot <span class="dt">\</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--modes</span> <span class="st">&quot;text+box&quot;</span> <span class="at">--fusions</span> fused <span class="at">--prompt-sets</span> <span class="st">&quot;road&quot;</span> <span class="at">--negative-sets</span> <span class="st">&quot;;sidewalk,grass,building&quot;</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data/results/pilot_B</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal volume get <span class="at">--env</span> cook <span class="at">--force</span> cc-results /pilot_B/pilot ../data/results/pilot_B/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Set <code>--modes/--fusions/--prompt-sets/--negative-sets</code> to the finalists from 4.6 and 4.7 (the values above are an example), and add <code>--delta finetuned/ft1/seg_head_best.pt</code> if the fine-tuned head was adopted. Each configuration gets its own folder of QA overlays, and <code>pilot_summary.csv</code> reports road fraction, empty-mask rate, and box fall-backs. <strong>Check:</strong> curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B’s segmentation quality is measured rather than assumed.</p>
+</section>
+<section id="imagery-for-the-evaluation-sample" class="level3">
+<h3 class="anchored" data-anchor-id="imagery-for-the-evaluation-sample">4.9 Imagery for the evaluation sample</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> A <span class="at">--input</span> ../data/sample/sample.csv <span class="at">--out-csv</span> ../logs/fetch_A.csv</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_fetch.py <span class="at">--source</span> B <span class="at">--input</span> ../data/sample/sample.csv <span class="at">--out-csv</span> ../logs/fetch_B.csv</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Check:</strong> zero <code>error</code> rows; <code>ground_res_m</code> ≈ 0.028 for A (zoom 22 at Chicago’s latitude) and ≈ 0.049 for B (1024 px over 50 m).</p>
 </section>
 <section id="segmentation" class="level3">
-<h3 class="anchored" data-anchor-id="segmentation">4.6 Segmentation</h3>
-<p>Modal GPU (L40S); ~150 images ≈ 10–20 min per run:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> C <span class="at">--checkpoint</span> pcd_finetuned/checkpoint.pt <span class="at">--run-name</span> ft</span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> A <span class="at">--checkpoint</span> pcd_finetuned/checkpoint.pt <span class="at">--run-name</span> ft</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Before the authors’ weights arrive, test the plumbing with <code>--checkpoint base/sam2.1_hiera_base_plus.pt --run-name base --limit 10</code>. <strong>Check:</strong> <code>segment_stats.csv</code> shows <code>kept</code> &gt; 0 on most images, and the QA overlays (<code>uv run modal volume get cc-results /A_cook_rgb/ft/qa ../data/results/qa_A</code>) show magenta on sidewalks and buildings, not roads.</p>
+<h3 class="anchored" data-anchor-id="segmentation">4.10 Segmentation</h3>
+<p>Run the frozen configuration on both candidates (example values shown, for the fine-tuned head from 4.7; for the zero-shot baseline drop <code>--delta</code> and use <code>--fusion fused --prompts &quot;road,car,crosswalk&quot; --negatives &quot;sidewalk,grass,building,tree&quot; --prob-thd 0.15 --fill-holes-m2 25</code>):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> A <span class="at">--mode</span> text <span class="at">--fusion</span> semantic <span class="at">--prompts</span> road <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prob-thd</span> 0.4 <span class="at">--fill-holes-m2</span> 25 <span class="at">--delta</span> finetuned/ft1/seg_head_best.pt <span class="at">--run-name</span> v1</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run modal run cc_segment.py <span class="at">--source</span> B <span class="at">--mode</span> text <span class="at">--fusion</span> semantic <span class="at">--prompts</span> road <span class="dt">\</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--prob-thd</span> 0.4 <span class="at">--fill-holes-m2</span> 25 <span class="at">--delta</span> finetuned/ft1/seg_head_best.pt <span class="at">--run-name</span> v1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Add <code>--limit 10</code> for a first plumbing run. <strong>Check:</strong> in <code>segment_stats.csv</code>, <code>empty</code> is false and <code>box_fallback_to_text</code> is rare on nearly all clips; the QA overlays (<code>mkdir -p ../data/results/qa_B &amp;&amp; uv run modal volume get --env cook --force cc-results /B_cook_rgb/v1/qa ../data/results/qa_B/</code>) follow the curbs.</p>
 </section>
 <section id="grow-cut" class="level3">
-<h3 class="anchored" data-anchor-id="grow-cut">4.7 Grow-cut</h3>
-<p>Server, minutes; reference code unchanged:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./03_grow_cut.sh</span> C ft</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./03_grow_cut.sh</span> A ft</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Output per approach in <code>data/results/&lt;approach&gt;/ft/</code>: <code>refined_crosswalks_v3_0_4.geojson</code> and <code>.csv</code> with <code>length_ft</code>. <strong>Check:</strong> line counts per approach are similar and lengths fall mostly between 20 and 100 ft.</p>
+<h3 class="anchored" data-anchor-id="grow-cut">4.11 Grow-cut</h3>
+<p>Server, minutes; the reference code runs unchanged in its locked environment:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./03_grow_cut.sh</span> A v1</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./03_grow_cut.sh</span> B v1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Output per candidate in <code>data/results/&lt;folder&gt;/v1/</code>: <code>refined_crosswalks_v3_0_4.geojson</code> and <code>.csv</code> with <code>length_ft</code>. <strong>Check:</strong> similar line counts for A and B; lengths mostly between 20 and 100 ft.</p>
 </section>
-<section id="post-filter-before-comparing" class="level3">
-<h3 class="anchored" data-anchor-id="post-filter-before-comparing">4.8 Post-filter before comparing</h3>
-<p>The reference drops crossings shorter than 6 ft or longer than 160 ft <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>; that filter is not in <code>grow_cut.py</code>, so apply it in R when joining the three approaches to the ground-truth table.</p>
-<p>Ground truth (manual measurement) and the paired comparison are not scripted here; the QA overlays from 4.6 are a convenient base for the manual measurement pass.</p>
+<section id="hand-off-to-the-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="hand-off-to-the-comparison">4.12 Hand-off to the comparison</h3>
+<p>Apply the reference study’s plausibility filter — drop crossings shorter than 6 ft or longer than 160 ft <span class="citation" data-cites="moran2026scaling">(<a href="#ref-moran2026scaling" role="doc-biblioref">Moran et al. 2026</a>)</span>, which <code>grow_cut.py</code> does not apply — when joining A and B to the ground-truth table in R. The QA overlays from 4.10 are a convenient base for the manual measurement pass.</p>
 </section>
-</section>
-<section id="approach-b-4-band-model" class="level2">
-<h2 class="anchored" data-anchor-id="approach-b-4-band-model">5. Approach B: 4-Band Model</h2>
-<p>Approach B is a separate ML sub-project: the clips are already fetched in 4.5, but the model needs surgery, labels, and a training run before <code>cc_segment.py</code> can use it.</p>
-<ol type="1">
-<li><strong>Inflate the input layer.</strong> SAM 2’s Hiera trunk builds its patch embedding (<code>image_encoder.trunk.patch_embed.proj</code>, a 7 × 7 stride-4 <code>Conv2d</code>) with a hard-coded 3 input channels, and <code>build_sam2()</code> loads checkpoints strictly. Inflation therefore happens on the built model, not the checkpoint file: <code>05_inflate_4band.py</code> builds the 3-channel model from the fine-tuned checkpoint, swaps in a 4-channel conv (RGB filters copied, NIR filters zero), and saves the state dict. On RGB input the result is identical to the original.</li>
-<li><strong>Normalisation.</strong> SAM 2 normalises inputs with ImageNet mean/std for 3 channels (<code>sam2/utils/transforms.py</code>, <code>SAM2Transforms</code>). Extend both lists to 4 values, using the NIR band’s mean/std computed from the <code>pool_rgbn</code> clips.</li>
-<li><strong>Loading.</strong> Build the 3-channel model with no checkpoint (<code>build_sam2(cfg, None)</code>), call <code>inflate_to_4band(model)</code>, then <code>model.load_state_dict(torch.load(path)[&quot;model&quot;])</code>. <code>cc_segment.py</code> needs that branch plus reading all 4 bands; add it once training works.</li>
-<li><strong>Labels.</strong> If the authors’ annotations are georeferenced polygons, rasterise them onto the county clips’ grid (each GeoTIFF carries its transform). If they are pixel masks tied to Google tiles, annotate new county clips; the reference used 193 images, so plan for 100–200.</li>
-<li><strong>Training on Modal.</strong> One A10G or L4 is enough for patch-embed + mask-decoder training with the trunk frozen. Prototype the loop in Colab or <code>modal shell</code> first, then wrap it in a <code>@app.function(gpu=&quot;L4&quot;, timeout=6*3600)</code> that writes checkpoints to <code>cc-sam2-weights:/pcd_4band/</code>.</li>
-<li><strong>Decision rule</strong> (from <code>phase01_crosswalk_models.qmd</code>): carry B forward only if it beats A on error against ground truth, especially at high-canopy sites.</li>
-</ol>
 </section>
 <section id="notes-and-troubleshooting" class="level2">
-<h2 class="anchored" data-anchor-id="notes-and-troubleshooting">6. Notes and Troubleshooting</h2>
-<section id="native-resolution-vs.-resampling" class="level3">
-<h3 class="anchored" data-anchor-id="native-resolution-vs.-resampling">Native resolution vs. resampling</h3>
-<p>The “native 6-inch vs. resampled” open question mostly dissolves. SAM 2.1 resizes every image to 1024 px, so what the model sees is set by the clip’s footprint, not the pixel count requested. With the reference 50 m clip, the model input is ~4.9 cm/px for every approach. County imagery at 15 cm and Google zoom 22 (~2.8 cm/px nominal at Chicago’s latitude, itself upsampled from coarser source imagery) both pass through that same grid. Keep the 25 m radius fixed; changing it is the real knob, and it changes what the model was tuned on. The paper’s “30 cm per pixel, 1629 × 1629” figure does not match its code’s zoom-22 setting; the <code>ground_res_m</code> column in the fetch logs records what each clip actually is.</p>
+<h2 class="anchored" data-anchor-id="notes-and-troubleshooting">5. Notes and Troubleshooting</h2>
+<section id="why-boxes-from-osm" class="level3">
+<h3 class="anchored" data-anchor-id="why-boxes-from-osm">Why boxes from OSM</h3>
+<p>Each box is a 5 m square on an OSM road centre-line, placed on the first ring (15, 11, then 19 m from the clip centre) that crosses a road, so boxes sit on the approach legs rather than in the intersection box. Up to four boxes, at least 6 m apart, fully inside the clip. Typical OSM centre-line offsets of 1–2 m keep a 5 m box on pavement for streets at least ~9 m wide; on narrower streets a box can touch a parkway, which the benchmark and QA overlays will show. Clips with no OSM road nearby fall back to text, flagged in <code>box_fallback_to_text</code>.</p>
 </section>
-<section id="deviations-from-the-reference-code" class="level3">
-<h3 class="anchored" data-anchor-id="deviations-from-the-reference-code">Deviations from the reference code</h3>
+<section id="resolution" class="level3">
+<h3 class="anchored" data-anchor-id="resolution">Resolution</h3>
+<p>SAM 3 resizes every input to 1008 × 1008, so what the model sees is set by the clip footprint, not the pixel count requested. With the 50 m clip, both candidates reach the model at about 5 cm per pixel. Keep the 25 m radius fixed across candidates and across the benchmark (whose clips use the same radius).</p>
+</section>
+<section id="if-the-fine-tuned-head-is-still-not-enough" class="level3">
+<h3 class="anchored" data-anchor-id="if-the-fine-tuned-head-is-still-not-enough">If the fine-tuned head is still not enough</h3>
+<p>4.7 retrains only the segmentation head. Next steps, in order of cost: (1) more labels from your own imagery — 50–100 county clips labelled the same way, added to training, also make candidate B’s quality measurable; (2) also unfreeze the last blocks of the fusion encoder (more memory, higher overfitting risk on ~200 originals); (3) a small segmentation head on Meta’s satellite-pretrained DINOv3 backbone (<a href="https://huggingface.co/facebook/dinov3-vitl16-pretrain-sat493m"><code>dinov3-vitl16-pretrain-sat493m</code></a>). Score each on the same holdout before using it.</p>
+</section>
+<section id="differences-from-the-reference-code" class="level3">
+<h3 class="anchored" data-anchor-id="differences-from-the-reference-code">Differences from the reference code</h3>
 <table class="table-striped caption-top table">
-<caption>Where the scripts differ from agupta01/crossing-distances</caption>
+<caption>Where the pipeline differs from agupta01/crossing-distances</caption>
 <colgroup>
 <col style="width: 33%">
 <col style="width: 33%">
@@ -2675,45 +2819,41 @@ x,41.878123,-87.629456</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Georeferencing of masks</td>
-<td>Rebuilt from the file name, assuming a 25 m radius</td>
-<td>Read from each GeoTIFF’s transform, so county and Google clips are handled the same way</td>
+<td>Model</td>
+<td>SAM 2.1 Hiera Base+, privately fine-tuned</td>
+<td>SAM 3 image model, open weights</td>
 </tr>
 <tr class="even">
-<td>Coordinate CSV</td>
-<td>README says EPSG:3857; code actually uses lon/lat degrees</td>
-<td><code>lat</code>, <code>lon</code> in WGS84 throughout</td>
+<td>Drivable surface</td>
+<td>Auto-mask grid → drop masks on OSM roads → invert non-drivable</td>
+<td>Road probability from text and/or OSM box prompts, fused instance + semantic heads</td>
+</tr>
+<tr class="odd">
+<td>Configuration choice</td>
+<td>Fixed</td>
+<td>Chosen on labelled data (4.6–4.7), fine-tuned head if it wins on the holdout, frozen for both candidates</td>
+</tr>
+<tr class="even">
+<td>Georeferencing of masks</td>
+<td>Rebuilt from the file name, assuming a 25 m radius</td>
+<td>Read from each GeoTIFF’s transform</td>
 </tr>
 <tr class="odd">
 <td>“Within 25 m of a crossing” join</td>
-<td>Done in EPSG:3857 (≈ 18.6 m on the ground at 41.9° N)</td>
+<td>EPSG:3857 (≈ 18.6 m on the ground at 41.9° N)</td>
 <td>EPSG:3435 feet, true 25 m</td>
 </tr>
 <tr class="even">
-<td>SAM 2 CUDA extension</td>
-<td>Compiled with nvcc</td>
-<td>Skipped (<code>SAM2_BUILD_CUDA=0</code>); affects only optional hole-filling</td>
-</tr>
-<tr class="odd">
-<td>OSM road filter</td>
-<td>City-wide <code>features_from_place</code> per run</td>
-<td>Only roads around the sample, downloaded once (4.4)</td>
-</tr>
-<tr class="even">
-<td>Grow-cut</td>
+<td>OSM crossing extraction, grow-cut</td>
 <td>—</td>
 <td>Reference code, unchanged</td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="crs-and-datum" class="level3">
-<h3 class="anchored" data-anchor-id="crs-and-datum">CRS and datum</h3>
-<p>Cook County serves NAD83(2011) Illinois East (US ft). The fetcher asks the server for EPSG:3857 so all clips share one grid; the NAD83(2011) → WGS84 shift (≈ 1 m) moves positions slightly but not lengths. If positional agreement with OSM edges matters, compare a few QA overlays from A and C at the same intersection.</p>
-</section>
-<section id="google-imagery-terms" class="level3">
-<h3 class="anchored" data-anchor-id="google-imagery-terms">Google imagery terms</h3>
-<p>Approach C bulk-downloads basemap tiles the way the reference study did; Google’s Maps Platform terms restrict that, so confirm it fits the project’s data-use approvals.</p>
+<section id="crs-datum-and-data-terms" class="level3">
+<h3 class="anchored" data-anchor-id="crs-datum-and-data-terms">CRS, datum, and data terms</h3>
+<p>Cook County serves NAD83(2011) Illinois East (US ft); the fetcher requests EPSG:3857 so both candidates share one grid, and the ≈ 1 m datum shift moves positions slightly but not lengths. Candidate A bulk-downloads Google basemap tiles as the reference study did; Google’s Maps Platform terms restrict that, so confirm it fits the project’s data-use approvals. The benchmark dataset is CC BY 4.0: credit its authors when reporting results. Running SAM 3 on Modal keeps imagery within the project’s own accounts and pins the model version.</p>
 </section>
 <section id="troubleshooting" class="level3">
 <h3 class="anchored" data-anchor-id="troubleshooting">Troubleshooting</h3>
@@ -2733,39 +2873,79 @@ x,41.878123,-87.629456</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
+<td><code>401</code> / <code>403</code> / <code>GatedRepoError</code> in <code>cc_weights.py</code></td>
+<td>Access not yet approved, or token lacks read scope</td>
+<td>Check approval on the model page; recreate the token and the <code>huggingface</code> secret</td>
+</tr>
+<tr class="even">
+<td><code>Set ROBOFLOW_API_KEY</code></td>
+<td>Key not exported in this shell</td>
+<td><code>export ROBOFLOW_API_KEY=…</code> (section 3)</td>
+</tr>
+<tr class="odd">
+<td>Benchmark: many images with 0 boxes</td>
+<td>File names lack coordinates in that dataset version, or Overpass failed</td>
+<td>Check <code>meta.json</code>; rerun prep; box-mode configs fall back to text for those images</td>
+</tr>
+<tr class="even">
+<td><code>osm_roads.geojson missing</code></td>
+<td>Step 4.5 skipped or not uploaded</td>
+<td>Run 4.5 including the <code>modal volume put</code></td>
+</tr>
+<tr class="odd">
+<td><code>ModuleNotFoundError</code> while building or loading the SAM 3 image</td>
+<td>SAM 3 imports a package it doesn’t declare (e.g. <code>pycocotools</code>)</td>
+<td>Add it to <code>sam3_image</code> in <code>cc_segment.py</code>; the image’s build-time import check reports it before any GPU starts</td>
+</tr>
+<tr class="even">
+<td>Benchmark reports far fewer images than the prep printed</td>
+<td><code>/bench</code> on the volume still holds an earlier set</td>
+<td><code>modal volume rm -r cc-results /bench</code>, re-upload, and check the <code>benchmark set:</code> line printed at the start of the run</td>
+</tr>
+<tr class="odd">
+<td><code>[Errno 21] Is a directory</code> from <code>modal volume get</code></td>
+<td>Local destination folder didn’t exist</td>
+<td><code>mkdir -p</code> the destination first and end it with <code>/</code>; the remote folder is written inside it</td>
+</tr>
+<tr class="even">
+<td>Prep reports 0 <code>coords-in-name</code> images</td>
+<td>Wrong dataset version (e.g. 6: Esri patches and screenshots only)</td>
+<td><code>--list-versions</code>, then rerun prep with a version sized for the reference study’s 193 clips</td>
+</tr>
+<tr class="odd">
+<td>Benchmark scores only a handful of images</td>
+<td>Dataset version’s valid/test splits are tiny</td>
+<td>Keep the default <code>--splits test,valid,train</code> (augmented duplicates are dropped)</td>
+</tr>
+<tr class="even">
 <td><code>KeyError: &#39;MODAL_ENVIRONMENT&#39;</code></td>
 <td>Reference code reads it at import</td>
 <td><code>export MODAL_ENVIRONMENT=cook</code></td>
 </tr>
-<tr class="even">
-<td>Modal says the client is too old (reference venv)</td>
-<td><code>modal==0.77</code> pin</td>
-<td>Only matters if Modal is called from that venv; the runbook uses it locally only</td>
-</tr>
 <tr class="odd">
+<td><code>TypeError: Invalid value &#39;[]&#39; for dtype &#39;int64&#39;</code> in grow-cut</td>
+<td>Run under pandas 3.x</td>
+<td>Run via <code>03_grow_cut.sh</code> (reference repo’s locked environment)</td>
+</tr>
+<tr class="even">
 <td><code>exportImage failed … 4xx/5xx</code></td>
-<td>County server busy, or bbox outside the 995,000–1,212,500 / 1,740,000–2,007,500 ft extent</td>
-<td>Rerun the step (clips are overwritten, not duplicated); lower <code>max_containers</code> in <code>cc_fetch.py</code></td>
-</tr>
-<tr class="even">
-<td><code>RuntimeError</code> after a <code>missing_keys</code> log</td>
-<td>Checkpoint is not SAM 2.1 b+</td>
-<td>Confirm run and config with the authors; try <code>sam2.1_hiera_l.yaml</code> if it is the large model</td>
+<td>County server busy, or point outside the service extent</td>
+<td>Rerun the step (clips are overwritten); lower <code>max_containers</code> in <code>cc_fetch.py</code></td>
 </tr>
 <tr class="odd">
-<td>Magenta on road surfaces in QA</td>
-<td>Zero-shot or wrong weights; OSM filter off</td>
-<td>Check <code>run.json</code> checkpoint; confirm <code>/inputs/osm_drivable.geojson</code> was uploaded</td>
+<td>Fragmented road masks</td>
+<td>Instance fusion on large “stuff” regions</td>
+<td>Use <code>fused</code> or <code>semantic</code> fusion</td>
 </tr>
 <tr class="even">
+<td>Road spills onto sidewalks</td>
+<td>Sidewalk and road look alike in grey</td>
+<td>Add negatives (<code>sidewalk,grass,building</code>); compare in the benchmark</td>
+</tr>
+<tr class="odd">
 <td>Grow-cut finds 0 crosswalks</td>
 <td>Masks and edges don’t overlap</td>
 <td>Check both layers in QGIS; edges must come from 4.1</td>
-</tr>
-<tr class="odd">
-<td>OSM build killed</td>
-<td>Out of memory</td>
-<td>Add swap, or run 4.1 once on a 64 GB machine and copy the shapefile</td>
 </tr>
 </tbody>
 </table>
@@ -2775,15 +2955,21 @@ x,41.878123,-87.629456</code></pre>
 <h2 class="anchored" data-anchor-id="sources">Sources</h2>
 <ul>
 <li><a href="https://github.com/agupta01/crossing-distances">agupta01/crossing-distances</a></li>
-<li><a href="https://github.com/justenvirons/crosswalk-distances-cc">justenvirons/crosswalk-distances-cc</a> and <code>phase01_crosswalk_models.qmd</code></li>
+<li><a href="https://github.com/facebookresearch/sam3">facebookresearch/sam3</a> and <a href="https://huggingface.co/facebook/sam3">facebook/sam3 on Hugging Face</a></li>
+<li><a href="https://arxiv.org/abs/2607.09583">Promptable Concept Segmentation from Above: Evaluating SAM 3 in Remote Sensing (arXiv 2607.09583)</a></li>
+<li><a href="https://arxiv.org/abs/2512.08730">SegEarth-OV3: Exploring SAM 3 for Open-Vocabulary Semantic Segmentation in Remote Sensing Images (arXiv 2512.08730)</a> and <a href="https://github.com/earth-insights/SegEarth-OV-3">code</a></li>
+<li><a href="https://universe.roboflow.com/pcd-rxiqe/satellite-curb-segmentation">Satellite Curb Segmentation dataset (Roboflow Universe, CC BY 4.0)</a></li>
+<li><a href="https://huggingface.co/facebook/dinov3-vitl16-pretrain-sat493m">DINOv3 ViT-L/16 SAT-493M</a></li>
 <li><a href="https://gis.cookcountyil.gov/imagery/rest/services/CookOrtho2025/ImageServer">CookOrtho2025 ImageServer</a></li>
 <li><a href="https://modal.com/docs/guide/modal-1-0-migration">Modal 1.0 migration guide</a></li>
-<li><a href="https://github.com/facebookresearch/sam2">facebookresearch/sam2</a></li>
 </ul>
 
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-carion2025sam3segmentconcepts" class="csl-entry" role="listitem">
+Carion, Nicolas, Laura Gustafson, Yuan-Ting Hu, Shoubhik Debnath, Ronghang Hu, Didac Suris, Chaitanya Ryali, et al. 2025. <span>“SAM 3: Segment Anything with Concepts.”</span> <a href="https://arxiv.org/abs/2511.16719">https://arxiv.org/abs/2511.16719</a>.
+</div>
 <div id="ref-moran2026scaling" class="csl-entry" role="listitem">
 Moran, Marcel E., Anish Gupta, Jun Qian, and Debra F. Laefer. 2026. <span>“Scaling Pedestrian Crossing Analysis to 100 <span>U.S.</span> Cities via <span>AI</span>-Based Segmentation of Satellite Imagery.”</span> <em>Journal of Transport and Land Use</em> 19 (1): 21–40. <a href="https://doi.org/10.5198/jtlu.2026.2771">https://doi.org/10.5198/jtlu.2026.2771</a>.
 </div>

@@ -11,6 +11,7 @@ output/all_ped_fatalities*.*
 data/osm/*
 *.pbf
 _book/*
+*.jpg
 
 # History files
 .Rhistory

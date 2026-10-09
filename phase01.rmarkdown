@@ -1,0 +1,365 @@
+---
+editor_options: 
+  chunk_output_type: console
+---
+
+# Dataset Development {#sec-phase01}
+
+```{r}
+#| label: r-packages
+#| eval: true
+#| warning: false
+
+library(sf)              # simple features: read, transform and map spatial data
+library(reticulate)      # call Python (osmnx) from R
+library(dplyr)           # data manipulation verbs (filter, mutate, select, joins)
+library(purrr)           # functional iteration (map) over lists and files
+library(readr)           # fast CSV reading/writing
+library(glue)            # string interpolation
+library(janitor)         # clean column names and tabulate (clean_names, tabyl)
+library(cli)             # console alerts and progress messages
+library(tigris)          # download Census TIGER/Line boundaries
+library(units)           # unit-aware areas and lengths
+library(leaflet)         # interactive web maps
+library(leaflet.extras)  # addResetMapButton(), addFullscreenControl(), addGroupedLayersControl()
+library(osmextract)      # read OpenStreetMap extracts
+library(lubridate)       # date/time handling for crash records
+library(stringr)         # string helpers (str_replace, str_detect)
+
+# API key for leaflet maps
+CARTO_API_KEY  <- Sys.getenv("CARTO_API_KEY",  unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
+
+
+```
+
+## Overview
+
+This phase assembles every data layer needed to test the aims and hypotheses set out in [Background and Aims](phase00.html): the countywide study-area geography, the street/intersection network, traffic volume and vehicle mix (AADT), crash and fatality records, and socioeconomic/contextual covariates. Dataset development is in progress; each section below summarizes what is complete, in progress, or not yet started, and notes the research aim(s) each data layer supports.
+
+Implementation (dataset-creation) code lives in [Appendix A: Data Preparation Code](dataprep.html), which saves the resulting `sf` tables to `data/phase01_dataprep.RData` — loaded below to build an interactive map for data exploration; this chapter describes what each step produces and why, not the implementation detail itself.
+
+## Study Area Geography
+
+Supports **Aims 1–4** (defines the unit of geography used to organize and aggregate every other data layer).
+
+**Status: complete.**
+
+- **Complete:** Chicago's 77 community areas and suburban Cook County's incorporated municipalities (filtered to ≥4 sq mi to exclude small or fragmentary places) are combined into a single countywide polygon layer (`study_area`, N = 202), with a `type` field distinguishing community areas from municipalities.
+
+## Street Intersections
+
+Supports **Aim 1** (defines candidate crossing locations for the segmentation pipeline) and **Aims 3–4** (defines the spatial units fatality/crash records are matched to).
+
+**Status: complete.**
+
+- **Complete:** The Illinois OpenStreetMap extract from GeoFabrik was clipped to Cook County (`osmium extract`) and filtered to the drivable street network, removing parking aisles, driveways, private roads, airport features and indoor ways (`osmium tags-filter`).
+- **Complete:** One countywide street graph was built with OSMnx (`graph_from_xml()`), and OSM nodes within the default 10 m tolerance were merged into single intersection points with `consolidate_intersections()`, excluding dead ends (~170,000 points).
+- **Complete:** Intersections were spatially joined to the study-area geography and saved to `data/intersections/study_area_intersections.gpkg`, with `geoid`, `name` and `type`.
+
+All processing uses a downloaded OSM file, so no online map service (Overpass API) is queried. See [Street Intersections](phase01_intersections.html) for a full description of the methods.
+
+## Crossing Distance (Segmentation Models)
+
+Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.
+
+Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
+
+**Status: not started.**
+
+- **Not started:** Imagery/model comparison (Aim 1a) — measure crossing distance at a sample of intersections with all three imagery/model approaches and compare against manually measured ground truth, to select the approach for full-scale production.
+- **Not started (depends on Aim 1a):** Countywide production run (Aim 1b) — apply the selected approach to all study-area intersections to produce the countywide crossing-distance dataset.
+
+## Streets and Speed Limits
+
+Supports **Aims 3–4** (roadway functional class and speed limit are control variables in the fatality/injury models).
+
+**Status: complete.**
+
+- **Complete:** Countywide street centerlines were downloaded from Geofabrik (`osmextract`) and clipped to the study area.
+- **Complete:** OSM `maxspeed` tags were parsed and standardized to miles per hour, giving street segments with posted speed limits.
+
+## Traffic Volume and Vehicle Mix (IDOT AADT)
+
+Supports **Aims 3–4** (traffic volume and heavy-vehicle mix are covariates in the fatality and crash-rate models; hypothesis H8 in [Background and Aims](phase00.html)). Traffic volume measures how many vehicles pedestrians are exposed to at a crossing, and it is closely tied to crossing distance, since busier roads tend to be wider; vehicle mix captures the share of trucks and freight vehicles, which are more likely to cause severe injuries. Source: IDOT's Annual Average Daily Traffic layer, which reports total AADT and heavy commercial vehicle AADT (single-unit trucks and buses, and multi-unit combination trucks) by road segment.
+
+**Status: in progress.**
+
+- **Complete:** IDOT's AADT layer was downloaded, clipped to Cook County, and segment lengths recalculated after clipping (`data/infrastructure/study_area_aadt.gpkg`).
+- **Not started:** Derive vehicle-mix measures — heavy commercial vehicle share (`HCV_AADT` / `AADT`) and single-unit and multi-unit truck shares for each segment, treating missing values as missing rather than zero.
+- **Not started:** Attach AADT and truck share to each FARS fatality (Aim 3), from the nearest road segment(s) or the maximum on the roads meeting at the nearest intersection.
+- **Not started:** Summarize AADT by study-area unit (Aim 4) — vehicle miles traveled (AADT × segment length), VMT per road mile, and VMT-weighted mean truck share.
+- **Not started:** Assess coverage and count years — the share of road miles with AADT values (coverage is strongest on state and major roads) and the range of count years by unit, to judge whether summaries are comparable across units.
+
+## Pedestrian Fatalities (FARS)
+
+Supports **Aim 3** directly.
+
+**Status: complete.**
+
+- **Complete:** NHTSA FARS records for Illinois/Cook County, 2010–2024, were downloaded and filtered to pedestrian fatalities with valid coordinates, giving a point layer with date and time-of-day attributes.
+
+## Crash Records (IDOT)
+
+Supports **Aim 4** directly (as the primary crash-injury data source; see *Open Items* below regarding EMS data).
+
+**Status: complete for 2022–2024; additional years in progress.**
+
+- **Complete:** IDOT crash-report exports for 2022–2024 were combined into a single table.
+- **Complete:** Coordinates were cleaned (in-state ArcGIS `x`/`y` preferred, falling back to IDOT's reported longitude/latitude), and crash date/time was rebuilt from `crashyr`/`crashmonth`/`crashday`/`crashhour` rather than the UTC-shifted `crashdate` field.
+- **Complete:** Pedestrian crashes were flagged from `typeoffirstcrash`, and killed-or-seriously-injured (KSI) crashes from fatality and A-injury counts, giving a point layer of pedestrian crashes with severity and KSI flags.
+- **In progress:** Adding crash years beyond 2022–2024 as they become available, to increase statistical power for Aim 4.
+
+## Socioeconomic and Contextual Data
+
+Supports **Aim 2** directly (ADI, demographics) and provides control variables for **Aims 3–4**.
+
+**Status: in progress.**
+
+- **Complete:** Area Deprivation Index (ADI) — 2024 ACS variables via `sociome`/`tidycensus`; 2020 census tracts are aggregated to community areas (Chicago Data Portal tract-to-community-area lookup), and ADI is computed directly by Census place for suburban municipalities.
+- **In progress:** Transportation investment data — CMAP's FFY2025 Annual Obligation Report (FHWA obligations, AC authorizations, FTA obligations) extracted to the Cook County municipality/project-type level and flagged for street-design relevance (signal, intersection, roadway, bike/ped, safety, bridge projects): [`output/cook_county_transportation_obligations_ffy2025.xlsx`](output/cook_county_transportation_obligations_ffy2025.xlsx). This is a candidate exposure/control variable for Aims 2 and 4 (capital investment as a proxy for street-design change near crash locations); extend with future years' reports.
+
+## Interactive Map (Data Exploration)
+
+Loads a subset of [Appendix A: Data Preparation Code](dataprep.html)'s saved tables (`data/phase01_dataprep.RData`) to explore the assembled data layers together: the Cook County boundary, the study-area geography, street intersections, Councils of Mayors boundaries, walkability (NTAscore), Area Deprivation Index (ADI) by study-area unit, CMAP 2020 land use, IDOT annual average daily traffic (AADT), and the two point layers used in Aims 3–4 (FARS pedestrian fatalities and IDOT pedestrian crashes).
+
+```{r}
+#| label: dataprep-map
+#| eval: true
+#| echo: true
+#| code-fold: true
+
+load("data/phase01_dataprep.RData")
+
+CARTO_API_KEY <- Sys.getenv("CARTO_API_KEY", unset = "cb1_31xh_1_06fb99adb466f0f5a0392d7d")
+ZOOM_THRESHOLD <- 14
+
+bbox <- st_bbox(study_area)
+type_pal <- colorFactor(c("#9e9e9e", "#616161"), domain = c("community area", "municipality"))
+
+# ADI by study area unit: `adi` (data/census/adi_study_area.csv) is a plain
+# table keyed by GEOID, not spatial -- join it onto study_area's polygons
+# to map it. 
+study_area_adi <- study_area %>%
+  left_join(
+    adi %>% mutate(GEOID = as.character(GEOID)) %>% select(GEOID, ADI),
+    by = c("geoid" = "GEOID")
+  )
+
+walk_pal <- colorNumeric("Greens", domain = walkability$NTAscore, na.color = "transparent")
+adi_pal  <- colorNumeric("YlOrRd", domain = study_area_adi$ADI, na.color = "transparent")
+
+# Land use: conventional planning colors (APA LBCS-style -- yellow residential,
+# red commercial, blue institutional, purple industrial, gray transportation)
+lu_colors <- c(
+  "Residential"                = "#FFFF00",
+  "Commercial"                 = "#FF0000",
+  "Institutional"              = "#0000FF",
+  "Industrial"                 = "#A020F0",
+  "Transportation & Utilities" = "#BEBEBE",
+  "Agriculture"                = "#C8D88C",
+  "Open Space"                 = "#4DAF4A",
+  "Vacant"                     = "#E8DCC8",
+  "Water"                      = "#7FB2E5",
+  "Other / Not Classified"     = "#DDDDDD"
+)
+
+# AADT: line color and width both step up with traffic volume
+aadt_map <- aadt %>% filter(!is.na(AADT), AADT > 0)
+aadt_bins <- c(0, 5000, 15000, 30000, Inf)
+aadt_pal <- colorBin(c("#fdd49e", "#fc8d59", "#d7301f", "#7f0000"),
+                     domain = aadt_map$AADT, bins = aadt_bins)
+aadt_weight <- c(1.5, 2.5, 3.5, 5)[cut(aadt_map$AADT, aadt_bins, labels = FALSE)]
+
+exploration_map <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  # boundary lines get their own pane above the default overlay pane (z 400)
+  # so they stay on top of whichever thematic layer is switched on
+  addMapPane("boundary_lines", zIndex = 450) %>%
+  addTiles(
+    urlTemplate = paste0(
+      "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=",
+      CARTO_API_KEY
+    )
+  ) %>%
+  addPolygons(
+    data = study_area,
+    fillColor = ~type_pal(type),
+    weight = 1,
+    opacity = 0.5,
+    color = "#fff",
+    fillOpacity = 0.5,
+    label = ~ paste0(name, " (", type, ")"),
+    group = "Study Area"
+  ) %>%
+  addPolygons(
+    data = cog_boundaries,
+    fill = FALSE,
+    color = "#2b8cbe",
+    weight = 2.5,
+    opacity = 0.9,
+    dashArray = "4",
+    label = ~name,
+    options = pathOptions(pane = "boundary_lines"),
+    group = "Councils of Mayors"
+  ) %>%
+  addPolygons(
+    data = walkability,
+    fillColor = ~walk_pal(NTAscore),
+    fillOpacity = 0.65,
+    stroke = FALSE,
+    label = ~ paste0("Walkability (NTAscore): ", round(NTAscore, 1)),
+    group = "Walkability"
+  ) %>%
+  addPolygons(
+    data = study_area_adi,
+    fillColor = ~adi_pal(ADI),
+    weight = 1,
+    opacity = 0.5,
+    color = "#fff",
+    fillOpacity = 0.7,
+    label = ~ paste0(name, " (", type, ") — ADI: ", round(ADI, 1)),
+    group = "ADI"
+  ) %>%
+  # addPolygons(
+  #   data = land_use,
+  #   fillColor = ~unname(lu_colors[lu_category]),
+  #   fillOpacity = 0.7,
+  #   stroke = FALSE,
+  #   label = ~lu_category,
+  #   group = "Land Use (CMAP 2020)"
+  # ) %>%
+  addPolylines(
+    data = aadt_map,
+    color = ~aadt_pal(AADT),
+    weight = aadt_weight,
+    opacity = 0.9,
+    label = ~ paste0(
+      coalesce(na_if(ROAD_NAME, ""), na_if(MARKED_NAM, ""), "Unnamed segment"), " — AADT: ",
+      format(AADT, big.mark = ","), " vehicles/day (", AADT_YR, ")"
+    ),
+    group = "AADT"
+  ) %>%
+  addPolygons(
+    data = county_boundary,
+    fill = FALSE,
+    color = "#000",
+    weight = 4,
+    opacity = 1,
+    options = pathOptions(pane = "boundary_lines"),
+    group = "Cook County"
+  ) %>%
+  addCircleMarkers(
+    data = intersections,
+    radius = 2,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    fillColor = "#555",
+    group = "Intersections"
+  ) %>%
+  addCircleMarkers(
+    data = ped_fatalities,
+    radius = 4.5,
+    stroke = TRUE,
+    color = "#FFF",
+    weight = 0.25,
+    fillOpacity = 0.8,
+    fillColor = "darkred",
+    # label = ~ paste0("Pedestrian fatality (FARS) — ", fatality_date, ", ", fatality_time),
+    group = "FARS Ped Fatalities"
+  ) %>%
+  addCircleMarkers(
+    data = ped_crashes,
+    radius = 3.5,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    fillColor = "#3182bd",
+    label = ~ paste0(ped, " crash — ", severity),
+    group = "IDOT Ped Crashes"
+  ) %>%
+  # addLegend(
+  #   "bottomleft",
+  #   colors = c("#9e9e9e", "#2b8cbe", "#333", "darkred", "#3182bd"),
+  #   labels = c("Study area", "Councils of Mayors", "Intersections", "FARS fatality", "IDOT pedestrian crash"),
+  #   opacity = 1
+  # ) %>%
+  # addLegend(
+  #   "topright",
+  #   pal = walk_pal,
+  #   values = walkability$NTAscore,
+  #   title = "Walkability<br>(NTAscore)",
+  #   opacity = 0.8
+  # ) %>%
+  # addLegend(
+  #   "bottomright",
+  #   pal = adi_pal,
+  #   values = study_area_adi$ADI,
+  #   title = "ADI<br>(relative)",
+  #   opacity = 0.8
+  # ) %>%
+  addScaleBar(
+    position = "bottomright",
+    options = scaleBarOptions(metric = TRUE, imperial = TRUE)
+  ) %>%
+  fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]) %>%
+  addResetMapButton() %>%
+  addFullscreenControl() %>%
+  # Placeholder layer for the "None" radio option: an invisible point, so
+  # selecting "None" switches every thematic layer off. Every name listed in
+  # addGroupedLayersControl() must match a `group =` used above exactly, or
+  # that entry silently does nothing.
+  addCircleMarkers(
+    lng = mean(c(bbox[["xmin"]], bbox[["xmax"]])),
+    lat = mean(c(bbox[["ymin"]], bbox[["ymax"]])),
+    radius = 0, stroke = FALSE, fillOpacity = 0,
+    group = "None"
+  ) %>%
+  # Grouped layer control (leaflet.extras >= 2.1.0): boundaries and crashes
+  # are checkboxes (any combination); the thematic layers are radio buttons
+  # (one at a time) via exclusiveGroups, which must name the "Thematic" group.
+  addGroupedLayersControl(
+    overlayGroups = list(
+      "Boundaries" = c("Cook County", "Study Area", "Councils of Mayors"),
+      "Crashes" = c("FARS Ped Fatalities", "IDOT Ped Crashes"),
+      "Thematic" = c("None", "ADI", "Walkability", "AADT")
+    ),
+    options = groupedLayersControlOptions(
+      exclusiveGroups = "Thematic",
+      groupCheckboxes = FALSE,
+      groupsCollapsed = FALSE,
+      collapsed = FALSE
+    )
+  ) %>%
+  # Off by default (checked in the control to show): Councils of Mayors,
+  # all thematic layers except "None", and both crash layers
+  hideGroup(c("Councils of Mayors",
+              "ADI", "Walkability", "AADT",
+              "FARS Ped Fatalities", "IDOT Ped Crashes")) %>%
+  htmlwidgets::onRender(
+    sprintf(
+      "function(el, x) {
+          var map = this;
+          var threshold = %d;
+          var zoomGatedGroups = ['Intersections'];
+          function toggleByZoom() {
+            var show = map.getZoom() >= threshold;
+            zoomGatedGroups.forEach(function(name) {
+              var group = map.layerManager.getLayerGroup(name);
+              if (!group) return;
+              if (show) {
+                if (!map.hasLayer(group)) map.addLayer(group);
+              } else {
+                if (map.hasLayer(group)) map.removeLayer(group);
+              }
+            });
+          }
+          map.on('zoomend', toggleByZoom);
+          toggleByZoom();
+        }",
+      ZOOM_THRESHOLD
+    )
+  )
+
+exploration_map
+```
+
+`Intersections` is deliberately left out of the layer control so it's purely zoom-gated rather than a manual checkbox, since it's the largest layer (~170,000 points countywide).
+
