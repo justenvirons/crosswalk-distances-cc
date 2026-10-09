@@ -395,10 +395,20 @@ file.exists(c("data/osm/cook_all_network.osm", "data/osm/cook_crossings.osm",
               "data/osm/cook_drive_network.osm"))
 ```
 
-The reference repo is cloned next to the OSM files, and the packages its OSM code imports are added to `osmnx-env`. `modal` is needed only because the reference module imports it at load time; nothing is sent to Modal.
+The reference repo is cloned next to the OSM files, and the packages its OSM code imports are added to `osmnx-env`. The chunk also binds reticulate to `osmnx-env`, so this section can be run on its own in a fresh R session. Run it before the Python chunk below. `modal` is needed only because the reference module imports it at load time; nothing is sent to Modal.
 
 ```{r}
 #| label: reference-repo
+
+# Bind reticulate to osmnx-env before any Python runs. reticulate can bind to
+# only one Python per R session: if a Python chunk runs first (e.g. after an
+# R restart), it starts reticulate's default Python, which has no osmnx, and
+# `import osmnx` fails until R is restarted.
+reticulate::use_condaenv("osmnx-env", required = TRUE)
+if (!grepl("osmnx-env", reticulate::py_config()$python, fixed = TRUE)) {
+  stop("Python is already bound to ", reticulate::py_config()$python,
+       ". Restart R (Session > Restart R) and run this chunk before the Python chunk below.")
+}
 
 if (!dir.exists("data/osm/crossing-distances")) {
   system2("git", c("clone", "https://github.com/agupta01/crossing-distances.git",
