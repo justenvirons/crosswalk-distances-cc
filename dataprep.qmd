@@ -653,6 +653,54 @@ study_area_streets <- il_streets %>%
 st_write(study_area_streets, "data/infrastructure/study_area_streets.gpkg", delete_dsn = TRUE)
 ```
 
+### OSM road centre-lines for box prompts
+
+Optional. This replaces the runbook's step 4.5 (`02b_osm_roads.py`) and is needed only if a SAM 3 configuration that uses box prompts (`box` or `text+box`) is adopted. The leading text-only configuration never reads this file. The Python script queries Overpass live; this chunk reads the local Cook County extract instead, so the box centre-lines come from the same OSM snapshot as the intersections and crossing edges. It keeps the script's drivable road classes, which differ from `highway_subtypes` above (no service roads, construction or corridors; adds motorway links and living streets). It drops private or no-access ways, and keeps every way that touches the 80 m square around a sample or pilot intersection (40 m each side, as in the script).
+
+```{r}
+#| label: osm-box-roads
+
+box_road_classes <- c(
+  "motorway_link", "trunk", "trunk_link", "primary", "primary_link",
+  "secondary", "secondary_link", "tertiary", "tertiary_link",
+  "unclassified", "residential", "living_street", "busway"
+)
+box_half_width_ft <- 40 * 3.28084  # 40 m in EPSG:3435 US feet
+box_road_sql <- paste0("'", box_road_classes, "'", collapse = ", ")
+
+box_roads_all <- oe_read(
+  "data/osm/cook_extract.osm.pbf",
+  layer = "lines",
+  extra_tags = "access",
+  query = glue("SELECT * FROM lines WHERE highway IN ({box_road_sql})"),
+  force_vectortranslate = TRUE,  # re-convert so the access tag is included
+  quiet = TRUE
+) %>%
+  filter(is.na(access) | !access %in% c("private", "no")) %>%
+  st_transform(3435)
+
+# 80 m squares around every sample and pilot intersection
+box_areas <- bind_rows(
+  read_csv("data/sample/sample.csv"),
+  read_csv("data/sample/pilot.csv")
+) %>%
+  distinct(lat, lon) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  st_transform(3435) %>%
+  st_buffer(box_half_width_ft, endCapStyle = "SQUARE")
+
+osm_roads <- box_roads_all %>%
+  st_filter(box_areas) %>%
+  select(highway) %>%
+  st_transform(4326)
+
+nrow(osm_roads)  # expect a few thousand lines
+
+st_write(osm_roads, "data/sample/osm_roads.geojson", delete_dsn = TRUE)
+```
+
+Upload the file to the Modal results volume, where `cc_segment.py` reads it, from any machine with Modal set up: `modal volume put --env cook cc-results data/sample/osm_roads.geojson /inputs/osm_roads.geojson`. Check it in QGIS over the sample points.
+
 
 ## Annual Average Daily Traffic (IDOT)
 

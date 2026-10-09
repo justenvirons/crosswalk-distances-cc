@@ -31,7 +31,7 @@ Not yet run: the county pilot check (4.8), the evaluation-sample fetch and segme
 | `01_build_candidates.py` | server | Intersections with an OSM crossing ≤ 25 m, tagged Chicago/suburban + Google tile position |
 | `cc_fetch.py` | Modal CPU | 50 m clips: Google z22 (A), county RGB (B), county RGB+NIR (canopy pool) |
 | `02_select_sample.py` | server | Stratified evaluation sample + separate pilot set |
-| `02b_osm_roads.py` | server | OSM drivable centre-lines around clips, for box prompts |
+| `02b_osm_roads.py` | server | Optional: OSM drivable centre-lines around clips, for box prompts (also done locally in [Appendix A](dataprep.html)) |
 | `cc_weights.py` | Modal | SAM 3 checkpoint from Hugging Face to a volume; GPU smoke test |
 | `04_bench_prep.py` | server | Public curb dataset → images, ground-truth road masks, OSM prompt boxes |
 | `cc_benchmark.py` | Modal GPU | Scores every SAM 3 configuration against the labels (IoU, boundary F1); `--subset holdout`, `--delta` |
@@ -229,7 +229,11 @@ uv run python 02_select_sample.py --candidates ../data/sample/candidates.csv \
 
 The evaluation sample has 8 strata (geography × canopy high/low terciles × tile centre/edge) of 19 each, 152 in total; the pilot set is 30 other intersections. **Check:** the printed stratum table; thin cells mean the pool needs to be larger (`--pool-per-group 600` in 4.2).
 
-### 4.5 OSM road centre-lines for box prompts
+### 4.5 OSM road centre-lines for box prompts (optional)
+
+**Optional: run only if a configuration with box prompts (`box` or `text+box`) is adopted.** `cc_segment.py` reads this file only for those modes. The leading configuration (fine-tuned head, text prompt "road") never uses it. Box prompts are not supported by the evidence so far: on the 6 benchmark clips that could take boxes, the best `text+box` setting scored boundary F1 0.25, against 0.34 for text alone, and box-only 0.20 (`zs2`). Six clips is too few to rule boxes out; a fair test needs an unaugmented fork of the benchmark dataset (see 4.6).
+
+The same file can be built locally from the Cook County OSM extract, without Overpass, in [Appendix A: Data Preparation Code](dataprep.html) (chunk `osm-box-roads`); then only the `modal volume put` line below is needed. On the server:
 
 ```bash
 uv run python 02b_osm_roads.py --inputs ../data/sample/sample.csv,../data/sample/pilot.csv \
@@ -323,14 +327,16 @@ The benchmark is Google imagery only. Check that the top two or three configurat
 uv run modal run cc_fetch.py --source A --input ../data/sample/pilot.csv --subdir pilot_A --out-csv ../logs/pilot_A.csv
 uv run modal run cc_fetch.py --source B --input ../data/sample/pilot.csv --subdir pilot_B --out-csv ../logs/pilot_B.csv
 uv run modal run cc_segment.py --source A --input-dir pilot_A --pilot --run-name pilot \
-    --modes "text+box" --fusions fused --prompt-sets "road" --negative-sets ";sidewalk,grass,building"
+    --modes text --fusions semantic --prompt-sets "road" --negative-sets "" \
+    --prob-thds 0.3,0.4,0.5 --fill-holes 25 --delta finetuned/ft1/seg_head_last.pt
 uv run modal run cc_segment.py --source B --input-dir pilot_B --pilot --run-name pilot \
-    --modes "text+box" --fusions fused --prompt-sets "road" --negative-sets ";sidewalk,grass,building"
+    --modes text --fusions semantic --prompt-sets "road" --negative-sets "" \
+    --prob-thds 0.3,0.4,0.5 --fill-holes 25 --delta finetuned/ft1/seg_head_last.pt
 mkdir -p ../data/results/pilot_B
 uv run modal volume get --env cook --force cc-results /pilot_B/pilot ../data/results/pilot_B/
 ```
 
-Set `--modes/--fusions/--prompt-sets/--negative-sets` to the finalists from 4.6 and 4.7 (the values above are an example), and add `--delta finetuned/ft1/<chosen head>` if the fine-tuned head was adopted. Each configuration gets its own folder of QA overlays, and `pilot_summary.csv` reports road fraction, empty-mask rate, and box fall-backs. **Check:** curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B's segmentation quality is measured rather than assumed.
+The values above are the leading holdout configuration from 4.7 (fine-tuned final-epoch head, text prompt "road", semantic fusion, holes under 25 m² filled) at three thresholds. Set `--modes/--fusions/--prompt-sets/--negative-sets/--prob-thds` and `--delta` to the finalists from 4.6 and 4.7 if they differ; text-only modes need no OSM boxes, so step 4.5 can be skipped. Each configuration gets its own folder of QA overlays, and `pilot_summary.csv` reports road fraction, empty-mask rate, and box fall-backs. **Check:** curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B's segmentation quality is measured rather than assumed.
 
 ### 4.9 Imagery for the evaluation sample
 
@@ -390,7 +396,7 @@ Cook County serves NAD83(2011) Illinois East (US ft); the fetcher requests EPSG:
 | `401` / `403` / `GatedRepoError` in `cc_weights.py` | Access not yet approved, or token lacks read scope | Check approval on the model page; recreate the token and the `huggingface` secret |
 | `Set ROBOFLOW_API_KEY` | Key not exported in this shell | `export ROBOFLOW_API_KEY=…` (section 3) |
 | Benchmark: many images with 0 boxes | File names lack coordinates in that dataset version, or Overpass failed | Check `meta.json`; rerun prep; box-mode configs fall back to text for those images |
-| `osm_roads.geojson missing` | Step 4.5 skipped or not uploaded | Run 4.5 including the `modal volume put` |
+| `osm_roads.geojson missing` | A `box` or `text+box` configuration was run without step 4.5 | Run 4.5 including the `modal volume put`, or switch to `--mode text` |
 | `ModuleNotFoundError` while building or loading the SAM 3 image | SAM 3 imports a package it doesn't declare (e.g. `pycocotools`) | Add it to `sam3_image` in `cc_segment.py`; the image's build-time import check reports it before any GPU starts |
 | Benchmark reports far fewer images than the prep printed | `/bench` on the volume still holds an earlier set | `modal volume rm -r cc-results /bench`, re-upload, and check the `benchmark set:` line printed at the start of the run |
 | `[Errno 21] Is a directory` from `modal volume get` | Local destination folder didn't exist | `mkdir -p` the destination first and end it with `/`; the remote folder is written inside it |
