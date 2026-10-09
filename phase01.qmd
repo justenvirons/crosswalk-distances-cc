@@ -62,11 +62,13 @@ All processing uses a downloaded OSM file, so no online map service (Overpass AP
 
 Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.
 
-Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for all three candidate approaches (3-band Cook County orthoimagery, 4-band Cook County RGB+NIR orthoimagery, and Google Maps imagery).
+Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for the two candidate imagery sources (Google Maps imagery and Cook County 3-band RGB orthoimagery), both segmented by the same SAM 3 model (SAM 3.1 generation) with a fine-tuned segmentation head; the Modal runbook (`phase01_modal_runbook.qmd`) has the commands.
 
-**Status: not started.**
+**Status: in progress.**
 
-- **Not started:** Imagery/model comparison (Aim 1a) — measure crossing distance at a sample of intersections with all three imagery/model approaches and compare against manually measured ground truth, to select the approach for full-scale production.
+- **Done:** SAM 3 pipeline and runbook; zero-shot benchmark and segmentation-head fine-tuning on the reference study's curb labels (holdout boundary F1 at 0.5 m: 0.44 zero-shot, 0.54 fine-tuned).
+- **In progress:** Candidate pool, NDVI canopy screen (Cook County 4-band imagery), and stratified evaluation sample (152 intersections) plus pilot set (30) — code in [Appendix A: Data Preparation Code](dataprep.html).
+- **Not started:** Imagery comparison (Aim 1a) — measure crossing distance at the sample from both imagery sources and compare against manually measured ground truth, to select the source for full-scale production.
 - **Not started (depends on Aim 1a):** Countywide production run (Aim 1b) — apply the selected approach to all study-area intersections to produce the countywide crossing-distance dataset.
 
 ## Streets and Speed Limits
@@ -80,7 +82,7 @@ Supports **Aims 3–4** (roadway functional class and speed limit are control va
 
 ## Traffic Volume and Vehicle Mix (IDOT AADT)
 
-Supports **Aims 3–4** (traffic volume and heavy-vehicle mix are covariates in the fatality and crash-rate models; hypothesis H8 in [Background and Aims](phase00.html)). Traffic volume measures how many vehicles pedestrians are exposed to at a crossing, and it is closely tied to crossing distance, since busier roads tend to be wider; vehicle mix captures the share of trucks and freight vehicles, which are more likely to cause severe injuries. Source: IDOT's Annual Average Daily Traffic layer, which reports total AADT and heavy commercial vehicle AADT (single-unit trucks and buses, and multi-unit combination trucks) by road segment.
+Supports **Aims 3–4** (traffic volume and heavy-vehicle mix are covariates in the fatality and crash-rate models; hypothesis H7 in [Background and Aims](phase00.html)). Traffic volume measures how many vehicles pedestrians are exposed to at a crossing, and it is closely tied to crossing distance, since busier roads tend to be wider; vehicle mix captures the share of trucks and freight vehicles, which are more likely to cause severe injuries. Source: IDOT's Annual Average Daily Traffic layer, which reports total AADT and heavy commercial vehicle AADT (single-unit trucks and buses, and multi-unit combination trucks) by road segment.
 
 **Status: in progress.**
 

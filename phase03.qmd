@@ -7,5 +7,5 @@ This phase reports and interprets the results of the statistical tests run in [D
 | Task | Description | Output | Status |
 |---|---|---|---|
 | Report results by aim | Results for Aims 1a, 1b, 2, 3 and 4 | Results tables and figures | Not started |
-| Evaluate hypotheses | Assess support for H1–H8 | Hypothesis summary | Not started |
+| Evaluate hypotheses | Assess support for H1–H7 | Hypothesis summary | Not started |
 | Discussion | Interpret findings relative to prior literature | Discussion text | Not started |
