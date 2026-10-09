@@ -400,6 +400,9 @@ The reference repo is cloned next to the OSM files, and the packages its OSM cod
 ```{r}
 #| label: reference-repo
 
+reticulate::py_config()$python             # ...r-miniconda/envs/osmnx-env/python.exe
+reticulate::py_module_available("osmnx")   # TRUE
+
 # Bind reticulate to osmnx-env before any Python runs. reticulate can bind to
 # only one Python per R session: if a Python chunk runs first (e.g. after an
 # R restart), it starts reticulate's default Python, which has no osmnx, and
@@ -450,7 +453,6 @@ def features_from_local(query, tags):
     gdf = ox.features_from_xml(CROSSING_XML, tags=tags)
     return gdf.rename_axis(index={"element": "element_type", "id": "osmid"})
 
-
 ox.graph_from_place = graph_from_local
 ox.features_from_place = features_from_local
 
@@ -492,7 +494,7 @@ tile_offset <- function(lat, lon, z = 19) {
   2 * pmax(abs(xt %% 1 - 0.5), abs(yt %% 1 - 0.5))
 }
 
-all_intersections <- st_read("output/all_intersections.shp") %>%
+all_intersections <- st_read("data/intersections/study_area_intersections.gpkg") %>%
   st_transform(crs = 3435)
 
 nearest_edge <- st_nearest_feature(all_intersections, crosswalk_edges)
@@ -516,14 +518,14 @@ candidates <- candidates %>%
     lat = round(ll[, "Y"], 6),
     lon = round(ll[, "X"], 6),
     id = crosswalk_id(lat, lon),
-    geography = if_else(muni_name == "Chicago", "chicago", "suburban"),
+    geography = if_else(location == "Chicago, IL", "chicago", "suburban"),
     tile_offset = tile_offset(lat, lon)
   ) %>%
   distinct(id, .keep_all = TRUE) %>%
   group_by(geography) %>%
   slice_sample(n = pool_per_group) %>%
   ungroup() %>%
-  select(id, lat, lon, geography, muni_name, tile_offset, dist_to_osm_crossing_ft)
+  select(id, lat, lon, geography, name, tile_offset, dist_to_osm_crossing_ft)
 
 count(candidates, geography)  # expect 300 per geography
 
