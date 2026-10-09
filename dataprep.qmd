@@ -405,18 +405,19 @@ The reference repo is cloned next to the OSM files, and the packages its OSM cod
 # R restart), it starts reticulate's default Python, which has no osmnx, and
 # `import osmnx` fails until R is restarted.
 reticulate::use_condaenv("osmnx-env", required = TRUE)
-if (!grepl("osmnx-env", reticulate::py_config()$python, fixed = TRUE)) {
-  stop("Python is bound to ", reticulate::py_config()$python, ", not osmnx-env. ",
-       "If RETICULATE_PYTHON is set (Sys.getenv(\"RETICULATE_PYTHON\"); RStudio sets it ",
-       "from Tools > Global/Project Options > Python), clear it or point it at osmnx-env; ",
-       "then restart R and run this chunk before the Python chunk below.")
+if (!reticulate::py_module_available("osmnx")) {
+  stop("Python is bound to ", reticulate::py_config()$python, ", which has no osmnx. ",
+       "This needs the conda env osmnx-env (not a virtualenv of the same name). ",
+       "RStudio binds its own default Python when a Python chunk runs first: set ",
+       "Tools > Project Options > Python to the conda env osmnx-env, restart R, ",
+       "and run this chunk before the Python chunk below.")
 }
 
 if (!dir.exists("data/osm/crossing-distances")) {
   system2("git", c("clone", "https://github.com/agupta01/crossing-distances.git",
                    "data/osm/crossing-distances"))
 }
-reticulate::py_install(c("modal", "geopy", "tqdm"), envname = "osmnx-env", pip = TRUE)
+reticulate::conda_install("osmnx-env", c("modal", "geopy", "tqdm"), pip = TRUE)
 ```
 
 `osm_ingest_local()` is then called with OSMnx's two place-based download functions pointed at the local files. The reference code expects the OSMnx 1.x feature index names (`element_type`, `osmid`); OSMnx 2.x renamed them to `element` and `id`, so the replacement for `features_from_place` renames them back. Building the unsimplified countywide graph is the memory-heavy step (plan on 16–32 GB of RAM).
