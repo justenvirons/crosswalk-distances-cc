@@ -4,14 +4,17 @@ data/infrastructure/*
 data/census/*
 data/crashes/*
 data/boundaries/*
-data/modeling/c25q4_100*
+data/modeling/cmap/*
 output/all_streets*.*
 output/ped_fatalities*.*
 output/all_ped_fatalities*.*
 data/osm/*
+*.geojson
 *.pbf
 _book/*
 *.jpg
+*.tif
+*.xml
 
 # History files
 .Rhistory
