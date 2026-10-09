@@ -9,6 +9,7 @@ project:
     - phase01_intersections.qmd
     - phase01_crosswalk_models.qmd
     - dataprep.qmd
+    - phase01_modal_runbook.qmd
     - phase02.qmd
     - phase03.qmd
     - phase04.qmd
@@ -52,6 +53,7 @@ book:
     - references.qmd
   appendices:
     - dataprep.qmd
+    - phase01_modal_runbook.qmd
 
 bibliography: references.bib
 

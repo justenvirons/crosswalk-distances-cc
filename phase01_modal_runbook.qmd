@@ -1,61 +1,15 @@
----
-title: "Phase 1 — Modal + SAM 3 Runbook: Crossing-Distance Imagery Comparison"
-subtitle: "Street Design as a Public Health Determinant: Crosswalk Geometry and Pedestrian Injury Risk Across Cook County"
-author:
-  - name: "C. Scott Smith, PhD AICP"
-    affiliations:
-      - name: "DePaul University"
-      - name: "Cook County Department of Public Health (CCDPH)"
-    email: c.scott.smith@depaul.edu
-  - name: "Zane Sufi"
-    affiliations:
-      - name: "Oak Park River Forest High School"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    number-sections: false
-    theme: cosmo
-    embed-resources: true
-    code-copy: true
-  pdf:
-    toc: true
-    number-sections: true
-editor: source
-bibliography: references.bib
----
+# Pipeline Runbook {#sec-runbook}
 
 ## Read First
 
 This runbook takes a fresh Ubuntu server to crossing-distance measurements from two imagery sources, segmented by one model, on a stratified sample of Cook County intersections. Modal does all GPU and bulk-fetch work. The scripts are in `crosswalk_pipeline.tar.gz` and unpack into `~/crosswalk/pipeline`.
 
-| Candidate | Imagery | Segmentation | Status |
-|---|---|---|---|
-| A | Google Maps satellite tiles (reference methodology's original source) | SAM 3, configuration chosen by benchmark | Not started |
-| B | Cook County 3-band RGB orthoimagery (CookOrtho2025, leaf-off, single vintage) | SAM 3, same configuration | Not started |
-
-: Imagery candidates for Aims 1a and 1b {.striped}
-
-**Design.** Both candidates go through the same model, the same prompt configuration, and the same measurement step, so differences in error against ground truth are attributable to the imagery. Instead of the reference methodology's SAM 2.1 mask grid and privately fine-tuned checkpoint [@moran2026scaling], SAM 3 [@carion2025sam3segmentconcepts] is asked for the drivable surface directly. The reference's OSM crossing extraction and grow-cut measurement are reused unchanged. County 4-band imagery is used only to screen candidate intersections for canopy cover when stratifying the sample.
-
-**How SAM 3 is used.** Recent evaluations show that text-only prompting is SAM 3's weak point from overhead, and roads are its weakest class. In a July 2026 study on the DIOR aerial benchmark, a single exemplar box scored 66.6 mAP against 11.7 for text alone. SegEarth-OV3, a training-free SAM 3 method for remote sensing, raised road IoU by fusing SAM 3's semantic head with its instance masks. The pipeline therefore supports three prompt modes and three fusion rules:
-
-| Setting | Options |
-|---|---|
-| Prompt mode | `text` (a phrase such as "road"); `box` (5 m exemplar boxes on OSM road centre-lines ~15 m from the intersection, no text); `text+box` |
-| Fusion | `instance` (union of instance masks, SAM 3's default output); `semantic` (semantic head × presence); `fused` (max of instance and semantic, × presence, threshold 0.3 — the SegEarth-OV3 rule) |
-| Negatives | Optional competing phrases (e.g. sidewalk, grass, building): a pixel is road only where road scores highest |
-| Rule | `positive` (road probability above threshold) or `complement` (road = wherever no non-drivable phrase — sidewalk, grass, building, tree — exceeds the threshold, matching how the labels were drawn) |
-| Threshold | Probability cut-off, default 0.3; lower values reach further toward the curb |
-| Hole fill | Fill enclosed non-road holes smaller than N m² (parked cars, crosswalk paint); holes touching the clip edge and larger islands are kept |
-
-: SAM 3 configuration options {.striped}
-
-The configuration is chosen on labelled data before any Cook County measurement (4.6–4.7), then frozen for both candidates.
+The design behind these steps — the two imagery candidates (A, Google Maps; B, Cook County 3-band RGB), why SAM 3 replaces the reference methodology's SAM 2.1, the SAM 3 configuration options, the benchmark and fine-tuning results, and the sample design — is in [Crossing Distance: Imagery Source and Segmentation Model Comparison](phase01_crosswalk_models.html). This appendix covers only how to run it. The R equivalents of steps 4.2–4.4 are in [Appendix A: Data Preparation Code](dataprep.html).
 
 ::: {.callout-note}
 ## What has and hasn't been tested
+
+Run on Modal so far: zero-shot benchmark rounds (`zs2`, `zs3`), fine-tuning run `ft1`, and holdout runs `ho_zs`, `ho_ft1`, `ho_ft1_last`; results are in `data/modeling/`.
 
 Tested locally on 2026-10-08:
 
@@ -68,7 +22,7 @@ Tested locally on 2026-10-08:
 - Sample selection on the project's 169,456-point intersection layer.
 - Fine-tuning plumbing on a randomly initialised SAM 3 (CPU): gradients reach only the segmentation head, and the saved head reloads. Also the curb weighting, the augmentation and the holdout split, which has no original shared across holdout, validation and training.
 
-Not yet tested: a fine-tuning run with the real SAM 3 weights on a GPU, live calls to Modal, the Cook County ImageServer, Google tiles, Overpass, and Roboflow. Expect small fixes on the first run.
+Not yet run: the county pilot check (4.8), the evaluation-sample fetch and segmentation (4.9–4.10), and grow-cut on SAM 3 output (4.11). Expect small fixes on the first run.
 :::
 
 | Script | Runs on | Does |
@@ -82,7 +36,7 @@ Not yet tested: a fine-tuning run with the real SAM 3 weights on a GPU, live cal
 | `04_bench_prep.py` | server | Public curb dataset → images, ground-truth road masks, OSM prompt boxes |
 | `cc_benchmark.py` | Modal GPU | Scores every SAM 3 configuration against the labels (IoU, boundary F1); `--subset holdout`, `--delta` |
 | `05_make_holdout.py` | server | Holdout / validation / training split of the curb dataset by original image |
-| `cc_finetune.py` | Modal GPU | Fine-tunes SAM 3's segmentation head on the curb labels → `seg_head_best.pt` |
+| `cc_finetune.py` | Modal GPU | Fine-tunes SAM 3's segmentation head on the curb labels → `seg_head_best.pt`, `seg_head_last.pt` |
 | `cc_segment.py` | Modal GPU | Chosen configuration → `cross_walks.geojson` + QA overlays; pilot grid mode |
 | `03_grow_cut.sh` | server | Reference grow-cut, unchanged → `refined_crosswalks_v3_0_4.csv` (`length_ft`) |
 | `cc_sam3.py`, `cc_geom.py`, `cc_common.py` | shared | SAM 3 core; box geometry and metrics; constants |
@@ -209,8 +163,7 @@ SAM 3 runs inside a Modal container image defined in `cc_segment.py` (Python 3.1
 
 ::: {.callout-tip}
 ## SAM 3 vs. SAM 3.1
-
-SAM 3.1 (March 2026) adds *Object Multiplex*, a faster way to track many objects through video, with a new video checkpoint. Still images use the SAM 3 image checkpoint (`facebook/sam3`, `sam3.pt`), which is what this pipeline loads. As of October 2026 no newer Meta image checkpoint exists; recent progress on overhead imagery has come from how SAM 3 is prompted and how its outputs are combined, which this pipeline adopts.
+SAM 3.1's change (Object Multiplex) applies to video tracking only, so still images use the SAM 3 image checkpoint (`facebook/sam3`, `sam3.pt`). See [the model section of the comparison chapter](phase01_crosswalk_models.html).
 :::
 
 1. **SAM 3 weights.** Request access at [huggingface.co/facebook/sam3](https://huggingface.co/facebook/sam3) (accept Meta's licence terms; wait for approval). Create a read token under Settings → Access Tokens, store it as a Modal secret, then download and smoke-test:
@@ -304,7 +257,7 @@ uv run modal volume get --env cook --force cc-results /bench_runs/zs1 ../data/re
 
 In `../data/results/bench/zs1/`, `summary.csv` ranks configurations by mean **boundary F1 at 0.5 m** — how closely the predicted road edge follows the true curb, the quantity grow-cut cuts on — with IoU alongside. `summary_by_source.csv` repeats the scores by image source and by whether OSM boxes were available; judge box modes only on the `has_boxes = True` rows, and give most weight to the coordinate-named Google clips, which match candidate A's imagery. The 0.5 m tolerance assumes a 50 m clip; for Esri patches and screenshots the scale is unknown, so there it is a fixed ~10 px tolerance, comparable across configurations but not in metres. Review `qa/<config>/` for the top few: road tinted, predicted edge magenta, true curb green, prompt boxes yellow.
 
-**Round 2 (after the first run).** On the 165 Google clips the first run's best setting ("road", fused) reached IoU 0.65 but boundary F1 of only 0.35, and predicted road area was a median 77% of the true drivable area. SAM 3's "road" leaves out parked cars, crosswalk paint and shadows that the labels count as drivable, and each hole adds a false edge inside the road. A second grid tests fixes for that:
+**Round 2 (after the first run).** If the best first-round setting under-calls road (`area_ratio_median` well below 1, because parked cars, crosswalk paint and shadows are left out and each hole adds a false edge), run a second grid that tests fixes for it:
 
 ```bash
 uv run modal run cc_benchmark.py --run-name zs3 --modes text --fusions fused \
@@ -314,7 +267,7 @@ uv run modal run cc_benchmark.py --run-name zs3 --modes text --fusions fused \
 
 45 configurations. `summary.csv` now also reports boundary F1 at 1.0 m (`bf1_1m_mean`) and the median predicted/true road area (`area_ratio_median`, below 1 = road under-called).
 
-**Round 2 result.** The best zero-shot setting on the 165 Google clips was "road, car, crosswalk" with negatives "sidewalk, grass, building, tree", fused, threshold 0.15, holes under 25 m² filled: boundary F1 0.44 at 0.5 m and 0.55 at 1 m, IoU 0.70, road area 93% of true. The threshold, the negatives and the hole fill each added 2–3 points; the complement rule was worse (over-calls road by about 20%). Record this as the zero-shot baseline in `data/results/README`. At this level fewer than half the clips have a curb edge within 1 m of the truth along most of its length, which is too weak to hand to grow-cut, so fine-tune (4.7) and compare on held-out clips before choosing.
+Record the best zero-shot setting and its scores as the baseline in `data/results/README` (the current results are summarized in the comparison chapter). If its boundary F1 is too weak to hand to grow-cut, fine-tune (4.7) and compare on held-out clips before choosing.
 
 ### 4.7 Fine-tune SAM 3 on the curb labels
 
@@ -352,11 +305,15 @@ uv run modal run cc_benchmark.py --run-name ho_ft1 --subset holdout \
     --delta finetuned/ft1/seg_head_best.pt --modes text --fusions semantic,fused \
     --prompt-sets "road" --negative-sets ";sidewalk,grass,building,tree" \
     --prob-thds 0.3,0.4,0.5 --fill-holes 0,25
-uv run modal volume get --env cook --force cc-results /bench_runs/ho_zs ../data/results/bench/
-uv run modal volume get --env cook --force cc-results /bench_runs/ho_ft1 ../data/results/bench/
+uv run modal run cc_benchmark.py --run-name ho_ft1_last --subset holdout \
+    --delta finetuned/ft1/seg_head_last.pt --modes text --fusions semantic \
+    --prompt-sets "road" --prob-thds 0.3,0.4,0.5 --fill-holes 25
+for r in ho_zs ho_ft1 ho_ft1_last; do
+  uv run modal volume get --env cook --force cc-results /bench_runs/$r ../data/results/bench/
+done
 ```
 
-Both runs print `subset holdout: 40 of 40 listed originals found`. The head is trained on the semantic map for "road", so semantic fusion with "road" alone is the expected winner; the fused and negative-class variants check whether the instance masks or other phrases still help. The zero-shot baseline's settings were chosen on all 165 clips, holdout included, so its holdout score is, if anything, flattering. **Choose:** adopt the fine-tuned head if its best configuration beats the baseline's boundary F1 by more than ~0.05 on the holdout and its QA overlays (`qa/<config>/`) follow the curbs. Record both scores, the run name, and the chosen configuration in `data/results/README`. Then use `--delta finetuned/ft1/seg_head_best.pt` with that configuration in 4.8 and 4.10.
+Each run prints `subset holdout: 40 of 40 listed originals found`. The head is trained on the semantic map for "road", so semantic fusion with "road" alone is the expected winner; the fused and negative-class variants check whether the instance masks or other phrases still help. The zero-shot baseline's settings were chosen on all 165 clips, holdout included, so its holdout score is, if anything, flattering. **Choose:** adopt the fine-tuned head if its best configuration beats the baseline's boundary F1 by more than ~0.05 on the holdout and its QA overlays (`qa/<config>/`) follow the curbs. Record both scores, the run name, and the chosen configuration in `data/results/README`. Score both the best-validation head (`seg_head_best.pt`) and the final-epoch head (`seg_head_last.pt`): with only 15 validation originals, the best-epoch pick is noisy. In run `ft1` the final-epoch head scored higher on the holdout (boundary F1 0.54 vs. 0.49; zero-shot 0.44). Then use `--delta` with the chosen head and configuration in 4.8 and 4.10.
 
 ### 4.8 County pilot check
 
@@ -373,7 +330,7 @@ mkdir -p ../data/results/pilot_B
 uv run modal volume get --env cook --force cc-results /pilot_B/pilot ../data/results/pilot_B/
 ```
 
-Set `--modes/--fusions/--prompt-sets/--negative-sets` to the finalists from 4.6 and 4.7 (the values above are an example), and add `--delta finetuned/ft1/seg_head_best.pt` if the fine-tuned head was adopted. Each configuration gets its own folder of QA overlays, and `pilot_summary.csv` reports road fraction, empty-mask rate, and box fall-backs. **Check:** curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B's segmentation quality is measured rather than assumed.
+Set `--modes/--fusions/--prompt-sets/--negative-sets` to the finalists from 4.6 and 4.7 (the values above are an example), and add `--delta finetuned/ft1/<chosen head>` if the fine-tuned head was adopted. Each configuration gets its own folder of QA overlays, and `pilot_summary.csv` reports road fraction, empty-mask rate, and box fall-backs. **Check:** curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B's segmentation quality is measured rather than assumed.
 
 ### 4.9 Imagery for the evaluation sample
 
@@ -386,13 +343,13 @@ uv run modal run cc_fetch.py --source B --input ../data/sample/sample.csv --out-
 
 ### 4.10 Segmentation
 
-Run the frozen configuration on both candidates (example values shown, for the fine-tuned head from 4.7; for the zero-shot baseline drop `--delta` and use `--fusion fused --prompts "road,car,crosswalk" --negatives "sidewalk,grass,building,tree" --prob-thd 0.15 --fill-holes-m2 25`):
+Run the frozen configuration on both candidates (example values shown: the leading holdout configuration from 4.7, final-epoch head; for the zero-shot baseline drop `--delta` and use `--fusion fused --prompts "road,car,crosswalk" --negatives "sidewalk,grass,building,tree" --prob-thd 0.15 --fill-holes-m2 25`):
 
 ```bash
 uv run modal run cc_segment.py --source A --mode text --fusion semantic --prompts road \
-    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_best.pt --run-name v1
+    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_last.pt --run-name v1
 uv run modal run cc_segment.py --source B --mode text --fusion semantic --prompts road \
-    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_best.pt --run-name v1
+    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_last.pt --run-name v1
 ```
 
 Add `--limit 10` for a first plumbing run. **Check:** in `segment_stats.csv`, `empty` is false and `box_fallback_to_text` is rare on nearly all clips; the QA overlays (`mkdir -p ../data/results/qa_B && uv run modal volume get --env cook --force cc-results /B_cook_rgb/v1/qa ../data/results/qa_B/`) follow the curbs.
@@ -420,24 +377,7 @@ Each box is a 5 m square on an OSM road centre-line, placed on the first ring (1
 
 ### Resolution
 
-SAM 3 resizes every input to 1008 × 1008, so what the model sees is set by the clip footprint, not the pixel count requested. With the 50 m clip, both candidates reach the model at about 5 cm per pixel. Keep the 25 m radius fixed across candidates and across the benchmark (whose clips use the same radius).
-
-### If the fine-tuned head is still not enough
-
-4.7 retrains only the segmentation head. Next steps, in order of cost: (1) more labels from your own imagery — 50–100 county clips labelled the same way, added to training, also make candidate B's quality measurable; (2) also unfreeze the last blocks of the fusion encoder (more memory, higher overfitting risk on ~200 originals); (3) a small segmentation head on Meta's satellite-pretrained DINOv3 backbone ([`dinov3-vitl16-pretrain-sat493m`](https://huggingface.co/facebook/dinov3-vitl16-pretrain-sat493m)). Score each on the same holdout before using it.
-
-### Differences from the reference code
-
-| Item | Reference | Here |
-|---|---|---|
-| Model | SAM 2.1 Hiera Base+, privately fine-tuned | SAM 3 image model, open weights |
-| Drivable surface | Auto-mask grid → drop masks on OSM roads → invert non-drivable | Road probability from text and/or OSM box prompts, fused instance + semantic heads |
-| Configuration choice | Fixed | Chosen on labelled data (4.6–4.7), fine-tuned head if it wins on the holdout, frozen for both candidates |
-| Georeferencing of masks | Rebuilt from the file name, assuming a 25 m radius | Read from each GeoTIFF's transform |
-| "Within 25 m of a crossing" join | EPSG:3857 (≈ 18.6 m on the ground at 41.9° N) | EPSG:3435 feet, true 25 m |
-| OSM crossing extraction, grow-cut | — | Reference code, unchanged |
-
-: Where the pipeline differs from agupta01/crossing-distances {.striped}
+SAM 3 resizes every input to 1008 × 1008, so keep the 25 m radius fixed across candidates and across the benchmark (whose clips use the same radius). If the fine-tuned head is still not good enough, see the next steps listed under Open Questions in the comparison chapter.
 
 ### CRS, datum, and data terms
 

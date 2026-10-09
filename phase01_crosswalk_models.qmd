@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This chapter operationalizes Aim 1a ([Background and Aims](phase00.html)). Before the countywide crossing-distance dataset (Aim 1b) is produced, two imagery sources are compared against manually measured ground truth on a stratified sample of intersections: Google Maps satellite imagery and Cook County orthoimagery. Both are segmented by the same SAM 3.1-generation model. The result decides which imagery source Aim 1b runs at full scale. This chapter covers the comparison design and the reasoning behind it. The step-by-step commands, scripts, and Modal setup are in the companion runbook, `phase01_modal_runbook.qmd`. The R equivalents of its candidate-pool and sample-selection steps are in [Appendix A: Data Preparation Code](dataprep.html).
+This chapter operationalizes Aim 1a ([Background and Aims](phase00.html)). Before the countywide crossing-distance dataset (Aim 1b) is produced, two imagery sources are compared against manually measured ground truth on a stratified sample of intersections: Google Maps satellite imagery and Cook County orthoimagery. Both are segmented by the same SAM 3.1-generation model. The result decides which imagery source Aim 1b runs at full scale. This chapter covers the comparison design and the reasoning behind it. The step-by-step commands, scripts, and Modal setup are in [Appendix B: Pipeline Runbook](phase01_modal_runbook.html). The R equivalents of its candidate-pool and sample-selection steps are in [Appendix A: Data Preparation Code](dataprep.html).
 
 This comparison is also designed to stand on its own as a methods contribution: a rigorous, ground-truth-validated test of whether a documented, single-vintage, leaf-off county orthoimagery product outperforms the commercial satellite basemap imagery the reference methodology [@moran2024multiscale; @moran2026scaling] was built on — independent of this project's applied safety analyses in Aims 2–4.
 
@@ -86,7 +86,7 @@ The configuration is chosen by measurement on the public [Satellite Curb Segment
 
 : Holdout scores, zero-shot vs. fine-tuned SAM 3 (`data/modeling/ho_zs`, `ho_ft1`, `ho_ft1_last`) {.striped}
 
-The adoption rule from the runbook is to use the fine-tuned head if it beats the zero-shot baseline's boundary F1 by more than ~0.05 on the holdout and its QA overlays follow the curbs. The final-epoch head clears that bar (+0.10); the best-validation-epoch head (+0.05) is borderline.
+The adoption rule from the runbook (step 4.7) is to use the fine-tuned head if it beats the zero-shot baseline's boundary F1 by more than ~0.05 on the holdout and its QA overlays follow the curbs. The final-epoch head clears that bar (+0.10); the best-validation-epoch head (+0.05) is borderline.
 
 ### Current model parameters
 
@@ -106,7 +106,7 @@ The adoption rule from the runbook is to use the fine-tuned head if it beats the
 
 : Model parameters, reference vs. this project {.striped}
 
-The configuration is confirmed on the county pilot set (runbook step 4.8) before being frozen for both candidates.
+The configuration is confirmed on the county pilot set ([Appendix B: Pipeline Runbook](phase01_modal_runbook.html), step 4.8) before being frozen for both candidates.
 
 ## Comparison Design
 
@@ -148,7 +148,7 @@ Select the imagery source with the lower error against ground truth and the lowe
 
 ## Open Questions
 
-- **Which fine-tuned head to freeze:** the final-epoch head (`seg_head_last.pt`) scores higher on the holdout than the best-validation-epoch head (`seg_head_best.pt`), which the runbook's step 4.10 example currently references. The 15-image validation set is small and noisy. Confirm the choice on QA overlays and the county pilot before freezing, and record it in `data/results/README`.
+- **Which fine-tuned head to freeze:** the final-epoch head (`seg_head_last.pt`) scores higher on the holdout than the best-validation-epoch head (`seg_head_best.pt`), which the runbook originally used; the runbook's step 4.10 example now uses the final-epoch head. The 15-image validation set is small and noisy. Confirm the choice on QA overlays and the county pilot before freezing, and record it in `data/results/README`.
 - **Fine-tuned quality is still modest:** boundary F1 at 0.5 m of ~0.54 means many curb edges are off by more than half a metre. Next steps, in order of cost: label 50–100 county clips and add them to training (which also makes Candidate B's segmentation quality measurable rather than assumed); unfreeze the last blocks of the fusion encoder; or train a small head on Meta's satellite-pretrained DINOv3 backbone.
 - **County-imagery domain shift:** every label is on Google imagery. If county clips behave clearly worse for every finalist in the pilot check, label 20–30 county clips before the full run.
 - **Sample size:** 152 is set by the stratified design, not a power calculation. Refine once the ground-truth protocol's per-intersection cost is known.

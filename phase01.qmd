@@ -62,7 +62,7 @@ All processing uses a downloaded OSM file, so no online map service (Overpass AP
 
 Supports **Aim 1** directly — this is the study's core measured variable, and a prerequisite for Aims 2–4's crossing-distance exposure variable.
 
-Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for the two candidate imagery sources (Google Maps imagery and Cook County 3-band RGB orthoimagery), both segmented by the same SAM 3 model (SAM 3.1 generation) with a fine-tuned segmentation head; the Modal runbook (`phase01_modal_runbook.qmd`) has the commands.
+Per Aim 1a ([Background and Aims](phase00.html)), imagery source and segmentation model selection is being validated on a sample of intersections before the countywide production run (Aim 1b). See [Crossing Distance Model Comparison](phase01_crosswalk_models.html) for the detailed comparison design and operationalization steps for the two candidate imagery sources (Google Maps imagery and Cook County 3-band RGB orthoimagery), both segmented by the same SAM 3 model (SAM 3.1 generation) with a fine-tuned segmentation head; [Appendix B: Pipeline Runbook](phase01_modal_runbook.html) has the commands.
 
 **Status: in progress.**
 

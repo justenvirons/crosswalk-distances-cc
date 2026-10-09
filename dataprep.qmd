@@ -457,7 +457,7 @@ nrow(crosswalk_edges)  # expect tens of thousands of lines
 
 ### Candidate pool
 
-Equivalent to the runbook's `01_build_candidates.py` (step 4.2). It keeps intersections with an OSM crossing edge within 25 m, labels each as Chicago or suburban, and computes its position within the zoom-19 Google tile grid (`tile_offset`: 0 = tile centre, 1 = tile edge). It then draws up to 300 per geography. The `id` follows the reference repo's clip naming (e.g. `41878123N_87629456W`), which the Modal fetch step also uses, so later tables join on it. The draws use R's random number generator, so they differ from the Python script's at the same seed.
+Equivalent to `01_build_candidates.py` in [Appendix B: Pipeline Runbook](phase01_modal_runbook.html) (step 4.2). It keeps intersections with an OSM crossing edge within 25 m, labels each as Chicago or suburban, and computes its position within the zoom-19 Google tile grid (`tile_offset`: 0 = tile centre, 1 = tile edge). It then draws up to 300 per geography. The `id` follows the reference repo's clip naming (e.g. `41878123N_87629456W`), which the Modal fetch step also uses, so later tables join on it. The draws use R's random number generator, so they differ from the Python script's at the same seed.
 
 ```{r}
 #| label: candidate-pool
