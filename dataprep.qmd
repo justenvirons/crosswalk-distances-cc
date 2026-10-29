@@ -34,6 +34,7 @@ library(stringr)       # string helpers (str_replace, str_starts)
 library(tidycensus)    # download American Community Survey (ACS) data
 library(sociome)       # compute Area Deprivation Index (ADI) from ACS data
 library(arcgislayers)  # query ArcGIS feature services (CMAP land use)
+library(openxlsx)      # write formatted Excel workbooks (study area analytical dataset)
 ```
 
 ## Study Area Geography
@@ -1320,6 +1321,94 @@ study_area_dictionary %>%
   filter(variable %in% analysis_vars) %>%
   arrange(match(variable, analysis_vars)) %>%
   write_csv("data/analysis/study_area_analysis_dictionary.csv")
+```
+
+### Export to Excel
+
+Writes `study_area_analysis` (without geometry) and its data dictionary to `data/analysis/study_area_analysis.xlsx`, one sheet each. Each column of the dataset gets a number format that suits its data type. The formats change only how values are displayed; the stored values keep full precision.
+
+| Variables | Excel format | Example |
+|---|---|---|
+| `geoid`, `name`, `location`, `type` | text, left-aligned | `1714000` |
+| `total_population`, `intersections`, `ped_crashes`, `ped_fatalities` | whole number with thousands separator | `12,345` |
+| `area_sqmi` | 2 decimals | `3.47` |
+| `median…` ADI indicators | US dollars, no cents | `$65,400` |
+| `pct…` ADI indicators (stored as 0–1 proportions) | percent, 1 decimal | `23.4%` |
+| `ratioThoseMakingUnder10kToThoseMakingOver50k` (log scale) | 2 decimals | `2.31` |
+| `ADI` and the three ADI-3 subscales | 1 decimal | `104.2` |
+| walkability scores (area-weighted means) | 2 decimals | `-7.25` |
+
+```{r}
+#| label: analysis-excel
+
+analysis_tbl <- st_drop_geometry(study_area_analysis)
+
+text_vars  <- c("geoid", "name", "location", "type")
+count_vars <- c("total_population", "intersections", "ped_crashes", "ped_fatalities")
+
+column_formats <- tibble(variable = names(analysis_tbl)) %>%
+  left_join(select(study_area_dictionary, variable, group), by = "variable") %>%
+  mutate(
+    num_fmt = case_when(
+      variable %in% text_vars                                  ~ "@",
+      variable %in% count_vars                                 ~ "#,##0",
+      variable == "area_sqmi"                                  ~ "#,##0.00",
+      str_starts(variable, "median")                           ~ "$#,##0",
+      str_starts(variable, "pct")                              ~ "0.0%",
+      variable == "ratioThoseMakingUnder10kToThoseMakingOver50k" ~ "0.00",
+      group == "ADI"                                           ~ "0.0",
+      group == "Walkability"                                   ~ "0.00",
+      TRUE                                                     ~ "0.00"  # undocumented numeric columns
+    ),
+    halign = if_else(num_fmt == "@", "left", "right")
+  )
+
+header_style <- createStyle(
+  textDecoration = "bold", fgFill = "#D9E1F2", border = "bottom",
+  wrapText = TRUE, valign = "top", halign = "center"
+)
+
+wb <- createWorkbook()
+
+# Sheet 1: the analytical dataset
+addWorksheet(wb, "study_area_analysis")
+writeData(wb, "study_area_analysis", analysis_tbl, headerStyle = header_style)
+
+data_rows <- seq_len(nrow(analysis_tbl)) + 1
+for (i in seq_len(nrow(column_formats))) {
+  addStyle(
+    wb, "study_area_analysis",
+    style = createStyle(numFmt = column_formats$num_fmt[i], halign = column_formats$halign[i]),
+    rows = data_rows, cols = i, gridExpand = TRUE
+  )
+}
+
+text_cols <- which(column_formats$variable %in% text_vars)
+setColWidths(wb, "study_area_analysis", cols = text_cols, widths = "auto")
+setColWidths(wb, "study_area_analysis", cols = setdiff(seq_len(ncol(analysis_tbl)), text_cols),
+             widths = 14)
+setRowHeights(wb, "study_area_analysis", rows = 1, heights = 60)  # wrapped long variable names
+freezePane(wb, "study_area_analysis", firstActiveRow = 2, firstActiveCol = 3)  # keep geoid, name visible
+addFilter(wb, "study_area_analysis", rows = 1, cols = seq_len(ncol(analysis_tbl)))
+
+# Sheet 2: the data dictionary (all text, wrapped)
+dictionary_tbl <- read_csv("data/analysis/study_area_analysis_dictionary.csv", show_col_types = FALSE)
+
+addWorksheet(wb, "data_dictionary")
+writeData(wb, "data_dictionary", dictionary_tbl, headerStyle = header_style)
+addStyle(
+  wb, "data_dictionary",
+  style = createStyle(numFmt = "@", wrapText = TRUE, valign = "top"),
+  rows = seq_len(nrow(dictionary_tbl)) + 1, cols = seq_len(ncol(dictionary_tbl)),
+  gridExpand = TRUE
+)
+setColWidths(wb, "data_dictionary", cols = seq_len(ncol(dictionary_tbl)),
+             widths = c(variable = 32, group = 18, definition = 60,
+                        source = 45, interpretation = 60)[names(dictionary_tbl)])
+freezePane(wb, "data_dictionary", firstActiveRow = 2, firstActiveCol = 2)
+addFilter(wb, "data_dictionary", rows = 1, cols = seq_len(ncol(dictionary_tbl)))
+
+saveWorkbook(wb, "data/analysis/study_area_analysis.xlsx", overwrite = TRUE)
 ```
 
 ## Read, Format and Save
