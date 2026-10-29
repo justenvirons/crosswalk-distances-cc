@@ -10,7 +10,7 @@ editor_options:
 
 ## Purpose
 
-This chapter contains the code that builds the `sf` data tables that support [Dataset Development](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, OSM crossing edges and the crossing-distance comparison sample, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), and crash records (IDOT). It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which [Dataset Development](phase01.html) loads (a subset of) to build an interactive map for data exploration.
+This chapter contains the code that builds the `sf` data tables that support [Dataset Development](phase01.html)'s dataset-development tasks: the countywide study-area geography, street intersections, OSM crossing edges and the crossing-distance comparison sample, the street/speed-limit network, pedestrian fatality records (NHTSA FARS), crash records (IDOT), and the Area Deprivation Index (ADI). These are combined into a study-area analytical dataset (`study_area_analysis`) with its data dictionary. It ends by saving the resulting tables to `data/phase01_dataprep.RData`, which [Dataset Development](phase01.html) loads (a subset of) to build an interactive map for data exploration.
 
 ## Activate R Libraries
 
@@ -1031,8 +1031,10 @@ tracts_with_ca <- tracts_raw %>%
 adi_ca_agg <- tracts_with_ca %>%
   group_by(commarea_geoid, commarea_name) %>%
   summarise(
-    across(all_of(adi_sum_vars), \(x) sum(x, na.rm = TRUE)),
+    # medians first: they are weighted by tract population (B01003_001), which
+    # the sum below then replaces with the community area total
     across(all_of(adi_median_vars), \(x) weighted.mean(x, w = B01003_001, na.rm = TRUE)),
+    across(all_of(c(adi_sum_vars, "B01003_001")), \(x) sum(x, na.rm = TRUE)),
     .groups = "drop"
   ) %>%
   rename(GEOID = commarea_geoid, NAME = commarea_name) %>%
@@ -1053,7 +1055,7 @@ This step calculates ADI for each municipality in suburban Cook County. The Cens
 places_raw <- get_acs_tidy_wide(
   geography = "place",
   state = "17",
-  variables = adi_acs_vars
+  variables = c(adi_acs_vars, "B01003_001")  # + total population
 )
 
 suburban_place_geoids <- places_cook_county$geoid
@@ -1085,6 +1087,241 @@ adi_study_area <- adi_community_areas %>%
 write_csv(adi_study_area, "data/census/adi_study_area.csv")
 ```
 
+## Study Area Analytical Dataset
+
+This section builds `study_area_analysis`, one row per study area (Chicago community area or suburban municipality), for the area-level analyses. It keeps the `study_area` fields and adds:
+
+1. total population (from the ADI dataset) and land-plus-water area in square miles;
+2. the ADI score, its three ADI-3 subscales and its 15 indicators (`ADI` through `pctHouseholdsWithOverOnePersonPerRoom`);
+3. the count of street intersections;
+4. the count of IDOT pedestrian crashes, 2022–2024;
+5. the count of FARS fatal pedestrian crashes, 2022–2024;
+6. area-weighted mean CMAP walkability scores, `MarketScor` through `TotalScore`.
+
+It reads the files written by the sections above, so it can run in a fresh session once they exist. A data dictionary describing each variable follows the code.
+
+### Inputs
+
+```{r}
+#| label: analysis-inputs
+
+study_area_base <- st_read("data/boundaries/study_area.gpkg", quiet = TRUE) %>%
+  st_transform(3435)
+
+adi_study_area <- read_csv(
+  "data/census/adi_study_area.csv",
+  col_types = cols(GEOID = col_character(), NAME = col_character())
+)
+
+intersections_sa  <- st_read("data/intersections/study_area_intersections.gpkg", quiet = TRUE)
+ped_crashes_sa    <- st_read("data/crashes/cc_ped_crashes_2022_2024.gpkg", quiet = TRUE)
+ped_fatalities_sa <- st_read("data/crashes/ped_fatalities.gpkg", quiet = TRUE)
+walkability_sa    <- st_read("data/infrastructure/walkability.gpkg", quiet = TRUE) %>%
+  st_transform(3435)
+```
+
+### Population, area and ADI
+
+Total population is ACS table B01003 (`B01003_001`), carried through the ADI calculation above: summed across tracts for community areas, and taken directly from the Census place estimate for municipalities. Area is computed from each study area's polygon in EPSG:3435 and includes water.
+
+```{r}
+#| label: analysis-adi
+
+if (!"B01003_001" %in% names(adi_study_area)) {
+  stop("adi_study_area.csv has no B01003_001 (total population). ",
+       "Re-run the Area Deprivation Index (ADI) section to add it.")
+}
+
+adi_analysis <- adi_study_area %>%
+  select(geoid = GEOID,
+         total_population = B01003_001,
+         ADI:pctHouseholdsWithOverOnePersonPerRoom)
+
+unmatched_adi <- setdiff(study_area_base$geoid, adi_analysis$geoid)
+if (length(unmatched_adi) > 0) {
+  cli::cli_alert_warning(
+    "{length(unmatched_adi)} study area{?s} ha{?s/ve} no ADI record: {unmatched_adi}"
+  )
+}
+```
+
+### Intersection and pedestrian crash counts
+
+Each point layer already carries the `geoid` of the study area it falls in (assigned with `st_join()` above). Study areas with no points get a count of 0.
+
+```{r}
+#| label: analysis-counts
+
+count_by_geoid <- function(points, name) {
+  points %>%
+    st_drop_geometry() %>%
+    count(geoid, name = name)
+}
+
+point_counts <- list(
+  count_by_geoid(intersections_sa, "intersections"),
+  count_by_geoid(ped_crashes_sa, "ped_crashes"),
+  count_by_geoid(ped_fatalities_sa, "ped_fatalities")
+) %>%
+  reduce(full_join, by = "geoid")
+```
+
+### Walkability
+
+CMAP scores walkability for each subzone (the `subzone09` grid of roughly quarter-square-mile cells). Subzones don't nest within community areas or municipalities, so each score is averaged with weights equal to the area of each subzone that falls inside the study area. Subzones with a missing score are left out of that score's average. `walkability.gpkg` was written from a shapefile, so its field names are cut to 10 characters (e.g. `MarketScore` is `MarketScor`).
+
+```{r}
+#| label: analysis-walkability
+
+walk_vars <- walkability_sa %>%
+  st_drop_geometry() %>%
+  select(MarketScor:TotalScore) %>%
+  select(where(is.numeric)) %>%
+  names()
+
+walkability_analysis <- walkability_sa %>%
+  select(all_of(walk_vars)) %>%
+  st_intersection(select(study_area_base, geoid)) %>%
+  mutate(overlap_sqft = as.numeric(st_area(.))) %>%
+  st_drop_geometry() %>%
+  group_by(geoid) %>%
+  summarise(
+    across(all_of(walk_vars),
+           \(x) sum(x * overlap_sqft, na.rm = TRUE) / sum(overlap_sqft[!is.na(x)])),
+    .groups = "drop"
+  ) %>%
+  mutate(across(all_of(walk_vars), \(x) if_else(is.nan(x), NA_real_, x)))
+```
+
+### Assemble and save
+
+```{r}
+#| label: analysis-assemble
+
+study_area_analysis <- study_area_base %>%
+  mutate(area_sqmi = as.numeric(set_units(st_area(.), mi^2)), .after = type) %>%
+  left_join(adi_analysis, by = "geoid") %>%
+  relocate(total_population, .before = area_sqmi) %>%
+  left_join(point_counts, by = "geoid") %>%
+  mutate(across(c(intersections, ped_crashes, ped_fatalities), \(x) replace_na(x, 0L))) %>%
+  left_join(walkability_analysis, by = "geoid")
+
+nrow(study_area_analysis) == nrow(study_area_base)  # expect TRUE: one row per study area
+
+dir.create("data/analysis", showWarnings = FALSE)
+st_write(study_area_analysis, "data/analysis/study_area_analysis.gpkg", delete_dsn = TRUE)
+write_csv(st_drop_geometry(study_area_analysis), "data/analysis/study_area_analysis.csv")
+```
+
+### Data dictionary
+
+The dictionary below documents every variable in `study_area_analysis`. Walkability definitions and point ranges come from CMAP's *Walkability Local Strategy Map* methodology. ADI definitions follow the sociome package's `calculate_adi()`.
+
+Some points apply to several variables:
+
+- **ADI scores are relative to their own group.** ADI and the ADI-3 subscales were computed separately for the 77 community areas and for the suburban municipalities (see [Area Deprivation Index (ADI)](#area-deprivation-index-adi)). A score compares an area only with others of the same `type`. Compare across types using the raw indicators, or analyse the two groups separately.
+- **Indicators named `pct…` are proportions (0–1), not percentages.** For community areas, the four median indicators are population-weighted means of tract medians, not true medians.
+- **Counts are not rates.** Intersection and crash counts grow with area and population. Divide by `area_sqmi`, `total_population` or `intersections` before comparing areas.
+- **Walkability scores are area-weighted averages of subzone scores.** A study area's value is the typical score across its land, not a score for the area as a whole. A penalty average such as `HHPen2 = -6` means about 20% of the area (−6 / −30) is in penalised subzones.
+- **Walkability already includes crashes.** `FatalPen` and `SerFatalSc`, and so `Character` and `TotalScore`, include penalties for IDOT bicycle and pedestrian crashes from 2010–2014. Using `TotalScore` to predict pedestrian crashes is therefore partly circular. Consider `Amenities`, or `TotalScore - FatalPen - SerFatalSc`, as the exposure instead.
+- **Time periods differ.** Population and ADI are 2020–2024 ACS estimates; intersections are from a current OSM extract; crashes are 2022–2024; walkability inputs date from 2010–2016.
+
+```{r}
+#| label: analysis-dictionary
+#| eval: true
+
+src_study_area  <- "Chicago Health Atlas community areas; Cook County Health Atlas places (Metopio)"
+src_acs         <- "ACS 2020-2024 5-year estimates (tidycensus); ADI via sociome::calculate_adi()"
+src_walk        <- "CMAP Walkability Local Strategy Map (subzone09); area-weighted to study area"
+adi_relative    <- "Relative to areas of the same type (community areas or municipalities) only."
+
+study_area_dictionary <- tribble(
+  ~variable, ~group, ~definition, ~source, ~interpretation,
+
+  # study area
+  "geoid", "Study area", "Study area identifier: community area number (1-77) or Census place GEOID.", src_study_area, "Join key. Not a number to analyse.",
+  "name", "Study area", "Community area or municipality name.", src_study_area, "Label.",
+  "location", "Study area", "'Chicago, IL' or 'suburban Cook County'.", src_study_area, "Use to stratify Chicago vs suburban areas.",
+  "type", "Study area", "'community area' or 'municipality'.", src_study_area, "Also identifies the group each ADI score is relative to.",
+  "total_population", "Population and area", "Total population (ACS B01003_001). Community areas: sum of tracts whose interior point falls in the area.", src_acs, "Denominator for per-capita rates. Margins of error are not carried through.",
+  "area_sqmi", "Population and area", "Polygon area in square miles, land and water, from EPSG:3435.", "Computed from study area polygons", "Denominator for densities. Lakefront areas include some water.",
+
+  # ADI
+  "ADI", "ADI", "Area Deprivation Index: factor-based composite of the 15 indicators below, scaled to mean 100, SD 20.", src_acs, paste("Higher = more socioeconomic disadvantage.", adi_relative),
+  "Financial_Strength", "ADI", "ADI-3 subscale: income, housing costs and white-collar jobs.", src_acs, paste("Higher = more financial strength (less disadvantage).", adi_relative),
+  "Economic_Hardship_and_Inequality", "ADI", "ADI-3 subscale: poverty, renting, income inequality, single parents, no vehicle, unemployment.", src_acs, paste("Higher = more hardship.", adi_relative),
+  "Educational_Attainment", "ADI", "ADI-3 subscale: education levels and household crowding.", src_acs, paste("Higher = more educational attainment (less disadvantage).", adi_relative),
+  "medianFamilyIncome", "ADI", "Median family income, US dollars (B19113).", src_acs, "Higher = less disadvantage. Community areas: population-weighted mean of tract medians.",
+  "medianMortgage", "ADI", "Median monthly owner costs for housing units with a mortgage, US dollars (B25088).", src_acs, "Higher = less disadvantage. Community areas: population-weighted mean of tract medians.",
+  "medianRent", "ADI", "Median gross rent, US dollars (B25064).", src_acs, "Higher = less disadvantage. Community areas: population-weighted mean of tract medians.",
+  "medianHouseValue", "ADI", "Median value of owner-occupied housing units, US dollars (B25077).", src_acs, "Higher = less disadvantage. Community areas: population-weighted mean of tract medians.",
+  "pctFamiliesInPoverty", "ADI", "Proportion of families below the poverty level (B17010).", src_acs, "Proportion 0-1. Higher = more disadvantage.",
+  "pctOwnerOccupiedHousing", "ADI", "Proportion of occupied housing units that are owner-occupied (B25003).", src_acs, "Proportion 0-1. Higher = less disadvantage.",
+  "ratioThoseMakingUnder10kToThoseMakingOver50k", "ADI", "Log of 100 x (households with income under $10k / households with income of $50k or more) (B19001).", src_acs, "Log scale. Higher = more income disparity.",
+  "pctPeopleLivingBelow150PctFederalPovertyLevel", "ADI", "Proportion of people with income below 150% of the federal poverty level (C17002).", src_acs, "Proportion 0-1. Higher = more disadvantage.",
+  "pctHouseholdsWithChildrenThatAreSingleParent", "ADI", "Proportion of households with children under 18 that are single-parent households (B11005).", src_acs, "Proportion 0-1. Higher = more disadvantage.",
+  "pctHouseholdsWithNoVehicle", "ADI", "Proportion of occupied housing units with no vehicle available (B25044).", src_acs, "Proportion 0-1. Higher = more disadvantage; also a marker of reliance on walking and transit.",
+  "pctPeopleWithWhiteCollarJobs", "ADI", "Proportion of employed people 16+ in management, business, science and arts occupations (C24010).", src_acs, "Proportion 0-1. Higher = less disadvantage.",
+  "pctPeopleUnemployed", "ADI", "Proportion of the civilian labor force that is unemployed (B23025).", src_acs, "Proportion 0-1. Higher = more disadvantage.",
+  "pctPeopleWithAtLeastHSEducation", "ADI", "Proportion of people 25+ with at least a high school diploma or equivalent (B15003).", src_acs, "Proportion 0-1. Higher = less disadvantage.",
+  "pctPeopleWithLessThan9thGradeEducation", "ADI", "Proportion of people 25+ with less than 9th grade education (B15003).", src_acs, "Proportion 0-1. Higher = more disadvantage.",
+  "pctHouseholdsWithOverOnePersonPerRoom", "ADI", "Proportion of occupied housing units with more than one occupant per room (B25014).", src_acs, "Proportion 0-1. Higher = more crowding / disadvantage.",
+
+  # counts
+  "intersections", "Counts", "Number of street intersections: drive-network nodes merged with osmnx consolidate_intersections(), dead ends excluded.", "OpenStreetMap (Geofabrik Illinois extract), osmnx", "Divide by area_sqmi for intersection density (street connectivity), or use as the denominator for crash rates per intersection.",
+  "ped_crashes", "Counts", "Number of crashes, 2022-2024, whose first crash type was Pedestrian, all severities.", "IDOT crash data, 2022-2024", "Count, not a rate: normalise by total_population, area_sqmi or intersections. Includes the fatal crashes counted in ped_fatalities.",
+  "ped_fatalities", "Counts", "Number of fatal crashes, 2022-2024, whose first harmful event was a pedestrian (one record per crash).", "NHTSA FARS, 2022-2024", "Counts crashes, not deaths; a crash can kill more than one person. Small numbers: pool years or areas for stable rates.",
+
+  # walkability
+  "MarketScor", "Walkability", "MarketScore: supermarkets within a 30-minute walk of the subzone centroid.", paste(src_walk, "| Chicago State University, 2011"), "-10 (none) to 10 (7+). Negative values flag areas without a supermarket in reach.",
+  "LibScore", "Walkability", "Public libraries within a 30-minute walk.", paste(src_walk, "| Illinois State Library, 2010"), "0 (none) to 10 (20+).",
+  "SchoolsSco", "Walkability", "SchoolsScore: public and private schools within a 30-minute walk.", paste(src_walk, "| Illinois State Board of Education, 2013"), "0 (none) to 10 (20+).",
+  "MetraScore", "Walkability", "Metra stations within a 30-minute walk.", paste(src_walk, "| RTA, 2013"), "0 (none) to 10 (7+). Mostly suburban.",
+  "PaceScore", "Walkability", "Pace bus stops within a 30-minute walk.", paste(src_walk, "| Pace, 2015"), "0 (none) to 2 (5+).",
+  "CTAScore", "Walkability", "CTA rail stations within a 30-minute walk.", paste(src_walk, "| CTA, 2015"), "0 (none) to 20 (5+). Mostly Chicago and inner suburbs.",
+  "DnBScore", "Walkability", "Selected destinations (restaurants, shops, arts, public administration; NAICS list in the methodology) within a 30-minute walk.", paste(src_walk, "| Dun & Bradstreet, 2015"), "0 (<50) to 20 (1,000+).",
+  "Amenities", "Walkability", "Total amenity score: sum of the amenity scores above.", src_walk, "Methodology range -10 to 92 (including transit access). Higher = more destinations within walking distance. Contains no crash data.",
+  "ParcelScor", "Walkability", "ParcelScore: average parcel size in the subzone.", paste(src_walk, "| county assessor files, 2014-2016"), "0 (10,000+ sq ft) to 20 (<5,000 sq ft). Smaller parcels = finer-grained, more varied development.",
+  "EmpScore", "Walkability", "Jobs in the subzone, scored only where the subzone has 100+ households.", paste(src_walk, "| CMAP 2010 subzone employment estimates"), "0 or 10 (200+ jobs). Rewards mixed residential and employment use.",
+  "B_LENGscor", "Walkability", "B_LENGscore: average block length in the walkshed.", paste(src_walk, "| Navteq streets, 2015"), "5 if under 500 ft, else 0. Shorter blocks = more direct walking routes.",
+  "INT_DENSsc", "Walkability", "INT_DENSscore: density of 4-way intersections in the walkshed.", paste(src_walk, "| Navteq streets, 2015"), "0 (<40/sq mi), 10 (40-70) or 20 (>70). Higher = better connected grid.",
+  "B_SIZEscor", "Walkability", "B_SIZEscore: average block size in the walkshed, acres.", paste(src_walk, "| Navteq streets, 2015"), "10 if 1-9 acres, else 0.",
+  "HHPen2", "Walkability", "Low-population penalty: subzones with fewer than 5 households.", paste(src_walk, "| 2010 Census households"), "-30 or 0. The area average shows how much of the area is essentially unpopulated (e.g. -6 = about 20%).",
+  "HHscore2", "Walkability", "Households in the subzone.", paste(src_walk, "| 2010 Census households"), "0 (<100), 5, 10 or 20 (1,600+). Higher = denser residential population.",
+  "TreeScore", "Walkability", "Ratio of tree canopy to road density, for subzones with at least 1 mile of road.", paste(src_walk, "| University of Vermont urban tree canopy"), "0 to 2 in the scoring table (summary table lists 3). Higher = more shade and comfort.",
+  "FatalPen", "Walkability", "Penalty for fatal bicycle and pedestrian crashes in the subzone.", paste(src_walk, "| IDOT crashes, 2010-2014"), "0 (none), -2 (1) or -5 (2+). Overlaps with crash outcomes; see notes above.",
+  "SerFatalSc", "Walkability", "SerFatalScore: penalty for serious and fatal bicycle and pedestrian crashes, scaled by subzone population.", paste(src_walk, "| IDOT crashes, 2010-2014"), "0 to -6; harsher where population is under 1,000. Overlaps with crash outcomes; see notes above.",
+  "TransitAcc", "Walkability", "TransitAccess: CMAP Access to Transit Index score for transit connectivity and frequency.", paste(src_walk, "| CMAP Access to Transit Index, 2013"), "0 to 10. Higher = better transit service.",
+  "Character", "Walkability", "Total characteristics score: sum of ParcelScor through SerFatalSc.", src_walk, "Methodology range -41 to 88. Includes crash penalties.",
+  "TotalScore", "Walkability", "Total walkability score: Amenities + Character.", src_walk, "Possible -51 to 180; observed -43.5 to 156. CMAP classes: 0 or less very low, 1-20 low, 21-50 moderate, 51-100 high, 101+ very high. Includes crash penalties."
+)
+
+knitr::kable(select(study_area_dictionary, -group))
+```
+
+The check below compares the dictionary with the dataset's columns. It flags walkability or `study_area` fields that are not documented above, which can happen if the source files change. It then writes the dictionary next to the dataset.
+
+```{r}
+#| label: analysis-dictionary-save
+
+analysis_vars <- names(st_drop_geometry(study_area_analysis))
+
+undocumented <- setdiff(analysis_vars, study_area_dictionary$variable)
+if (length(undocumented) > 0) {
+  cli::cli_alert_warning("Not in the data dictionary: {undocumented}")
+}
+
+absent <- setdiff(study_area_dictionary$variable, analysis_vars)
+if (length(absent) > 0) {
+  cli::cli_alert_warning("In the data dictionary but not the dataset: {absent}")
+}
+
+study_area_dictionary %>%
+  filter(variable %in% analysis_vars) %>%
+  arrange(match(variable, analysis_vars)) %>%
+  write_csv("data/analysis/study_area_analysis_dictionary.csv")
+```
+
 ## Read, Format and Save
 
 ### Read datasets
@@ -1101,6 +1338,8 @@ ped_crashes <- st_read("data/crashes/cc_ped_crashes_2022_2024.gpkg") %>% st_tran
 adi <- read.csv("data/census/adi_study_area.csv")
 aadt <- st_read("data/infrastructure/study_area_aadt.gpkg") %>% st_transform(crs=4326)
 land_use <- st_read("data/boundaries/land_use_simplified_2020.gpkg") %>% st_transform(crs=4326)
+study_area_analysis <- st_read("data/analysis/study_area_analysis.gpkg") %>% st_transform(crs=4326)
+study_area_dictionary <- read_csv("data/analysis/study_area_analysis_dictionary.csv")
 
 ```
 
@@ -1120,6 +1359,8 @@ save(
   ped_crashes,
   adi,
   aadt,
+  study_area_analysis,
+  study_area_dictionary,
   # land_use,
   file = "data/phase01_dataprep.RData"
 )

@@ -3,6 +3,8 @@ data/intersections/*
 data/infrastructure/*
 data/census/*
 data/crashes/*
+data/analysis/*.gpkg
+data/analysis/study_area_analysis.csv
 data/boundaries/*
 data/modeling/cmap/*
 output/all_streets*.*
