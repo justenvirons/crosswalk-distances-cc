@@ -1411,6 +1411,13 @@ addFilter(wb, "data_dictionary", rows = 1, cols = seq_len(ncol(dictionary_tbl)))
 saveWorkbook(wb, "data/analysis/study_area_analysis.xlsx", overwrite = TRUE)
 ```
 
+### Download analytical dataset, dictionary
+
+Use the below links to download the analytical dataset (units of analysis are community areas for city of Chicago and municipalities for suburban Cook County). 
+
+- [download spreadsheet]("data/analysis/study_area_analysis.xlsx") with analysis data and corresponding data dictionary
+- [download analysis]("data/analysis/study_area_analysis.gpkg") dataset in gpkg format for mapping and spatial analytics
+
 ## Read, Format and Save
 
 ### Read datasets
