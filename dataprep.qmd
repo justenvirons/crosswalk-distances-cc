@@ -656,7 +656,7 @@ st_write(study_area_streets, "data/infrastructure/study_area_streets.gpkg", dele
 
 ### OSM road centre-lines for box prompts
 
-Optional. This replaces the runbook's step 4.5 (`02b_osm_roads.py`) and is needed only if a SAM 3 configuration that uses box prompts (`box` or `text+box`) is adopted. The leading text-only configuration never reads this file. The Python script queries Overpass live; this chunk reads the local Cook County extract instead, so the box centre-lines come from the same OSM snapshot as the intersections and crossing edges. It keeps the script's drivable road classes, which differ from `highway_subtypes` above (no service roads, construction or corridors; adds motorway links and living streets). It drops private or no-access ways, and keeps every way that touches the 80 m square around a sample or pilot intersection (40 m each side, as in the script).
+This replaces the runbook's step 4.5 (`02b_osm_roads.py`). It is needed if a SAM 3 configuration that uses box prompts (`box` or `text+box`) is adopted, or if segmentation uses the OSM corridor clip (`--osm-clip`, runbook step 4.8). The leading text-only configuration reads this file only with the clip. The Python script queries Overpass live; this chunk reads the local Cook County extract instead, so the box centre-lines come from the same OSM snapshot as the intersections and crossing edges. It keeps the script's drivable road classes, which differ from `highway_subtypes` above (no service roads, construction or corridors; adds motorway links and living streets). It drops private or no-access ways, and keeps every way that touches the 80 m square around a sample or pilot intersection (40 m each side, as in the script).
 
 ```{r}
 #| label: osm-box-roads

@@ -22,7 +22,9 @@ Tested locally on 2026-10-08:
 - Sample selection on the project's 169,456-point intersection layer.
 - Fine-tuning plumbing on a randomly initialised SAM 3 (CPU): gradients reach only the segmentation head, and the saved head reloads. Also the curb weighting, the augmentation and the holdout split, which has no original shared across holdout, validation and training.
 
-Not yet run: the county pilot check (4.8), the evaluation-sample fetch and segmentation (4.9–4.10), and grow-cut on SAM 3 output (4.11). Expect small fixes on the first run.
+Also run: the county pilot check (4.8), runs `pilot` (thresholds 0.3/0.4/0.5) and `pilot_osm` (OSM corridor clip at threshold 0.4).
+
+Still open from 4.8: whether to adopt `--osm-clip`, and at what `--osm-margin-m`. Not yet run: the evaluation-sample fetch and segmentation (4.9–4.10) and grow-cut on SAM 3 output (4.11). Expect small fixes on the first run.
 :::
 
 | Script | Runs on | Does |
@@ -229,9 +231,9 @@ uv run python 02_select_sample.py --candidates ../data/sample/candidates.csv \
 
 The evaluation sample has 8 strata (geography × canopy high/low terciles × tile centre/edge) of 19 each, 152 in total; the pilot set is 30 other intersections. **Check:** the printed stratum table; thin cells mean the pool needs to be larger (`--pool-per-group 600` in 4.2).
 
-### 4.5 OSM road centre-lines for box prompts (optional)
+### 4.5 OSM road centre-lines for box prompts and the OSM clip
 
-**Optional: run only if a configuration with box prompts (`box` or `text+box`) is adopted.** `cc_segment.py` reads this file only for those modes. The leading configuration (fine-tuned head, text prompt "road") never uses it. Box prompts are not supported by the evidence so far: on the 6 benchmark clips that could take boxes, the best `text+box` setting scored boundary F1 0.25, against 0.34 for text alone, and box-only 0.20 (`zs2`). Six clips is too few to rule boxes out; a fair test needs an unaugmented fork of the benchmark dataset (see 4.6).
+**Needed if box prompts (`box` or `text+box`) or the OSM corridor clip (`--osm-clip`, see 4.8) are used.** `cc_segment.py` reads this file only in those cases. The leading configuration (fine-tuned head, text prompt "road") needs it only with `--osm-clip`. The file covers both the pilot and the evaluation sample, so one upload serves 4.8 and 4.10. Box prompts are not supported by the evidence so far: on the 6 benchmark clips that could take boxes, the best `text+box` setting scored boundary F1 0.25, against 0.34 for text alone, and box-only 0.20 (`zs2`). Six clips is too few to rule boxes out; a fair test needs an unaugmented fork of the benchmark dataset (see 4.6).
 
 The same file can be built locally from the Cook County OSM extract, without Overpass, in [Appendix A: Data Preparation Code](dataprep.html) (chunk `osm-box-roads`); then only the `modal volume put` line below is needed. On the server:
 
@@ -272,7 +274,8 @@ flowchart TD
 
   subgraph S48["4.8 County pilot, 30 clips, no labels"]
     PILOT["pilot: same configuration on A (Google) and B (county)<br/>thresholds 0.3 / 0.4 / 0.5<br/>at 0.4: A empty on 2 of 30 (canopy, building shadow)<br/>B spills onto parking lots"]
-    OSM["pilot_osm: + OSM centre-line corridor clip<br/>A–B road-fraction correlation 0.76 → 0.96<br/>open: corridor cuts real road on a few clips"]
+    OSM["pilot_osm: + OSM centre-line corridor clip, margin 2 m<br/>A–B road-fraction correlation 0.76 → 0.96<br/>open: corridor cuts real road on a few clips"]
+    MARGIN["pilot_osm_m4: wider margin<br/>adopt clip, and at what margin?"]
     D3{"County imagery clearly<br/>worse for every finalist?"}
     LABEL["Label 20–30 county clips<br/>and score B directly"]
   end
@@ -293,7 +296,7 @@ flowchart TD
   HOZS --> D2
   HOBEST --> D2
   HOLAST --> D2
-  D2 -- "yes: final head +0.10" --> CHOSEN --> PILOT --> OSM --> D3
+  D2 -- "yes: final head +0.10" --> CHOSEN --> PILOT --> OSM --> MARGIN --> D3
   D3 -- "no" --> SEG --> GC --> CMP
   D3 -. "yes" .-> LABEL -.-> SEG
 
@@ -302,7 +305,7 @@ flowchart TD
   classDef open fill:#e3ecf8,stroke:#3d6aa8,color:#1b2f4d,stroke-dasharray:4 3
   class DATA,ZS2,BOX,ZS3,SPLIT,FT1,HOZS,HOBEST,HOLAST,CHOSEN,PILOT done
   class D1,D2,D3 decision
-  class OSM,LABEL,SEG,GC,CMP open
+  class OSM,MARGIN,LABEL,SEG,GC,CMP open
 ```
 
 ### 4.6 Benchmark on labelled data
@@ -400,6 +403,22 @@ uv run modal volume get --env cook --force cc-results /pilot_B/pilot ../data/res
 
 The values above are the leading holdout configuration from 4.7 (fine-tuned final-epoch head, text prompt "road", semantic fusion, holes under 25 m² filled) at three thresholds. Set `--modes/--fusions/--prompt-sets/--negative-sets/--prob-thds` and `--delta` to the finalists from 4.6 and 4.7 if they differ; text-only modes need no OSM boxes, so step 4.5 can be skipped. Each configuration gets its own folder of QA overlays, and `pilot_summary.csv` reports road fraction, empty-mask rate, and box fall-backs. **Check:** curbs followed on both sources; no systematic failure on county imagery (e.g. leaf-off shadows read as road edges). If county imagery behaves clearly worse for every finalist, label 20–30 county clips the same way as the benchmark before the full run, so B's segmentation quality is measured rather than assumed.
 
+**OSM corridor clip.** At threshold 0.4, B's road mask spills onto parking lots and driveways. Run `pilot_osm` keeps road only within a corridor around each OSM drivable centre-line (needs `osm_roads.geojson` from 4.5). It raised the A–B road-fraction correlation from 0.76 to 0.96, but on a few clips the corridor cuts real carriageway, mostly wide or flared approaches. Before freezing the configuration, rerun the clip with a wider margin on both sources and compare the overlays (white line = corridor edge) clip by clip with `pilot_osm`:
+
+```bash
+for SRC in A B; do
+  uv run modal run cc_segment.py --source $SRC --input-dir pilot_$SRC --pilot --run-name pilot_osm_m4 \
+      --modes text --fusions semantic --prompt-sets "road" --negative-sets "" \
+      --prob-thds 0.4 --fill-holes 25 --osm-clip --osm-margin-m 4 \
+      --delta finetuned/ft1/seg_head_last.pt
+done
+mkdir -p ../data/results/pilot_osm_m4_{A,B}
+uv run modal volume get --env cook --force cc-results /pilot_A/pilot_osm_m4 ../data/results/pilot_osm_m4_A/
+uv run modal volume get --env cook --force cc-results /pilot_B/pilot_osm_m4 ../data/results/pilot_osm_m4_B/
+```
+
+**Choose:** adopt `--osm-clip` with the smallest margin (2, 4, or 6 m) at which no pilot clip loses carriageway at a crossing approach and lots stay cut. If no margin does both, leave the clip off and accept the spill, which pushes B's grow-cut lengths up, or widen `OSM_HALF_WIDTH_M` for the class that is cut. Record the run, margin, and decision in `data/results/README`, and use the same flags on both sources in 4.10.
+
 ### 4.9 Imagery for the evaluation sample
 
 ```bash
@@ -419,6 +438,8 @@ uv run modal run cc_segment.py --source A --mode text --fusion semantic --prompt
 uv run modal run cc_segment.py --source B --mode text --fusion semantic --prompts road \
     --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_last.pt --run-name v1
 ```
+
+If the OSM clip was adopted in 4.8, add `--osm-clip --osm-margin-m <chosen margin>` to both commands. Confirm first that `/inputs/osm_roads.geojson` on the results volume was built from both `sample.csv` and `pilot.csv` (4.5). Clips with no centre-line nearby are left unclipped; check how many with the `osm_clip` column of `segment_stats.csv`.
 
 Add `--limit 10` for a first plumbing run. **Check:** in `segment_stats.csv`, `empty` is false and `box_fallback_to_text` is rare on nearly all clips; the QA overlays (`mkdir -p ../data/results/qa_B && uv run modal volume get --env cook --force cc-results /B_cook_rgb/v1/qa ../data/results/qa_B/`) follow the curbs.
 
