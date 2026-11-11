@@ -203,12 +203,12 @@ def main(source: str, input: str, out_csv: str, limit: int = 0, subdir: str = ""
     print(f"Fetching {len(df)} clips for source {source} -> /{subdir}")
 
     if source == "A":
-        results = fetch_google.map(lats, lons, kwargs={"subdir": subdir},
-                                   return_exceptions=True)
+        results = list(fetch_google.map(lats, lons, kwargs={"subdir": subdir},
+                                        return_exceptions=True))
     else:
         bands = "0,1,2" if source == "B" else "0,1,2,3"
-        results = fetch_cook.map(lats, lons, kwargs={"subdir": subdir, "bands": bands},
-                                 return_exceptions=True)
+        results = list(fetch_cook.map(lats, lons, kwargs={"subdir": subdir, "bands": bands},
+                                      return_exceptions=True))
 
     rows = []
     for (la, lo), r in zip(zip(lats, lons), results):
