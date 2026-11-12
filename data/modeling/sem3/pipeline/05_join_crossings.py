@@ -1,9 +1,12 @@
 """Score each imagery source's grow-cut output against the crossing units (server).
 
-Each grow-cut line is assigned to the unit edge it runs along: at least
---min-overlap of the line within --buffer-ft of the edge, and its direction within
---max-angle of the edge's. Lines that run along no unit edge but lie inside a
-sample clip are false detections. Pieces assigned to one unit are ordered along
+Each grow-cut line is assigned to the unit edge it runs along: its direction within
+--max-angle of the edge's, and either at least --min-overlap of the line within
+--buffer-ft of the edge, or at least --min-overlap of the edge within --buffer-ft
+of the line (so a line that overshoots the curbs still measures its crossing, with
+the overshoot scored as error). Lines inside a sample clip that run along no unit
+edge are classed as on a crossing cut by the clip edge (not a unit; not counted)
+or as false detections (along no OSM crossing edge). Pieces assigned to one unit are ordered along
 the edge; pieces separated by less than --merge-gap-ft are one crossing (the gap is
 added to the length), larger gaps are reported as separate groups (refuge island or
 a hole in the mask; the ground truth decides which). Model errors are not edited.
@@ -71,7 +74,8 @@ def assign(lines, units, buffer_ft, min_overlap, max_angle):
         best = (None, 0.0, np.inf)
         for j in sidx.query(ln.buffer(buffer_ft)):
             e = units.geometry.iloc[j]
-            frac = ln.intersection(e.buffer(buffer_ft)).length / ln.length
+            frac = max(ln.intersection(e.buffer(buffer_ft)).length / ln.length,
+                       e.intersection(ln.buffer(buffer_ft)).length / max(e.length, 1e-9))
             if frac < min_overlap:
                 continue
             if angle_diff(lb, edge_bearing_at(e, mid)) > max_angle:
@@ -108,6 +112,7 @@ def main():
     ap.add_argument("--gt-dir", default="../data/groundtruth")
     ap.add_argument("--sample", default="../data/sample/sample_screened.csv")
     ap.add_argument("--results-root", default="../data/results")
+    ap.add_argument("--edges", default="../data/osm/crosswalk_edges_v2_0.shp")
     ap.add_argument("--sources", default="A:A_google,B:B_cook_rgb")
     ap.add_argument("--run", default="v1")
     ap.add_argument("--buffer-ft", type=float, default=15.0)
@@ -134,6 +139,10 @@ def main():
                              geometry=[box(*bbox_lonlat(la, lo, RADIUS_M)) for la, lo in zip(s.lat, s.lon)],
                              crs=4326).to_crs(3435)
 
+    edges = gpd.read_file(args.edges).to_crs(3435)
+    edges["unit_id"] = edges["osmid"].astype(str)
+    others = edges[~edges.unit_id.isin(set(units.unit_id))].reset_index(drop=True)
+
     false_rows = []
     for item in args.sources.split(","):
         key, folder = item.split(":")
@@ -145,9 +154,14 @@ def main():
         mids["geometry"] = lines.geometry.interpolate(0.5, normalized=True)
         in_clip = gpd.sjoin(mids, clips, predicate="within", how="left")
         in_clip = in_clip[~in_clip.index.duplicated()]
-        fd = in_clip[in_clip.unit_id.isna() & in_clip.sample_id.notna()]
-        for sid, n in fd.groupby("sample_id").size().items():
-            false_rows.append({"source": key, "sample_id": sid, "n_lines": int(n)})
+        loose = in_clip[in_clip.unit_id.isna() & in_clip.sample_id.notna()]
+        on_other, _ = assign(lines.loc[loose.index], others, args.buffer_ft,
+                             args.min_overlap, args.max_angle)
+        loose = loose.assign(kind=np.where(pd.notna(on_other), "crossing cut by clip edge",
+                                           "false detection"))
+        fd = loose[loose.kind == "false detection"]
+        for (sid, kind), n in loose.groupby(["sample_id", "kind"]).size().items():
+            false_rows.append({"source": key, "sample_id": sid, "kind": kind, "n_lines": int(n)})
 
         recs = []
         for uid, g in lines[lines.unit_id.notna()].groupby("unit_id"):
@@ -159,7 +173,8 @@ def main():
         table = table.merge(r, on="unit_id", how="left")
         table[f"{key}_status"] = np.where(table[f"{key}_len_ft"].notna(), "found", "missed")
         print(f"{key}: {len(lines)} lines; {int(lines.unit_id.notna().sum())} on units, "
-              f"{len(fd)} false detections in sample clips, "
+              f"{len(fd)} false detections and {len(loose) - len(fd)} on crossings cut by "
+              f"the clip edge in sample clips, "
               f"{int((lines.unit_id.isna() & in_clip.sample_id.isna()).sum())} outside sample clips | "
               f"units found {int((table[f'{key}_status'] == 'found').sum())} of {len(table)}, "
               f"split into 2+ groups {int((table[f'{key}_groups'] > 1).sum())}")
@@ -188,7 +203,7 @@ def main():
     status_cols = ["unit_id", "sample_id", *STRATA, "added", "gt_status"] + \
         [c for k in keys for c in (f"{k}_status", f"{k}_lines", f"{k}_groups")]
     table[status_cols].to_csv(os.path.join(out_dir, "crossing_status.csv"), index=False)
-    pd.DataFrame(false_rows, columns=["source", "sample_id", "n_lines"]).to_csv(
+    pd.DataFrame(false_rows, columns=["source", "sample_id", "kind", "n_lines"]).to_csv(
         os.path.join(out_dir, "false_detections.csv"), index=False)
     table.to_csv(os.path.join(out_dir, "crossing_lengths.csv"), index=False)
 

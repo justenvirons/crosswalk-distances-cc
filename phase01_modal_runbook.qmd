@@ -509,7 +509,7 @@ Score each source against the units (any time; it reports progress on the ground
 uv run python 05_join_crossings.py
 ```
 
-It assigns each grow-cut line to the unit edge it runs along (≥ 60% of the line within 15 ft, direction within 20°), merges pieces less than 3 ft apart, and writes `crossing_status.csv` (found/missed and piece counts per source, ground truth measured or not: no lengths), `false_detections.csv`, and `crossing_lengths.csv`. **Do not open `crossing_lengths.csv` until the measurement pass is finished.** In the R comparison, apply the reference study's plausibility filter, dropping model lengths shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply, and count them as failures.
+It assigns each grow-cut line to the unit edge it runs along (direction within 20°, and ≥ 60% of the line within 15 ft of the edge or ≥ 60% of the edge within 15 ft of the line, so an overshooting line still measures its crossing), merges pieces less than 3 ft apart, sets apart lines along crossings cut by the clip edge (not units), and writes `crossing_status.csv` (found/missed and piece counts per source, ground truth measured or not: no lengths), `false_detections.csv`, and `crossing_lengths.csv`. **Do not open `crossing_lengths.csv` until the measurement pass is finished.** In the R comparison, apply the reference study's plausibility filter, dropping model lengths shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply, and count them as failures.
 
 ## 5. Notes and Troubleshooting
 
