@@ -24,7 +24,7 @@ Tested locally on 2026-10-08:
 
 Also run: the county pilot check (4.8: `pilot`, `pilot_osm`, `pilot_osm_m4`), the evaluation-sample fetch (4.9, 152 of 152 clips on both sources), and segmentation `v1` (4.10) with the OSM clip at 2 m and the frozen head `frozen/v1_seg_head.pt` (retrained run `ft1b`, holdout bF1 0.538, IoU 0.784 at threshold 0.4).
 
-Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation sample restricted to street–street intersections (4.10a). Not yet run: the street–street screen and top-up (4.10a), and grow-cut on SAM 3 output (4.11).
+Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation sample restricted to street–street intersections (4.10a). Screen run (4.10a): final sample 147. Not yet run: fetch and segmentation of the 67 added points, and grow-cut on SAM 3 output (4.11).
 :::
 
 | Script | Runs on | Does |
@@ -466,6 +466,8 @@ uv run python 02b_osm_roads.py --inputs ../data/sample/candidates.csv \
 uv run python 02c_street_screen.py --roads ../data/sample/osm_roads_pool.geojson
 ```
 
+Result (80 ft): 80 of the original 152 kept, 67 added, **final sample 147**. Seven strata reach 19; Chicago × high canopy × tile centre has only 14 eligible intersections (7 kept, all 7 eligible spares added). The shortfall was accepted rather than enlarging the candidate pool: the paired tests and the mixed model do not need equal cells, and recomputing canopy terciles on a larger pool could move existing points between strata.
+
 It prints the stratum table (target, kept, added, spare eligible) and writes `sample_screened.csv` (the final sample, with an `added` column), `sample_excluded.csv` (with the reason), `sample_added.csv`, and `pool_screen.csv`. Fetch the added points into the same imagery folders, then rerun `v1` on both candidates with the pool roads file, so every clip is clipped against one OSM snapshot:
 
 ```bash
@@ -474,7 +476,7 @@ uv run modal run cc_fetch.py --source B --input ../data/sample/sample_added.csv 
 uv run modal volume put --env cook --force cc-results ../data/sample/osm_roads_pool.geojson /inputs/osm_roads.geojson
 ```
 
-and repeat the 4.10 loop. Excluded points stay in the run (`cc_segment.py` segments every clip in the folder); they are dropped when joining on `sample_screened.csv` in 4.12. **Check:** zero fetch errors; `osm_clip` true on every clip; the stratum table shows 19 in every cell.
+and repeat the 4.10 loop. Excluded points stay in the run (`cc_segment.py` segments every clip in the folder); they are dropped when joining on `sample_screened.csv` in 4.12. **Check:** zero fetch errors; `Segmenting 219 clips` (152 original + 67 added) and `'run': 'ft1b', 'epoch': 12` on both sources; `osm_clip` true on every clip.
 
 ### 4.11 Grow-cut
 
