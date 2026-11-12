@@ -121,15 +121,31 @@ The candidate pool and sample are built in [Appendix A: Data Preparation Code](d
 
 The evaluation sample has 8 strata (geography × canopy × tile position) of 19 intersections each, 152 in total. A separate 30-intersection pilot set, which never overlaps the evaluation sample, is used only to check segmentation settings on county imagery. If cells come out thin, enlarge the pool to 600 per geography.
 
+**Street–street screen.** The intersection layer is built from the drive network including service roads, so it contains alley mouths, parking-lot and driveway junctions, and consolidated points that are not at a junction of two streets. About half of the original 152 points were of this kind. The sample is restricted to street–street intersections by two rules fixed before any crossing length was examined: the point lies within 50 ft of a drivable OSM centre-line, and drivable roads within 80 ft (the clip half-width) run in at least two directions more than 30° apart. Excluded points were replaced from eligible candidates in the same stratum, giving a final sample of **147**: seven strata of 19 and one (Chicago × high canopy × tile centre) of 14, the number of eligible intersections available. The screen and its checks are in runbook step 4.10a.
+
+### Units of analysis
+
+The unit is the **crossing**, not the intersection. A unit is an OSM crossing edge (the edges grow-cut measures along) that lies wholly inside the 50 m clip of a sample intersection, so both imagery sources show the whole crossing. Units are fixed from OSM and the clip geometry alone (`04_crossing_units.py`), before any model output or hand measurement is examined; most intersections contribute two to four.
+
 ### Ground truth
 
-Manually measure crossing distance at each sampled intersection, following the same measurement protocol as the reference methodology's own validation, so results are comparable to its published 93% accuracy / ~2 ft 3 in median-error benchmark. The segmentation QA overlays are a convenient base for the manual measurement pass.
+Each unit is measured by hand in QGIS, by drawing a line into the `gt_crossings` layer of `groundtruth.gpkg` (EPSG:3435, US feet), tagged with the unit's `unit_id`. The length is computed from the drawn line.
+
+- **What to measure:** curb face to curb face along the crossing, following the line pedestrians use (the marked crosswalk where there is one, otherwise the OSM crossing edge's alignment). Parking and bike lanes between the curbs are included.
+- **Refuge islands:** following the reference study, a crossing interrupted by a raised refuge island or median is measured as separate pieces, one line from each curb to the island ("treating any formal crossing between a sidewalk and refuge island, or connecting two refuge islands, as distinct" [@moran2024multiscale]). Each piece gets its own line with the same `unit_id`, `piece` 1, 2, …, and `island` = yes. Painted medians and flush islands are not refuges and do not split a crossing.
+- **Hidden curbs:** if a curb cannot be located on any available imagery (canopy, shadow, a parked vehicle), record `curb_visible` = no and leave the unit unmeasured rather than estimate it; `partial` where the curb is inferred over a short gap. Unmeasurable units are reported, not dropped silently.
+- **Blinding:** measure on the raw imagery with only the clip squares and unit edges visible. The segmentation overlays and grow-cut lines are not loaded, and model lengths (`crossing_lengths.csv`) are not opened until the measurement pass is complete.
+- **Imagery (proposed; confirm before starting):** measure every unit on the Cook County orthoimagery, which is orthorectified to a documented standard and flown leaf-off, and record it in `imagery`. Because measuring on one source's imagery favours that source, also measure a random 20% of units on Google imagery, which shows how much the ground truth itself depends on the imagery, and, if feasible, field-measure a small subset with a measuring wheel as an independent anchor.
+- **Reliability:** a second measurer independently measures a random 30 units; agreement (intraclass correlation, median absolute difference) is reported alongside the results.
+
+`05_join_crossings.py` assigns each grow-cut line to the unit edge it runs along (most of its length within 15 ft of the edge, direction within 20°). Pieces less than 3 ft apart are one crossing; larger gaps are kept as separate groups and compared with the ground truth's island pieces. Model errors are not edited: a line that overshoots a curb or covers part of a crossing is scored as it is.
 
 ### Metrics
 
 - **Absolute/median error** against ground truth, per candidate.
 - **Inter-method agreement** between A and B at the same intersections (a paired design) — Bland-Altman plots and intraclass correlation.
-- **Measurement failure rate**: the share of sampled intersections where a candidate produces no plausible crossing (empty mask, no grow-cut result, or a length outside 6–160 ft). Canopy occlusion is hypothesized to make this higher for Candidate A.
+- **Measurement failure rate**: the share of units where a candidate produces no plausible crossing (no grow-cut line along the unit edge, or a length outside 6–160 ft). Canopy occlusion is hypothesized to make this higher for Candidate A.
+- **False detections**: grow-cut lines inside a sample clip that run along no unit edge, per candidate.
 - All of the above broken out by sampling stratum (canopy cover, tile position, geography) to test H5/H6 directly, not just compare overall averages.
 
 ### Statistical approach
@@ -142,9 +158,9 @@ Select the imagery source with the lower error against ground truth and the lowe
 
 ## Status
 
-- **Done:** SAM 3 pipeline scripts and runbook; zero-shot benchmark (two rounds); fine-tuning run `ft1`; holdout scoring of zero-shot vs. fine-tuned head.
-- **In progress:** candidate pool, canopy screen and stratified sample (code in [Appendix A](dataprep.html)).
-- **Not started:** county pilot check; imagery fetch and segmentation for the evaluation sample; grow-cut; manual ground truth; paired comparison; countywide production run (Aim 1b, gated on this comparison).
+- **Done:** SAM 3 pipeline scripts and runbook; zero-shot benchmark (two rounds); fine-tuning (`ft1`, retrained as `ft1b` and frozen); holdout scoring; candidate pool, canopy screen and stratified sample; county pilot check and the OSM corridor clip (2 m); street–street screen (final sample 147); imagery fetch, segmentation and grow-cut for both candidates.
+- **In progress:** crossing units and ground-truth layer (`04_crossing_units.py`); manual ground truth.
+- **Not started:** paired comparison; countywide production run (Aim 1b, gated on this comparison).
 
 ## Open Questions
 

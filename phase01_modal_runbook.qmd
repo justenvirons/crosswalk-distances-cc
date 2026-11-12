@@ -24,7 +24,7 @@ Tested locally on 2026-10-08:
 
 Also run: the county pilot check (4.8: `pilot`, `pilot_osm`, `pilot_osm_m4`), the evaluation-sample fetch (4.9, 152 of 152 clips on both sources), and segmentation `v1` (4.10) with the OSM clip at 2 m and the frozen head `frozen/v1_seg_head.pt` (retrained run `ft1b`, holdout bF1 0.538, IoU 0.784 at threshold 0.4).
 
-Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation sample restricted to street–street intersections (4.10a). Screen run (4.10a): final sample 147. Not yet run: fetch and segmentation of the 67 added points, and grow-cut on SAM 3 output (4.11).
+Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation sample restricted to street–street intersections (4.10a). Screen run (4.10a): final sample 147; the 67 added points fetched and segmented; grow-cut run on both sources (4.11). In progress: crossing units and ground truth (4.12).
 :::
 
 | Script | Runs on | Does |
@@ -42,6 +42,8 @@ Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation s
 | `cc_segment.py` | Modal GPU | Chosen configuration → `cross_walks.geojson` + QA overlays; pilot grid mode |
 | `02c_street_screen.py` | server | Drops sample points that are not street–street intersections and refills each stratum from the candidate pool |
 | `03_grow_cut.sh` | server | Reference grow-cut, unchanged → `refined_crosswalks_v3_0_4.csv` (`length_ft`) |
+| `04_crossing_units.py` | server | Crossing units (OSM crossing edges wholly inside each clip) and the ground-truth GeoPackage |
+| `05_join_crossings.py` | server | Assigns grow-cut lines to units, flags misses and false detections, joins the ground truth |
 | `cc_sam3.py`, `cc_geom.py`, `cc_common.py` | shared | SAM 3 core; box geometry and metrics; constants |
 
 : Pipeline scripts {.striped}
@@ -489,9 +491,25 @@ Server, minutes; the reference code runs unchanged in its locked environment:
 
 Output per candidate in `data/results/<folder>/v1/`: `refined_crosswalks_v3_0_4.geojson` and `.csv` with `length_ft`. **Check:** similar line counts for A and B; lengths mostly between 20 and 100 ft.
 
-### 4.12 Hand-off to the comparison
+`03_grow_cut.sh` needs the crossing edges from Appendix A (`crosswalk_edges_v2_0.shp`, `.shx`, `.dbf`, `.prj`) in `~/crosswalk/data/osm/`. In `v1` it matched 429 (A) and 434 (B) crossings in the 219 clips. Its CSV holds only `geometry` (WKT, EPSG:4326) and `length_ft`, so lines are linked to crossings by location in 4.12.
 
-Keep only the points in `sample_screened.csv` (4.10a). Apply the reference study's plausibility filter — drop crossings shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply — when joining A and B to the ground-truth table in R. The QA overlays from 4.10 are a convenient base for the manual measurement pass.
+### 4.12 Crossing units, ground truth and the join
+
+The comparison is per crossing (see the comparison chapter). Define the units, wholly-inside-the-clip OSM crossing edges at the 147 screened intersections, and create the ground-truth layer:
+
+```bash
+uv run python 04_crossing_units.py
+```
+
+It writes `data/groundtruth/units.csv` and `groundtruth.gpkg` (layers `clips`, `units`, and an empty `gt_crossings` line layer in EPSG:3435). Rerunning it keeps an existing `gt_crossings` layer unless `--overwrite-gt` is given. Copy `groundtruth.gpkg` to the machine used for measuring, digitize the hand measurements into `gt_crossings` following the ground-truth protocol in the comparison chapter, and copy it back.
+
+Score each source against the units (any time; it reports progress on the ground truth):
+
+```bash
+uv run python 05_join_crossings.py
+```
+
+It assigns each grow-cut line to the unit edge it runs along (≥ 60% of the line within 15 ft, direction within 20°), merges pieces less than 3 ft apart, and writes `crossing_status.csv` (found/missed and piece counts per source, ground truth measured or not: no lengths), `false_detections.csv`, and `crossing_lengths.csv`. **Do not open `crossing_lengths.csv` until the measurement pass is finished.** In the R comparison, apply the reference study's plausibility filter, dropping model lengths shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply, and count them as failures.
 
 ## 5. Notes and Troubleshooting
 
