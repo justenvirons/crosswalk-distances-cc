@@ -75,7 +75,7 @@ def main():
     ap.add_argument("--pilot", default="../data/sample/pilot.csv")
     ap.add_argument("--out-dir", default="../data/sample")
     ap.add_argument("--max-dist-ft", type=float, default=50.0)
-    ap.add_argument("--radius-ft", type=float, default=60.0)
+    ap.add_argument("--radius-ft", type=float, default=80.0)
     ap.add_argument("--min-dirs", type=int, default=2)
     ap.add_argument("--tol-deg", type=float, default=30.0)
     ap.add_argument("--seed", type=int, default=44)
@@ -110,8 +110,9 @@ def main():
     pool["n_dirs"] = ndirs
     no_roads = int(np.isinf(pool["dist_road_ft"]).sum())
     if no_roads:
-        print(f"WARNING: {no_roads} candidates have no OSM road nearby: is --roads built "
-              "from candidates.csv?")
+        print(f"note: {no_roads} candidates have no drivable OSM road nearby (service "
+              "roads, parking aisles or footways only; ineligible). If this is a large share, "
+              "check that --roads was built from candidates.csv.")
     pool["reason"] = np.select(
         [pool.dist_road_ft > args.max_dist_ft, pool.n_dirs < args.min_dirs],
         [f"> {args.max_dist_ft:g} ft from a drivable centre-line",
