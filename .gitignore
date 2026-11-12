@@ -72,3 +72,7 @@ rsconnect/
 /.quarto/
 
 **/*.quarto_ipynb
+
+# Python bytecode
+__pycache__/
+*.pyc
