@@ -13,6 +13,9 @@ a hole in the mask; the ground truth decides which). Model errors are not edited
 
 Inputs: 04_crossing_units.py output, refined_crosswalks_v3_0_4.csv per source
 (03_grow_cut.sh), and, once measured, the gt_crossings layer of groundtruth.gpkg.
+Ground-truth lines are split by their `imagery` field: --gt-imagery (county) gives
+gt_len_ft, the reference; --check-imagery (google) gives gt_google_len_ft, the
+re-measurement of the random subset in gt_google_subset.csv.
 
 Writes to --out-dir:
   crossing_status.csv     per unit: found/missed and piece counts per source,
@@ -119,6 +122,10 @@ def main():
     ap.add_argument("--min-overlap", type=float, default=0.6)
     ap.add_argument("--max-angle", type=float, default=20.0)
     ap.add_argument("--merge-gap-ft", type=float, default=3.0)
+    ap.add_argument("--gt-imagery", default="county",
+                    help="imagery value of the primary ground-truth lines")
+    ap.add_argument("--check-imagery", default="google",
+                    help="imagery value of the re-measurement lines (subset)")
     ap.add_argument("--out-dir", default="")
     args = ap.parse_args()
 
@@ -180,27 +187,51 @@ def main():
               f"split into 2+ groups {int((table[f'{key}_groups'] > 1).sum())}")
 
     gt_n = 0
+    gt_cols = []
     if "gt_crossings" in pyogrio.list_layers(gpkg)[:, 0].tolist():
         gt = gpd.read_file(gpkg, layer="gt_crossings")
         if len(gt):
             gt = gt.to_crs(3435)
             gt["unit_id"] = gt["unit_id"].astype(str)
+            gt["imagery"] = gt["imagery"].fillna("").astype(str).str.strip().str.lower()
             gt["len"] = gt.length
-            agg = gt.groupby("unit_id").agg(gt_len_ft=("len", "sum"), gt_pieces=("len", "size"),
-                                            gt_island=("island", lambda x: "yes" if (x == "yes").any() else "no"),
-                                            gt_curb_visible=("curb_visible", lambda x: "/".join(sorted(set(map(str, x))))))
-            unknown = sorted(set(agg.index) - set(table.unit_id))
+            bad = sorted(set(gt.imagery) - {args.gt_imagery, args.check_imagery})
+            if bad:
+                print(f"WARNING: gt_crossings lines with imagery {bad} are ignored; "
+                      f"use '{args.gt_imagery}' or '{args.check_imagery}'")
+            unknown = sorted(set(gt.unit_id) - set(table.unit_id))
             if unknown:
                 print(f"WARNING: {len(unknown)} gt_crossings unit_id values match no unit:", unknown[:10])
-            table = table.merge(agg.reset_index(), on="unit_id", how="left")
-            gt_n = int(table.gt_len_ft.notna().sum())
+            for img, pre in ((args.gt_imagery, "gt"), (args.check_imagery, f"gt_{args.check_imagery}")):
+                g = gt[gt.imagery == img]
+                if g.empty:
+                    continue
+                agg = g.groupby("unit_id").agg(
+                    **{f"{pre}_len_ft": ("len", "sum"), f"{pre}_pieces": ("len", "size"),
+                       f"{pre}_island": ("island", lambda x: "yes" if (x == "yes").any() else "no"),
+                       f"{pre}_curb_visible": ("curb_visible", lambda x: "/".join(sorted(set(map(str, x)))))})
+                table = table.merge(agg.reset_index(), on="unit_id", how="left")
+                gt_cols.append(pre)
+            if "gt" in gt_cols:
+                gt_n = int(table.gt_len_ft.notna().sum())
     if "gt_len_ft" not in table:
         table["gt_len_ft"] = np.nan
     table["gt_status"] = np.where(table.gt_len_ft.notna(), "measured", "not yet")
+    chk = f"gt_{args.check_imagery}"
+    sub_path = os.path.join(args.gt_dir, f"gt_{args.check_imagery}_subset.csv")
+    if os.path.exists(sub_path):
+        sub = set(pd.read_csv(sub_path, dtype={"unit_id": str}).unit_id)
+        table[f"in_{args.check_imagery}_subset"] = table.unit_id.isin(sub)
+        done = int(table[f"{chk}_len_ft"].notna().sum()) if f"{chk}_len_ft" in table else 0
+        extra = int((table[f"{chk}_len_ft"].notna() & ~table[f"in_{args.check_imagery}_subset"]).sum()) \
+            if f"{chk}_len_ft" in table else 0
+        print(f"{args.check_imagery} re-measurement: {done} of {len(sub)} subset units"
+              + (f" (+{extra} outside the subset)" if extra else ""))
     print(f"ground truth: {gt_n} of {len(table)} units measured")
 
     keys = [i.split(":")[0] for i in args.sources.split(",")]
     status_cols = ["unit_id", "sample_id", *STRATA, "added", "gt_status"] + \
+        [c for c in table.columns if c.startswith("in_") and c.endswith("_subset")] + \
         [c for k in keys for c in (f"{k}_status", f"{k}_lines", f"{k}_groups")]
     table[status_cols].to_csv(os.path.join(out_dir, "crossing_status.csv"), index=False)
     pd.DataFrame(false_rows, columns=["source", "sample_id", "kind", "n_lines"]).to_csv(

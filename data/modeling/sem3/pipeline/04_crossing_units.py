@@ -8,6 +8,8 @@ An edge inside two overlapping clips is assigned to the clip whose centre is nea
 
 Writes to --out-dir:
   units.csv                 unit_id, sample_id, stratum, added (no lengths)
+  gt_google_subset.csv      random --google-frac of units per stratum (seed
+                            --seed) to measure a second time on Google imagery
   groundtruth.gpkg
     layer clips             the 50 m clip squares, with sample_id (navigation)
     layer units             the unit edges, with unit_id and sample_id (reference)
@@ -37,6 +39,8 @@ def main():
     ap.add_argument("--out-dir", default="../data/groundtruth")
     ap.add_argument("--margin-m", type=float, default=0.5,
                     help="an edge must lie this far inside the clip edge")
+    ap.add_argument("--google-frac", type=float, default=0.2)
+    ap.add_argument("--seed", type=int, default=2027)
     ap.add_argument("--overwrite-gt", action="store_true",
                     help="replace an existing gt_crossings layer (destroys measurements)")
     args = ap.parse_args()
@@ -83,6 +87,10 @@ def main():
     u.insert(0, "unit_id", u["osmid"])
 
     u.drop(columns="geometry").to_csv(os.path.join(args.out_dir, "units.csv"), index=False)
+    sub = u.drop(columns="geometry").groupby(STRATA).sample(frac=args.google_frac,
+                                                            random_state=args.seed)
+    sub[["unit_id", "sample_id", *STRATA]].sort_values(["sample_id", "unit_id"]).to_csv(
+        os.path.join(args.out_dir, "gt_google_subset.csv"), index=False)
     clips.drop(columns=["cx", "cy"]).to_file(gpkg, layer="clips", driver="GPKG")
     u[["unit_id", "sample_id", "geometry"]].to_file(gpkg, layer="units", driver="GPKG")
 
@@ -109,6 +117,7 @@ def main():
     missing = sorted(set(clips.sample_id) - set(u.sample_id))
     if missing:
         print(f"{len(missing)} clips have no whole crossing edge:", ", ".join(missing))
+    print(f"{len(sub)} units in the Google re-measurement subset -> {args.out_dir}/gt_google_subset.csv")
     print(f"-> {args.out_dir}/units.csv, {gpkg}")
 
 
