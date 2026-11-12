@@ -22,9 +22,9 @@ Tested locally on 2026-10-08:
 - Sample selection on the project's 169,456-point intersection layer.
 - Fine-tuning plumbing on a randomly initialised SAM 3 (CPU): gradients reach only the segmentation head, and the saved head reloads. Also the curb weighting, the augmentation and the holdout split, which has no original shared across holdout, validation and training.
 
-Also run: the county pilot check (4.8), runs `pilot` (thresholds 0.3/0.4/0.5) and `pilot_osm` (OSM corridor clip at threshold 0.4).
+Also run: the county pilot check (4.8: `pilot`, `pilot_osm`, `pilot_osm_m4`), the evaluation-sample fetch (4.9, 152 of 152 clips on both sources), and segmentation `v1` (4.10) with the OSM clip at 2 m and the frozen head `frozen/v1_seg_head.pt` (retrained run `ft1b`, holdout bF1 0.538, IoU 0.784 at threshold 0.4).
 
-Still open from 4.8: whether to adopt `--osm-clip`, and at what `--osm-margin-m`. Not yet run: the evaluation-sample fetch and segmentation (4.9–4.10) and grow-cut on SAM 3 output (4.11). Expect small fixes on the first run.
+Decided: the OSM corridor clip at `--osm-margin-m 2` (4.8), and the evaluation sample restricted to street–street intersections (4.10a). Not yet run: the street–street screen and top-up (4.10a), and grow-cut on SAM 3 output (4.11).
 :::
 
 | Script | Runs on | Does |
@@ -40,6 +40,7 @@ Still open from 4.8: whether to adopt `--osm-clip`, and at what `--osm-margin-m`
 | `05_make_holdout.py` | server | Holdout / validation / training split of the curb dataset by original image |
 | `cc_finetune.py` | Modal GPU | Fine-tunes SAM 3's segmentation head on the curb labels → `seg_head_best.pt`, `seg_head_last.pt` |
 | `cc_segment.py` | Modal GPU | Chosen configuration → `cross_walks.geojson` + QA overlays; pilot grid mode |
+| `02c_street_screen.py` | server | Drops sample points that are not street–street intersections and refills each stratum from the candidate pool |
 | `03_grow_cut.sh` | server | Reference grow-cut, unchanged → `refined_crosswalks_v3_0_4.csv` (`length_ft`) |
 | `cc_sam3.py`, `cc_geom.py`, `cc_common.py` | shared | SAM 3 core; box geometry and metrics; constants |
 
@@ -430,18 +431,50 @@ uv run modal run cc_fetch.py --source B --input ../data/sample/sample.csv --out-
 
 ### 4.10 Segmentation
 
-Run the frozen configuration on both candidates (example values shown: the leading holdout configuration from 4.7, final-epoch head; for the zero-shot baseline drop `--delta` and use `--fusion fused --prompts "road,car,crosswalk" --negatives "sidewalk,grass,building,tree" --prob-thd 0.15 --fill-holes-m2 25`):
+**Freeze the head first.** `cc_finetune.py` overwrites `finetuned/<run>/` on every run, and the original `ft1` epoch-12 head was lost that way: a second run named `ft1` stopped after epoch 1 and replaced both files (its metadata reads `epoch: 1`; the `ft1` log and `run.json` were left from the complete run). `ft1b` retrained it with the same settings and seed; its validation curve matches `ft1` to within 0.003 at every epoch and its holdout score (`ho_ft1b_last`: bF1 0.538, IoU 0.784 at threshold 0.4) matches `ho_ft1_last`. Copy the chosen head to a path no training run writes to, and check the run name and epoch in the `loaded fine-tuned segmentation head` line of every later run:
 
 ```bash
-uv run modal run cc_segment.py --source A --mode text --fusion semantic --prompts road \
-    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_last.pt --run-name v1
-uv run modal run cc_segment.py --source B --mode text --fusion semantic --prompts road \
-    --prob-thd 0.4 --fill-holes-m2 25 --delta finetuned/ft1/seg_head_last.pt --run-name v1
+uv run modal volume cp --env cook cc-sam3-weights /finetuned/ft1b/seg_head_last.pt /frozen/v1_seg_head.pt
 ```
 
-If the OSM clip was adopted in 4.8, add `--osm-clip --osm-margin-m <chosen margin>` to both commands. Confirm first that `/inputs/osm_roads.geojson` on the results volume was built from both `sample.csv` and `pilot.csv` (4.5). Clips with no centre-line nearby are left unclipped; check how many with the `osm_clip` column of `segment_stats.csv`.
+Run the frozen configuration on both candidates, with the OSM clip adopted in 4.8 (for the zero-shot baseline drop `--delta` and use `--fusion fused --prompts "road,car,crosswalk" --negatives "sidewalk,grass,building,tree" --prob-thd 0.15 --fill-holes-m2 25`):
+
+```bash
+for SRC in A B; do
+  uv run modal run cc_segment.py --source $SRC --mode text --fusion semantic --prompts road \
+      --prob-thd 0.4 --fill-holes-m2 25 --osm-clip --osm-margin-m 2 \
+      --delta frozen/v1_seg_head.pt --run-name v1
+done
+```
+
+`/inputs/osm_roads.geojson` on the results volume must cover every clip (4.5); clips with no centre-line nearby are left unclipped, so check that the `osm_clip` column of `segment_stats.csv` is true on all of them. In run `v1`: 152 of 152 clipped on both sources, one empty mask on each, mean road fraction 0.336 (A) and 0.344 (B), A–B road-fraction correlation 0.92 (0.75 unclipped).
 
 Add `--limit 10` for a first plumbing run. **Check:** in `segment_stats.csv`, `empty` is false and `box_fallback_to_text` is rare on nearly all clips; the QA overlays (`mkdir -p ../data/results/qa_B && uv run modal volume get --env cook --force cc-results /B_cook_rgb/v1/qa ../data/results/qa_B/`) follow the curbs.
+
+### 4.10a Restrict the sample to street–street intersections
+
+The intersection layer includes points that are not junctions of two streets: parking-lot and driveway nodes next to arterials, alley mouths, and mid-block points, all of which reach the candidate pool when an OSM crossing lies within 25 m. A crossing length there measures a driveway or alley, not an intersection approach, and B's parking-lot spill concentrates on exactly these points. The study is restricted to street–street intersections by two rules, fixed before any grow-cut length was examined and applied identically to both candidates:
+
+1. the point lies within 50 ft of a drivable OSM centre-line (the 4.5 classes: no service roads, alleys or parking aisles); and
+2. drivable OSM roads within 60 ft of the point run in at least two directions more than 30° apart.
+
+In `v1`, rule 1 alone removed 9 of 152 points (58–94 ft from a centre-line; the rest were within 31 ft, most within 1 ft), including all four clips whose road fraction the OSM clip cut by more than 0.3 on B. Visual checks of the three points 25–31 ft away found two alley or driveway junctions and one mid-block point, which led to rule 2. `02c_street_screen.py` applies both rules to every candidate, drops ineligible sample points, and refills each stratum to its original 19 from eligible, unused, non-pilot candidates in the same stratum (seed 44; canopy terciles and tile split recomputed from the pool exactly as in 4.4). It needs drivable centre-lines around all 600 candidates, and the same file then serves the OSM clip for the new clips:
+
+```bash
+uv run python 02b_osm_roads.py --inputs ../data/sample/candidates.csv \
+    --out ../data/sample/osm_roads_pool.geojson
+uv run python 02c_street_screen.py --roads ../data/sample/osm_roads_pool.geojson
+```
+
+It prints the stratum table (target, kept, added, spare eligible) and writes `sample_screened.csv` (the final sample, with an `added` column), `sample_excluded.csv` (with the reason), `sample_added.csv`, and `pool_screen.csv`. Fetch the added points into the same imagery folders, then rerun `v1` on both candidates with the pool roads file, so every clip is clipped against one OSM snapshot:
+
+```bash
+uv run modal run cc_fetch.py --source A --input ../data/sample/sample_added.csv --out-csv ../logs/fetch_A_added.csv
+uv run modal run cc_fetch.py --source B --input ../data/sample/sample_added.csv --out-csv ../logs/fetch_B_added.csv
+uv run modal volume put --env cook --force cc-results ../data/sample/osm_roads_pool.geojson /inputs/osm_roads.geojson
+```
+
+and repeat the 4.10 loop. Excluded points stay in the run (`cc_segment.py` segments every clip in the folder); they are dropped when joining on `sample_screened.csv` in 4.12. **Check:** zero fetch errors; `osm_clip` true on every clip; the stratum table shows 19 in every cell.
 
 ### 4.11 Grow-cut
 
@@ -456,7 +489,7 @@ Output per candidate in `data/results/<folder>/v1/`: `refined_crosswalks_v3_0_4.
 
 ### 4.12 Hand-off to the comparison
 
-Apply the reference study's plausibility filter — drop crossings shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply — when joining A and B to the ground-truth table in R. The QA overlays from 4.10 are a convenient base for the manual measurement pass.
+Keep only the points in `sample_screened.csv` (4.10a). Apply the reference study's plausibility filter — drop crossings shorter than 6 ft or longer than 160 ft [@moran2026scaling], which `grow_cut.py` does not apply — when joining A and B to the ground-truth table in R. The QA overlays from 4.10 are a convenient base for the manual measurement pass.
 
 ## 5. Notes and Troubleshooting
 
